@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.ChannelMapper">
+  <resultMap id="ChannelConfiguration" type="com.lrj.trade.payment.model.ChannelConfiguration" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="merchant_no" javaType="java.lang.String"/>
+      <arg column="channel_code" javaType="java.lang.String"/>
+      <arg column="channel_merchant_no" javaType="java.lang.String"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="credential_ref" javaType="java.lang.String"/>
+      <arg column="return_url_id" javaType="java.lang.String"/>
+      <arg column="return_url" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <!-- 追加不可变渠道绑定，数据库唯一键阻止收款主体跨租户复用。 -->
+  <insert id="insert">
+    INSERT INTO tc_merchant_channel(tenant_id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,created_at,updated_at)
+VALUES(#{tenant},#{merchant},#{code},#{channelMerchant},#{currency},#{credential},#{returnId},#{returnUrl},#{now},#{now})
+  </insert>
+  <!-- 共享锁定可用配置，禁止新尝试绕过渠道启停。 -->
+  <select id="lockActive" resultMap="ChannelConfiguration" useCache="false">
+    SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version FROM tc_merchant_channel WHERE tenant_id=#{tenant} AND merchant_no=#{merchant} AND channel_code=#{code} AND currency=#{currency} AND status='ACTIVE' FOR SHARE
+  </select>
+  <!-- 历史查询不受冻结影响，合法收退款仍依赖原绑定。 -->
+  <select id="findById" resultMap="ChannelConfiguration" useCache="false">
+    SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version FROM tc_merchant_channel WHERE tenant_id=#{tenant} AND id=#{channel}
+  </select>
+  <!-- 管理端有界分页，仅当前租户配置。 -->
+  <select id="list" resultMap="ChannelConfiguration" useCache="false">
+    SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version FROM tc_merchant_channel WHERE tenant_id=#{tenant} AND id &gt; #{after} ORDER BY id LIMIT #{limit}
+  </select>
+</mapper>

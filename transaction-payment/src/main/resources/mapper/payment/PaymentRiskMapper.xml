@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.PaymentRiskMapper">
+  <resultMap id="evaluation" type="com.lrj.trade.payment.model.RiskEvaluation">
+    <constructor>
+      <arg column="evaluation_no" javaType="java.lang.String"/>
+      <arg column="tenant_id" javaType="_long"/>
+      <arg column="attempt_id" javaType="java.lang.String"/>
+      <arg column="request_no" javaType="java.lang.String"/>
+      <arg column="order_id" javaType="java.lang.String"/>
+      <arg column="member_id" javaType="java.lang.String"/>
+      <arg column="channel_code" javaType="java.lang.String"/>
+      <arg column="channel_merchant_no" javaType="java.lang.String"/>
+      <arg column="amount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="input_hash" javaType="java.lang.String"/>
+      <arg column="state" javaType="java.lang.String"/>
+      <arg column="decision_id" javaType="java.lang.String"/>
+      <arg column="rule_version" javaType="java.lang.String"/>
+      <arg column="model_version" javaType="java.lang.String"/>
+      <arg column="valid_until" javaType="java.time.Instant"/>
+      <arg column="requested_at" javaType="java.time.Instant"/>
+      <arg column="deadline" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <select id="latest" resultMap="evaluation" useCache="false">
+    SELECT r.evaluation_no,r.tenant_id,r.attempt_id,r.request_no,r.order_id,r.member_id,r.channel_code,r.channel_merchant_no,r.amount,r.currency,r.input_hash,r.state,r.decision_id,r.rule_version,r.model_version,r.valid_until,r.requested_at,r.deadline
+    FROM tc_payment_attempt a JOIN tc_payment_risk r
+      ON r.tenant_id=a.tenant_id AND r.attempt_id=a.id AND r.evaluation_no=a.risk_evaluation_no
+    WHERE a.tenant_id=#{tenant} AND a.merchant_request_no=#{request} FOR UPDATE
+  </select>
+  <update id="point">
+    UPDATE tc_payment_attempt SET risk_evaluation_no=#{evaluation},version=version+1
+    WHERE tenant_id=#{tenant} AND merchant_request_no=#{request}
+  </update>
+  <insert id="insert">
+    INSERT INTO tc_payment_risk(evaluation_no,tenant_id,attempt_id,request_no,order_id,member_id,channel_code,channel_merchant_no,amount,currency,input_hash,requested_at,deadline)
+    VALUES(#{evaluation},#{tenant},#{attempt},#{request},#{order},#{member},#{channel},#{merchant},#{amount},#{currency},#{hash},#{now},#{deadline})
+  </insert>
+  <update id="decide">
+    UPDATE tc_payment_risk SET state=#{state},decision_id=#{decision},rule_version=#{rule},model_version=#{model},valid_until=#{until}
+    WHERE tenant_id=#{tenant} AND evaluation_no=#{evaluation} AND state='PENDING'
+  </update>
+</mapper>

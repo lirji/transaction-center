@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.order.mapper.OrderMapper">
+  <resultMap id="header" type="com.lrj.trade.order.model.OrderHeader" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="order_no" javaType="java.lang.String"/>
+      <arg column="member_id" javaType="java.lang.String"/>
+      <arg column="quote_id" javaType="java.lang.String"/>
+      <arg column="merchant_no" javaType="java.lang.String"/>
+      <arg column="warehouse_id" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="financial_status" javaType="java.lang.String"/>
+      <arg column="payable_amount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="expires_at" javaType="java.time.Instant"/>
+      <arg column="payment_started_at" javaType="java.time.Instant"/>
+      <arg column="paid_at" javaType="java.time.Instant"/>
+      <arg column="completed_at" javaType="java.time.Instant"/>
+      <arg column="created_at" javaType="java.time.Instant"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="item" type="com.lrj.trade.order.model.OrderItemRow" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="sku_id" javaType="java.lang.String"/>
+      <arg column="sku_revision" javaType="_long"/>
+      <arg column="title" javaType="java.lang.String"/>
+      <arg column="specification" javaType="java.lang.String"/>
+      <arg column="stock_type" javaType="java.lang.String"/>
+      <arg column="quantity" javaType="_long"/>
+      <arg column="unit_price" javaType="_long"/>
+      <arg column="payable_amount" javaType="_long"/>
+      <arg column="reservation_key" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <sql id="headerColumns">id,order_no,member_id,quote_id,merchant_no,warehouse_id,status,financial_status,payable_amount,currency,expires_at,payment_started_at,paid_at,completed_at,created_at,version</sql>
+  <select id="lockPaymentOrder" resultMap="header" useCache="false">
+    SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND id=#{order} FOR UPDATE
+  </select>
+  <select id="lockByNumber" resultMap="header" useCache="false">
+    SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND order_no=#{number} FOR UPDATE
+  </select>
+  <select id="resolutionCandidates" resultMap="header" useCache="false">
+    SELECT <include refid="headerColumns"/> FROM tc_order
+    WHERE tenant_id=#{tenant} AND id &gt; #{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <update id="markPaid">
+    UPDATE tc_order SET status='PAID',financial_status='PAID',paid_at=#{now},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status IN ('PENDING_PAYMENT','CLOSING') AND financial_status='UNPAID'
+  </update>
+  <update id="finishClose">
+    UPDATE tc_order SET status='CANCELLED',cancelled_at=#{now},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='CLOSING' AND financial_status='UNPAID'
+  </update>
+  <insert id="insertOrder">
+    INSERT INTO tc_order(tenant_id,order_no,member_id,quote_id,merchant_id,merchant_no,warehouse_id,status,financial_status,
+      gross_amount,payable_amount,currency,created_at,updated_at,expires_at)
+    VALUES (#{tenant},#{number},#{member},#{quote},#{merchantId},#{merchantNo},#{warehouse},#{status},#{financial},
+      #{amount},#{amount},#{currency},#{created},#{created},#{expires})
+  </insert>
+  <select id="findOwn" resultMap="header" useCache="false">
+    SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND order_no=#{number}
+  </select>
+  <select id="lockOwn" resultMap="header" useCache="false">
+    SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND order_no=#{number} FOR UPDATE
+  </select>
+  <select id="listOwn" resultMap="header" useCache="false">
+    SELECT <include refid="headerColumns"/> FROM tc_order
+    WHERE tenant_id=#{tenant} AND member_id=#{member} AND id &gt; #{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <insert id="insertItem">
+    INSERT INTO tc_order_item(tenant_id,order_id,sku_id,sku_revision,title,specification,stock_type,quantity,
+      unit_price,gross_amount,payable_amount,reservation_key,created_at,updated_at)
+    VALUES (#{tenant},#{order},#{sku},#{revision},#{title},#{specification},#{type},#{quantity},
+      #{price},#{amount},#{amount},#{reservation},#{created},#{created})
+  </insert>
+  <select id="items" resultMap="item" useCache="false">
+    SELECT id,sku_id,sku_revision,title,specification,stock_type,quantity,unit_price,payable_amount,reservation_key FROM tc_order_item
+    WHERE tenant_id=#{tenant} AND order_id=#{order} ORDER BY sku_id
+  </select>
+  <insert id="insertAddress">
+    INSERT INTO tc_order_address(tenant_id,order_id,recipient_cipher,phone_cipher,address_cipher,key_version,created_at,updated_at)
+    VALUES (#{tenant},#{order},#{recipient},#{phone},#{address},#{keyVersion},#{created},#{created})
+  </insert>
+  <update id="markPaymentStarted">
+    UPDATE tc_order SET payment_started_at=#{now},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='PENDING_PAYMENT' AND payment_started_at IS NULL
+  </update>
+  <update id="cancel">
+    UPDATE tc_order SET status=#{status},cancel_reason=#{reason},cancelled_at=#{cancelled},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='PENDING_PAYMENT'
+  </update>
+</mapper>

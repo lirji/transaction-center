@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.order.mapper.FulfillmentMapper">
+  <resultMap id="FulfillmentRecord" type="com.lrj.trade.order.model.FulfillmentRecord" autoMapping="false"><constructor>
+    <arg column="fulfillment_no" javaType="java.lang.String"/>
+    <arg column="order_id" javaType="_long"/>
+    <arg column="delivery_hash" javaType="java.lang.String"/>
+    <arg column="delivered_at" javaType="java.time.Instant"/>
+    <arg column="completion_hash" javaType="java.lang.String"/>
+    <arg column="completed_at" javaType="java.time.Instant"/>
+    <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <!-- 缺失永久键只以INSERT串行化，不先对索引间隙加锁。 -->
+  <insert id="insertDelivery">
+    INSERT INTO tc_order_fulfillment(tenant_id,order_id,fulfillment_no,source_actor_key,source_request_id,delivery_ref,delivered_at,delivery_hash,created_at)
+    VALUES(#{tenant},#{order},#{number},#{actor},#{event},#{evidence},#{at},#{hash},#{now}) ON DUPLICATE KEY UPDATE id=tc_order_fulfillment.id
+  </insert>
+  <!-- 订单锁保证当前聚合归属，源事件跨订单冲突不得返回另一订单事实。 -->
+  <select id="lockByOrder" resultMap="FulfillmentRecord" useCache="false">
+    SELECT fulfillment_no,order_id,delivery_hash,delivered_at,completion_hash,completed_at,version FROM tc_order_fulfillment WHERE tenant_id=#{tenant} AND order_id=#{order} FOR UPDATE
+  </select>
+  <!-- 交付与支付/退款财务维度分离。 -->
+  <update id="markDelivered">UPDATE tc_order SET status='FULFILLING',version=version+1,updated_at=#{now} WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='PAID'</update>
+  <!-- 首次商业完成写入永久事件和证据，唯一来源键兜底跨订单复用。 -->
+  <update id="complete">UPDATE tc_order_fulfillment SET completion_actor_key=#{actor},completion_request_id=#{event},completion_ref=#{evidence},completed_at=#{at},completion_hash=#{hash},version=version+1 WHERE tenant_id=#{tenant} AND order_id=#{order} AND version=#{version} AND completed_at IS NULL</update>
+  <!-- 只有真实交付后可以确认商业完成，历史支付事实不重算。 -->
+  <update id="markCompleted">UPDATE tc_order SET status='COMPLETED',completed_at=#{at},version=version+1,updated_at=#{now} WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='FULFILLING' AND completed_at IS NULL</update>
+</mapper>

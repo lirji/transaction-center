@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.PaymentFinancialSnapshotMapper">
+  <resultMap id="Snapshot" type="com.lrj.trade.core.FinancialSnapshotPort$Row"><constructor>
+    <arg column="metric" javaType="java.lang.String"/><arg column="count_lower_bound" javaType="_long"/>
+    <arg column="oldest_at" javaType="java.time.Instant"/><arg column="observed_at" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <!-- 固定全局状态窄例外，无租户/订单/金额明细，覆盖索引及LIMIT共同限定扫描成本。 -->
+  <select id="snapshot" resultMap="Snapshot" useCache="false" timeout="3">
+    SELECT 0 AS position,'payment_unknown' AS metric,COUNT(*) AS count_lower_bound,MIN(submitted_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT submitted_at FROM tc_payment_attempt FORCE INDEX(ix_attempt_observation)
+      WHERE status='UNKNOWN' ORDER BY submitted_at,id LIMIT 10001) AS bounded_payment_unknown
+    UNION ALL
+    SELECT 1 AS position,'refund_held' AS metric,COUNT(*) AS count_lower_bound,MIN(created_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT created_at FROM tc_payment_refund_hold FORCE INDEX(ix_hold_observation)
+      WHERE state='HELD' ORDER BY created_at,id LIMIT 10001) AS bounded_refund_held
+    UNION ALL
+    SELECT 2 AS position,'refund_submitted' AS metric,COUNT(*) AS count_lower_bound,MIN(created_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT created_at FROM tc_payment_refund_hold FORCE INDEX(ix_hold_observation)
+      WHERE state='SUBMITTED' ORDER BY created_at,id LIMIT 10001) AS bounded_refund_submitted
+    UNION ALL
+    SELECT 3 AS position,'callback_pending' AS metric,COUNT(*) AS count_lower_bound,MIN(received_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT received_at FROM tc_payment_callback FORCE INDEX(ix_payment_callback_observation)
+      WHERE status='PENDING' ORDER BY received_at,id LIMIT 10001) AS bounded_callback_pending
+    UNION ALL
+    SELECT 4 AS position,'callback_review' AS metric,COUNT(*) AS count_lower_bound,MIN(received_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT received_at FROM tc_payment_callback FORCE INDEX(ix_payment_callback_observation)
+      WHERE status='REVIEW' ORDER BY received_at,id LIMIT 10001) AS bounded_callback_review
+    ORDER BY position
+  </select>
+</mapper>

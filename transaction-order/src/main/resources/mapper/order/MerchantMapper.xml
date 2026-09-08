@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.order.mapper.MerchantMapper">
+  <resultMap id="merchant" type="com.lrj.trade.order.model.Merchant" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="merchant_no" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <insert id="insert">
+    INSERT INTO tc_merchant(tenant_id,merchant_no,name) VALUES (#{tenant},#{number},#{name})
+  </insert>
+  <select id="find" resultMap="merchant" useCache="false">
+    SELECT id,merchant_no,name,status,version FROM tc_merchant WHERE tenant_id=#{tenant}
+  </select>
+  <select id="lockActive" resultMap="merchant" useCache="false">
+    SELECT id,merchant_no,name,status,version FROM tc_merchant WHERE tenant_id=#{tenant} AND status='ACTIVE' FOR SHARE
+  </select>
+  <update id="changeStatus">
+    UPDATE tc_merchant SET status=#{status},version=version+1
+    WHERE tenant_id=#{tenant} AND version=#{version} AND status != #{status}
+  </update>
+</mapper>

@@ -19,5 +19,8 @@
     <module>transaction-member</module>
     <module>transaction-catalog</module>
     <module>transaction-inventory</module>
+    <module>transaction-order</module>
+    <module>transaction-payment</module>
+    <module>transaction-refund</module>
   </modules>
 </project>
