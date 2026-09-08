@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.core.mapper.OutboxOperationsMapper">
+  <resultMap id="Receipt" type="com.lrj.trade.core.OutboxReplayReceipt"><constructor>
+    <idArg column="id" javaType="_long"/><arg column="event_id" javaType="java.lang.String"/>
+    <arg column="request_hash" javaType="java.lang.String"/><arg column="result_version" javaType="java.lang.Long"/><arg column="result_replay_count" javaType="java.lang.Long"/>
+  </constructor></resultMap>
+  <resultMap id="Publication" type="com.lrj.trade.core.OutboxPublication"><constructor>
+    <arg column="id" javaType="java.lang.String"/>
+    <arg column="event_id" javaType="java.lang.String"/>
+    <arg column="event_type" javaType="java.lang.String"/>
+    <arg column="aggregate_id" javaType="java.lang.String"/>
+    <arg column="status" javaType="java.lang.String"/>
+    <arg column="version" javaType="_long"/>
+    <arg column="publish_attempt_base" javaType="_long"/>
+    <arg column="replay_count" javaType="_long"/>
+    <arg column="failure_count" javaType="_long"/>
+    <arg column="last_publish_error" javaType="java.lang.String"/>
+    <arg column="first_failure_at" javaType="java.time.Instant"/>
+    <arg column="last_failure_at" javaType="java.time.Instant"/>
+    <arg column="published_at" javaType="java.time.Instant"/>
+    <arg column="published_topic" javaType="java.lang.String"/>
+    <arg column="published_partition" javaType="java.lang.Integer"/>
+    <arg column="published_offset" javaType="java.lang.Long"/>
+  </constructor></resultMap>
+  <insert id="insertReceipt">
+    INSERT INTO tc_outbox_replay_receipt(tenant_id,actor_key,request_key,event_id,request_hash,reason,ticket_ref)
+    VALUES(#{tenant},#{actor},#{key},#{eventId},#{hash},#{reason},#{ticket})
+    ON DUPLICATE KEY UPDATE id=tc_outbox_replay_receipt.id
+  </insert>
+  <select id="lockReceipt" resultMap="Receipt" useCache="false">
+    SELECT id,event_id,request_hash,result_version,result_replay_count FROM tc_outbox_replay_receipt
+    WHERE tenant_id=#{tenant} AND actor_key=#{actor} AND request_key=#{key} FOR UPDATE
+  </select>
+  <update id="finishReceipt">
+    UPDATE tc_outbox_replay_receipt SET result_version=#{version},result_replay_count=#{replayCount},completed_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{id} AND result_version IS NULL
+  </update>
+  <update id="replay">
+    UPDATE tc_outbox SET status='PENDING',publish_attempt_base=#{base},replay_count=replay_count+1,last_replayed_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND event_id=#{eventId} AND status='REVIEW' AND version=#{version}
+  </update>
+  <select id="page" resultMap="Publication" useCache="false">
+    SELECT id,event_id,event_type,aggregate_id,status,version,publish_attempt_base,replay_count,failure_count,last_publish_error,
+      first_failure_at,last_failure_at,published_at,published_topic,published_partition,published_offset
+    FROM tc_outbox WHERE tenant_id=#{tenant} AND status=#{state} AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+</mapper>

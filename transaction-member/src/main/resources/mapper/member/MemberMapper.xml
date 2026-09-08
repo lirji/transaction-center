@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.member.mapper.MemberMapper">
+  <!-- 显式字段映射和绑定参数；保留租户条件、行锁及原子更新，禁止字符串拼接。 -->
+  <resultMap id="Member" type="com.lrj.trade.member.model.Member" autoMapping="false">
+    <constructor>
+      <arg column="memberId" javaType="java.lang.String"/>
+      <arg column="displayName" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="registeredAt" javaType="java.lang.String" typeHandler="com.lrj.trade.core.mapper.typehandler.UtcInstantStringTypeHandler"/>
+      <arg column="everPaid" javaType="_boolean"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="LockedMember" type="com.lrj.trade.member.model.LockedMember" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="ConsentState" type="com.lrj.trade.member.model.ConsentState" autoMapping="false">
+    <constructor>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="documentVersion" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="Consent" type="com.lrj.trade.member.model.Consent" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="purpose" javaType="java.lang.String"/>
+      <arg column="documentVersion" javaType="java.lang.String"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="memberVersion" javaType="_long"/>
+      <arg column="occurredAt" javaType="java.lang.String" typeHandler="com.lrj.trade.core.mapper.typehandler.UtcInstantStringTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 新增租户内会员，由唯一约束阻止重复身份。 -->
+  <insert id="insertMember">
+    <![CDATA[
+      INSERT INTO tc_member(tenant_id,identity_hash,issuer,subject,display_name,registered_at) VALUES (#{tenant},#{identityHash},#{issuer},#{subject},#{displayName},#{registeredAt})
+    ]]>
+  </insert>
+
+  <!-- 读取刚创建的会员编号，不跨租户解析身份。 -->
+  <select id="findIdByIdentity" resultType="java.lang.Long" useCache="false">
+    <![CDATA[
+      SELECT id FROM tc_member WHERE tenant_id=#{tenant} AND identity_hash=#{identityHash}
+    ]]>
+  </select>
+
+  <!-- 建立消费事实锁定行，注册事务失败时一起回滚。 -->
+  <insert id="insertTradeFact">
+    <![CDATA[
+      INSERT INTO tc_member_trade_fact(tenant_id,member_id) VALUES (#{tenant},#{memberId})
+    ]]>
+  </insert>
+
+  <!-- 精确匹配可信身份，返回本人展示资料及消费事实。 -->
+  <select id="findOwn" resultMap="Member" useCache="false">
+    <![CDATA[
+      SELECT m.id AS memberId,m.display_name AS displayName,m.status AS status,m.registered_at AS registeredAt,f.ever_paid AS everPaid,m.version AS version
+      FROM tc_member m JOIN tc_member_trade_fact f ON f.tenant_id=m.tenant_id AND f.member_id=m.id
+      WHERE m.tenant_id=#{tenant} AND m.identity_hash=#{identityHash} AND m.issuer=#{issuer} AND m.subject=#{subject}
+    ]]>
+  </select>
+
+  <!-- 在调用方已持有会员行锁后更新资料及版本。 -->
+  <update id="updateDisplayName">
+    <![CDATA[
+      UPDATE tc_member SET display_name=#{displayName},version=version+1 WHERE tenant_id=#{tenant} AND id=#{memberId}
+    ]]>
+  </update>
+
+  <!-- 按租户锁定会员，串行化后台状态和会员命令。 -->
+  <select id="lockById" resultMap="LockedMember" useCache="false">
+    <![CDATA[
+      SELECT id AS id,status AS status,version AS version
+      FROM tc_member WHERE tenant_id=#{tenant} AND id=#{memberId} FOR UPDATE
+    ]]>
+  </select>
+
+  <!-- 在会员行锁内更新状态，不修改既有消费事实。 -->
+  <update id="updateStatus">
+    <![CDATA[
+      UPDATE tc_member SET status=#{status},version=version+1 WHERE tenant_id=#{tenant} AND id=#{memberId}
+    ]]>
+  </update>
+
+  <!-- 按主键有界分页，不向管理端暴露登录身份。 -->
+  <select id="listMembers" resultMap="Member" useCache="false">
+    <![CDATA[
+      SELECT m.id AS memberId,m.display_name AS displayName,m.status AS status,m.registered_at AS registeredAt,f.ever_paid AS everPaid,m.version AS version
+      FROM tc_member m JOIN tc_member_trade_fact f ON f.tenant_id=m.tenant_id AND f.member_id=m.id
+      WHERE m.tenant_id=#{tenant} AND m.id>#{after} ORDER BY m.id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 查找不可变条款版本，未发布版本返回空列表。 -->
+  <select id="findConsentDocumentIds" resultType="java.lang.Long" useCache="false">
+    <![CDATA[
+      SELECT id FROM tc_consent_document WHERE tenant_id=#{tenant} AND purpose=#{purpose} AND document_version=#{documentVersion}
+    ]]>
+  </select>
+
+  <!-- 当前读最近授权，避免事务快照导致撤回旧授权。 -->
+  <select id="lockLatestConsent" resultMap="ConsentState" useCache="false">
+    <![CDATA[
+      SELECT action AS action,document_version AS documentVersion
+      FROM tc_member_consent WHERE tenant_id=#{tenant} AND member_id=#{memberId} AND purpose=#{purpose}
+      ORDER BY member_version DESC LIMIT 1 FOR UPDATE
+    ]]>
+  </select>
+
+  <!-- 追加授权历史，不能覆盖先前事件。 -->
+  <insert id="insertConsent">
+    <![CDATA[
+      INSERT INTO tc_member_consent(tenant_id,member_id,document_id,purpose,document_version,action,member_version,source_request_id)
+      VALUES (#{tenant},#{memberId},#{documentId},#{purpose},#{documentVersion},#{action},#{memberVersion},#{requestKey})
+    ]]>
+  </insert>
+
+  <!-- 授权变更与资料共用会员版本，调用方必须已持有行锁。 -->
+  <update id="advanceMemberVersion">
+    <![CDATA[
+      UPDATE tc_member SET version=version+1 WHERE tenant_id=#{tenant} AND id=#{memberId}
+    ]]>
+  </update>
+
+  <!-- 在同一事务中读取本次授权事件编号。 -->
+  <select id="findConsentId" resultType="java.lang.String" useCache="false">
+    <![CDATA[
+      SELECT CAST(id AS CHAR) FROM tc_member_consent WHERE tenant_id=#{tenant} AND member_id=#{memberId} AND source_request_id=#{requestKey}
+    ]]>
+  </select>
+
+  <!-- 按事件编号分页读取本人授权历史。 -->
+  <select id="listConsents" resultMap="Consent" useCache="false">
+    <![CDATA[
+      SELECT id AS id,purpose AS purpose,document_version AS documentVersion,action AS action,member_version AS memberVersion,created_at AS occurredAt
+      FROM tc_member_consent
+      WHERE tenant_id=#{tenant} AND member_id=#{memberId} AND id>#{after} ORDER BY id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 锁定可信身份所属会员，避免冻结与新交易并发穿透。 -->
+  <select id="lockOwn" resultMap="LockedMember" useCache="false">
+    <![CDATA[
+      SELECT id AS id,status AS status,version AS version
+      FROM tc_member
+      WHERE tenant_id=#{tenant} AND identity_hash=#{identityHash} AND issuer=#{issuer} AND subject=#{subject} FOR UPDATE
+    ]]>
+  </select>
+</mapper>

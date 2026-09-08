@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.member.mapper.MemberPaidEvidenceMapper">
+ <resultMap id="Evidence" type="com.lrj.trade.member.model.MemberPaidEvidenceRow" autoMapping="false"><constructor><arg column="orderId" javaType="java.lang.String"/><arg column="memberId" javaType="java.lang.String"/><arg column="paidAmount" javaType="_long"/><arg column="currency" javaType="java.lang.String"/><arg column="first" javaType="_boolean"/><arg column="policy" javaType="java.lang.String"/></constructor></resultMap>
+ <select id="read" resultMap="Evidence" useCache="false">
+ SELECT order_id AS orderId,member_id AS memberId,paid_amount AS paidAmount,currency,is_first AS first,first_order_policy AS policy FROM tc_member_paid_order WHERE tenant_id=#{tenant} AND order_id IN
+ <foreach collection="orders" item="orderId" open="(" separator="," close=")">#{orderId}</foreach>
+ </select>
+</mapper>

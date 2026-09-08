@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.member.mapper.MemberTradeFactMapper">
+  <resultMap id="fact" type="com.lrj.trade.member.model.TradeFact" autoMapping="false">
+    <constructor>
+      <arg column="member_id" javaType="java.lang.String"/>
+      <arg column="ever_paid" javaType="_boolean"/>
+      <arg column="first_paid_order_id" javaType="java.lang.String"/>
+      <arg column="first_confirmed_at" javaType="java.time.Instant"/>
+      <arg column="paid_order_count" javaType="_long"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="paidOrder" type="com.lrj.trade.member.model.PaidOrderFact" autoMapping="false">
+    <constructor>
+      <arg column="member_id" javaType="java.lang.String"/>
+      <arg column="order_id" javaType="java.lang.String"/>
+      <arg column="paid_amount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="confirmed_at" javaType="java.time.Instant"/>
+      <arg column="is_first" javaType="_boolean"/>
+      <arg column="first_order_policy" javaType="java.lang.String"/>
+      <arg column="fact_version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <sql id="factColumns">member_id,ever_paid,first_paid_order_id,first_confirmed_at,paid_order_count,version</sql>
+  <select id="lockFact" resultMap="fact" useCache="false">
+    SELECT <include refid="factColumns"/> FROM tc_member_trade_fact
+    WHERE tenant_id=#{tenant} AND member_id=#{member} FOR UPDATE
+  </select>
+  <select id="readFact" resultMap="fact" useCache="false">
+    SELECT <include refid="factColumns"/> FROM tc_member_trade_fact
+    WHERE tenant_id=#{tenant} AND member_id=#{member}
+  </select>
+  <select id="lockPaidOrder" resultMap="paidOrder" useCache="false">
+    SELECT member_id,order_id,paid_amount,currency,confirmed_at,is_first,first_order_policy,fact_version
+    FROM tc_member_paid_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND order_id=#{order} FOR UPDATE
+  </select>
+  <insert id="insertPaidOrder">
+    INSERT INTO tc_member_paid_order(tenant_id,member_id,order_id,paid_amount,currency,confirmed_at,is_first,first_order_policy,fact_version,created_at,updated_at)
+    VALUES(#{tenant},#{member},#{order},#{amount},#{currency},#{confirmed},#{first},#{policy},#{factVersion},#{confirmed},#{confirmed})
+  </insert>
+  <update id="advanceFact">
+    UPDATE tc_member_trade_fact
+    SET first_paid_order_id=CASE WHEN ever_paid=0 THEN #{order} ELSE first_paid_order_id END,
+        first_confirmed_at=CASE WHEN ever_paid=0 THEN #{confirmed} ELSE first_confirmed_at END,
+        ever_paid=1,paid_order_count=paid_order_count+1,version=version+1,updated_at=#{confirmed}
+    WHERE tenant_id=#{tenant} AND member_id=#{member} AND version=#{version}
+  </update>
+</mapper>
