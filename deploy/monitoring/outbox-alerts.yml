@@ -1,0 +1,35 @@
+groups:
+  - name: transaction-center-outbox
+    rules:
+      - alert: TradeOutboxReviewRequired
+        expr: max(trade_outbox_queue_count_lower_bound{job="transaction-center-worker",status="REVIEW"} and on(job,instance) (time() - trade_outbox_queue_observed_at_seconds{job="transaction-center-worker"} <= 60)) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 发布任务进入人工隔离队列
+          description: 使用租户授权的后台队列检查原因，受控重放需保留原事件及永久凭证。
+      - alert: TradeOutboxPublicationDelayed
+        expr: max(trade_outbox_queue_oldest_age_seconds{job="transaction-center-worker",status=~"READY|RUNNING"} and on(job,instance) (time() - trade_outbox_queue_observed_at_seconds{job="transaction-center-worker"} <= 60)) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 发布任务累计等待时间超过阈值
+          description: 年龄从任务首次创建计算，包含重放前历史；先核对发布开关和持久队列。
+      - alert: TradeOutboxObservationStale
+        expr: time() - trade_outbox_queue_observed_at_seconds{job="transaction-center-worker"} > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 发布队列没有新鲜观测
+          description: 采样失败保留旧值，不能将旧样本或首次采样失败解释为零积压。
+      - alert: TradeOutboxObservationMissing
+        expr: absent(trade_outbox_queue_observed_at_seconds{job="transaction-center-worker"})
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 发布队列观测指标缺失
+          description: 检查 Worker 存活、Prometheus 抓取及 trade.metrics.read 授权。
