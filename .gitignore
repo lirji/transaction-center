@@ -1,0 +1,84 @@
+# Maven / Java 构建产物
+**/target/
+*.class
+pom.xml.versionsBackup
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# IDE 本地配置
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# 本地 Agent 任务状态、检查点与验证产物
+/.codex/
+/CODEX_PROGRESS.md
+
+# 本地环境变量（保留可提交的配置模板）
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# 日志与 JVM 诊断文件
+*.log
+*.log.*
+logs/
+*.hprof
+hs_err_pid*
+replay_pid*
+*.jfr
+
+# 本地临时文件
+/tmp/
+/temp/
+*.tmp
+*.pid
+*.pid.lock
+
+# 操作系统与编辑器临时文件
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# 机器合同验证的本地Python缓存
+/scripts/contracts/__pycache__/
+
+# 操作系统与编辑器临时文件
+.vscode/
+
+# Java / Maven 本地构建与诊断产物
+.jqwik-database
+.flattened-pom.xml
+.mvn/timing.properties
+
+# 本机 Agent 配置与会话状态（共享配置保留）
+.claude/settings.local.json
+
+# Python 工具缓存与虚拟环境
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# 本地环境配置不入库，配置示例与模板保留
+!.env.*.example
+!.env.*.sample
+!.env.*.template
