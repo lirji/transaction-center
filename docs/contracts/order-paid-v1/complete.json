@@ -1,0 +1,23 @@
+{
+  "eventId": "915f3ef8-d5b8-47c2-a68b-a07a13bb82f2",
+  "eventType": "trade.order-paid.v1",
+  "schemaVersion": 1,
+  "tenantId": "1001",
+  "aggregateType": "ORDER",
+  "aggregateId": "9001",
+  "aggregateVersion": 3,
+  "occurredAt": "2026-09-07T08:00:00.123Z",
+  "producer": "transaction-center",
+  "traceId": "7a0d28c6-19db-4435-8df0-71c84a1f4d9b",
+  "data": {
+    "orderId": "9001",
+    "memberId": "8001",
+    "receiptNo": "RC-841da7d3-5bff-4e5d-b0d1-059f9f3c2dcf",
+    "paidAmount": 9007199254740991,
+    "currency": "CNY",
+    "paidAt": "2026-09-07T08:00:00.123Z",
+    "firstOrderPolicy": "FIRST_CONFIRMED_PAID_ORDER_V1",
+    "isFirstConfirmedPaidOrder": false,
+    "evidenceVersion": 3
+  }
+}

@@ -1,0 +1,5 @@
+# 正常收款V1黄金合同
+
+字段全部必填。minimal是首单，complete是非首单及最大安全金额；invalid-version结构正确但订单版本与data证据版本不一致，类型化合同必须拒绝。schema.json描述结构，测试验证实际codec与跨字段语义，不宣称运行JSON Schema引擎。
+
+原生orderId/memberId不是canonicalSubject。paidAt/occurredAt为本地主库确认时间，aggregateVersion=evidenceVersion不是会员factVersion。receiptNo为本地实收编号，不暴露渠道交易号。后续退款不改历史载荷；发布器与外部签收待继续。

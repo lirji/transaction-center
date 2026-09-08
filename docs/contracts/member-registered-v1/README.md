@@ -1,0 +1,5 @@
+# 注册V1机器合同
+
+所有字段必填；目前没有可选扩展字段，minimal/complete分别使用普通编号和合法Long最大编号。invalid-aggregate结构正确但跨字段语义错误，必须由类型化合同校验拒绝。schema描述静态结构；跨字段相等、Long上限、毫秒精度和来源仍由实现严格校验，不能只依赖JSON Schema。
+
+occurredAt=data.registeredAt；aggregateId=data.memberId；初始aggregateVersion=0不是C02 customerRevision或会员消费factVersion。事件不含issuer、subject、展示名。固定eventId用于消费去重；traceId当前只保证本地稳定关联。尚未连接发布器或提供方/消费者正式签收。

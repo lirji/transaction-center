@@ -1,0 +1,17 @@
+{
+  "eventId": "a5bd2bf1-a6fa-47dc-a200-fc57588dc347",
+  "eventType": "trade.member-registered.v1",
+  "schemaVersion": 1,
+  "tenantId": "1002",
+  "aggregateType": "MEMBER",
+  "aggregateId": "9223372036854775807",
+  "aggregateVersion": 0,
+  "occurredAt": "2026-09-07T08:00:00.123Z",
+  "producer": "transaction-center",
+  "traceId": "cb118984-8400-454c-b338-11b71c27e965",
+  "data": {
+    "memberId": "99",
+    "registeredAt": "2026-09-07T08:00:00.123Z",
+    "registrationSource": "AUTHENTICATED_IDENTITY"
+  }
+}
