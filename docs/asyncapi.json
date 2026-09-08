@@ -1,0 +1,1668 @@
+{
+  "asyncapi": "3.0.0",
+  "id": "urn:lrj:transaction-center:outbox",
+  "info": {
+    "title": "交易中心V1事件发布合同",
+    "version": "1.0.0",
+    "description": "事务Outbox至少一次发布。消费者须在业务事务内用eventId去重；本文件不代表外部消费者已验收。"
+  },
+  "defaultContentType": "application/json",
+  "servers": {
+    "development": {
+      "host": "localhost:49092",
+      "protocol": "kafka",
+      "description": "dev_infra本机映射，仅开发环境；生产认证与复制策略另行配置。"
+    }
+  },
+  "channels": {
+    "member_registered_v1": {
+      "address": "{environmentPrefix}trade.member-registered.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/member_registered_v1"
+        }
+      }
+    },
+    "order_paid_v1": {
+      "address": "{environmentPrefix}trade.order-paid.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/order_paid_v1"
+        }
+      }
+    },
+    "order_completed_v1": {
+      "address": "{environmentPrefix}trade.order-completed.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/order_completed_v1"
+        }
+      }
+    },
+    "order_cancelled_v1": {
+      "address": "{environmentPrefix}trade.order-cancelled.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/order_cancelled_v1"
+        }
+      }
+    },
+    "order_evidence_changed_v1": {
+      "address": "{environmentPrefix}trade.order-evidence-changed.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/order_evidence_changed_v1"
+        }
+      }
+    },
+    "refund_succeeded_v1": {
+      "address": "{environmentPrefix}trade.refund-succeeded.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/refund_succeeded_v1"
+        }
+      }
+    },
+    "inventory_changed_v1": {
+      "address": "{environmentPrefix}trade.inventory-changed.v1",
+      "parameters": {
+        "environmentPrefix": {
+          "description": "部署配置的环境主题前缀，和TRADE_OUTBOX_TOPIC_PREFIX完全一致。"
+        }
+      },
+      "servers": [
+        {
+          "$ref": "#/servers/development"
+        }
+      ],
+      "messages": {
+        "event": {
+          "$ref": "#/components/messages/inventory_changed_v1"
+        }
+      }
+    }
+  },
+  "operations": {
+    "send_member_registered_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/member_registered_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/member_registered_v1/messages/event"
+        }
+      ]
+    },
+    "send_order_paid_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/order_paid_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/order_paid_v1/messages/event"
+        }
+      ]
+    },
+    "send_order_completed_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/order_completed_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/order_completed_v1/messages/event"
+        }
+      ]
+    },
+    "send_order_cancelled_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/order_cancelled_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/order_cancelled_v1/messages/event"
+        }
+      ]
+    },
+    "send_order_evidence_changed_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/order_evidence_changed_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/order_evidence_changed_v1/messages/event"
+        }
+      ]
+    },
+    "send_refund_succeeded_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/refund_succeeded_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/refund_succeeded_v1/messages/event"
+        }
+      ]
+    },
+    "send_inventory_changed_v1": {
+      "action": "send",
+      "channel": {
+        "$ref": "#/channels/inventory_changed_v1"
+      },
+      "messages": [
+        {
+          "$ref": "#/channels/inventory_changed_v1/messages/event"
+        }
+      ]
+    }
+  },
+  "components": {
+    "messages": {
+      "member_registered_v1": {
+        "name": "trade.member-registered.v1",
+        "title": "交易会员注册V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "交易会员注册V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.member-registered.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "MEMBER"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateVersion": {
+                "const": 0
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "memberId",
+                  "registeredAt",
+                  "registrationSource"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "memberId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "registeredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "Z$"
+                  },
+                  "registrationSource": {
+                    "const": "AUTHENTICATED_IDENTITY"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:MEMBER:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/member-registered-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "minimal",
+            "headers": {
+              "eventId": "a5bd2bf1-a6fa-47dc-a200-fc57588dc347",
+              "traceparent": "00-cb1189848400454cb33811b71c27e965-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "a5bd2bf1-a6fa-47dc-a200-fc57588dc347",
+              "eventType": "trade.member-registered.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "MEMBER",
+              "aggregateId": "8001",
+              "aggregateVersion": 0,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "cb118984-8400-454c-b338-11b71c27e965",
+              "data": {
+                "memberId": "8001",
+                "registeredAt": "2026-09-07T08:00:00.123Z",
+                "registrationSource": "AUTHENTICATED_IDENTITY"
+              }
+            }
+          },
+          {
+            "name": "complete",
+            "headers": {
+              "eventId": "a5bd2bf1-a6fa-47dc-a200-fc57588dc347",
+              "traceparent": "00-cb1189848400454cb33811b71c27e965-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "a5bd2bf1-a6fa-47dc-a200-fc57588dc347",
+              "eventType": "trade.member-registered.v1",
+              "schemaVersion": 1,
+              "tenantId": "1002",
+              "aggregateType": "MEMBER",
+              "aggregateId": "9223372036854775807",
+              "aggregateVersion": 0,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "cb118984-8400-454c-b338-11b71c27e965",
+              "data": {
+                "memberId": "9223372036854775807",
+                "registeredAt": "2026-09-07T08:00:00.123Z",
+                "registrationSource": "AUTHENTICATED_IDENTITY"
+              }
+            }
+          }
+        ]
+      },
+      "order_paid_v1": {
+        "name": "trade.order-paid.v1",
+        "title": "交易正常收款V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "交易正常收款V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.order-paid.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "ORDER"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "memberId",
+                  "receiptNo",
+                  "paidAmount",
+                  "currency",
+                  "paidAt",
+                  "firstOrderPolicy",
+                  "isFirstConfirmedPaidOrder",
+                  "evidenceVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "memberId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "receiptNo": {
+                    "type": "string",
+                    "pattern": "^RC-",
+                    "maxLength": 64
+                  },
+                  "paidAmount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "paidAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "Z$"
+                  },
+                  "firstOrderPolicy": {
+                    "const": "FIRST_CONFIRMED_PAID_ORDER_V1"
+                  },
+                  "isFirstConfirmedPaidOrder": {
+                    "type": "boolean"
+                  },
+                  "evidenceVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:ORDER:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/order-paid-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "minimal",
+            "headers": {
+              "eventId": "915f3ef8-d5b8-47c2-a68b-a07a13bb82f2",
+              "traceparent": "00-7a0d28c619db44358df071c84a1f4d9b-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "915f3ef8-d5b8-47c2-a68b-a07a13bb82f2",
+              "eventType": "trade.order-paid.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 3,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "7a0d28c6-19db-4435-8df0-71c84a1f4d9b",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "receiptNo": "RC-841da7d3-5bff-4e5d-b0d1-059f9f3c2dcf",
+                "paidAmount": 10000,
+                "currency": "CNY",
+                "paidAt": "2026-09-07T08:00:00.123Z",
+                "firstOrderPolicy": "FIRST_CONFIRMED_PAID_ORDER_V1",
+                "isFirstConfirmedPaidOrder": true,
+                "evidenceVersion": 3
+              }
+            }
+          },
+          {
+            "name": "complete",
+            "headers": {
+              "eventId": "915f3ef8-d5b8-47c2-a68b-a07a13bb82f2",
+              "traceparent": "00-7a0d28c619db44358df071c84a1f4d9b-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "915f3ef8-d5b8-47c2-a68b-a07a13bb82f2",
+              "eventType": "trade.order-paid.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 3,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "7a0d28c6-19db-4435-8df0-71c84a1f4d9b",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "receiptNo": "RC-841da7d3-5bff-4e5d-b0d1-059f9f3c2dcf",
+                "paidAmount": 9007199254740991,
+                "currency": "CNY",
+                "paidAt": "2026-09-07T08:00:00.123Z",
+                "firstOrderPolicy": "FIRST_CONFIRMED_PAID_ORDER_V1",
+                "isFirstConfirmedPaidOrder": false,
+                "evidenceVersion": 3
+              }
+            }
+          }
+        ]
+      },
+      "order_completed_v1": {
+        "name": "trade.order-completed.v1",
+        "title": "order-completed V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "order-completed V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.order-completed.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "ORDER"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "memberId",
+                  "completedAt",
+                  "evidenceVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "memberId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "completedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "evidenceVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:ORDER:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/order-completed-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "minimal",
+            "headers": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "traceparent": "00-e980d6155b034d6c9e2c339459d66528-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "eventType": "trade.order-completed.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 7,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "completedAt": "2026-09-07T08:00:00.123Z",
+                "evidenceVersion": 7
+              }
+            }
+          },
+          {
+            "name": "complete",
+            "headers": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "traceparent": "00-e980d6155b034d6c9e2c339459d66528-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "eventType": "trade.order-completed.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 7,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "completedAt": "2026-09-07T08:00:00.123Z",
+                "evidenceVersion": 7
+              }
+            }
+          }
+        ]
+      },
+      "order_cancelled_v1": {
+        "name": "trade.order-cancelled.v1",
+        "title": "order-cancelled V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "order-cancelled V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.order-cancelled.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "ORDER"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "memberId",
+                  "cancelledAt",
+                  "evidenceVersion",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "memberId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "cancelledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "evidenceVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "enum": [
+                      "CANCEL_REQUEST",
+                      "PAYMENT_NONPAYABLE"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:ORDER:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/order-cancelled-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "minimal",
+            "headers": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "traceparent": "00-e980d6155b034d6c9e2c339459d66528-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "eventType": "trade.order-cancelled.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 7,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "cancelledAt": "2026-09-07T08:00:00.123Z",
+                "evidenceVersion": 7,
+                "reason": "CANCEL_REQUEST"
+              }
+            }
+          },
+          {
+            "name": "complete",
+            "headers": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "traceparent": "00-e980d6155b034d6c9e2c339459d66528-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "eventType": "trade.order-cancelled.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 7,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "cancelledAt": "2026-09-07T08:00:00.123Z",
+                "evidenceVersion": 7,
+                "reason": "PAYMENT_NONPAYABLE"
+              }
+            }
+          }
+        ]
+      },
+      "order_evidence_changed_v1": {
+        "name": "trade.order-evidence-changed.v1",
+        "title": "refund-evidence V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "refund-evidence V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.order-evidence-changed.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "ORDER"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "memberId",
+                  "refundNo",
+                  "refundAmount",
+                  "paidAmount",
+                  "cumulativeRefundedAmount",
+                  "pendingRefundAmount",
+                  "netPaidAmount",
+                  "conservativeEligibleAmount",
+                  "currency",
+                  "evidenceVersion",
+                  "changeReason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "memberId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "refundNo": {
+                    "type": "string",
+                    "pattern": "^RF-",
+                    "maxLength": 64
+                  },
+                  "refundAmount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "paidAmount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "cumulativeRefundedAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "pendingRefundAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "netPaidAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "conservativeEligibleAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "evidenceVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "changeReason": {
+                    "enum": [
+                      "REFUND_RESERVED",
+                      "REFUND_RELEASED",
+                      "REFUND_SUCCEEDED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:ORDER:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/refund-evidence-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "minimal",
+            "headers": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "traceparent": "00-e980d6155b034d6c9e2c339459d66528-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "eventType": "trade.order-evidence-changed.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 7,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "refundNo": "RF-287e81c9-341b-4809-ad99-3fc9e3d5410a",
+                "refundAmount": 40,
+                "paidAmount": 100,
+                "cumulativeRefundedAmount": 0,
+                "pendingRefundAmount": 40,
+                "netPaidAmount": 100,
+                "conservativeEligibleAmount": 60,
+                "currency": "CNY",
+                "evidenceVersion": 7,
+                "changeReason": "REFUND_RESERVED"
+              }
+            }
+          }
+        ]
+      },
+      "refund_succeeded_v1": {
+        "name": "trade.refund-succeeded.v1",
+        "title": "refund-evidence V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "refund-evidence V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.refund-succeeded.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "ORDER"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "orderId",
+                  "memberId",
+                  "refundNo",
+                  "refundAmount",
+                  "paidAmount",
+                  "cumulativeRefundedAmount",
+                  "pendingRefundAmount",
+                  "netPaidAmount",
+                  "conservativeEligibleAmount",
+                  "currency",
+                  "evidenceVersion",
+                  "changeReason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "orderId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "memberId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "refundNo": {
+                    "type": "string",
+                    "pattern": "^RF-",
+                    "maxLength": 64
+                  },
+                  "refundAmount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "paidAmount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "cumulativeRefundedAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "pendingRefundAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "netPaidAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "conservativeEligibleAmount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "evidenceVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "changeReason": {
+                    "enum": [
+                      "REFUND_RESERVED",
+                      "REFUND_RELEASED",
+                      "REFUND_SUCCEEDED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:ORDER:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/refund-evidence-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "complete",
+            "headers": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "traceparent": "00-e980d6155b034d6c9e2c339459d66528-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+              "eventType": "trade.refund-succeeded.v1",
+              "schemaVersion": 1,
+              "tenantId": "1001",
+              "aggregateType": "ORDER",
+              "aggregateId": "9001",
+              "aggregateVersion": 7,
+              "occurredAt": "2026-09-07T08:00:00.123Z",
+              "producer": "transaction-center",
+              "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+              "data": {
+                "orderId": "9001",
+                "memberId": "8001",
+                "refundNo": "RF-287e81c9-341b-4809-ad99-3fc9e3d5410a",
+                "refundAmount": 40,
+                "paidAmount": 100,
+                "cumulativeRefundedAmount": 40,
+                "pendingRefundAmount": 0,
+                "netPaidAmount": 60,
+                "conservativeEligibleAmount": 60,
+                "currency": "CNY",
+                "evidenceVersion": 7,
+                "changeReason": "REFUND_SUCCEEDED"
+              }
+            }
+          }
+        ]
+      },
+      "inventory_changed_v1": {
+        "name": "trade.inventory-changed.v1",
+        "title": "inventory-changed V1",
+        "contentType": "application/json",
+        "headers": {
+          "type": "object",
+          "required": [
+            "eventId",
+            "traceparent"
+          ],
+          "properties": {
+            "eventId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "traceparent": {
+              "type": "string",
+              "minLength": 55,
+              "maxLength": 55,
+              "pattern": "^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-0[01]$"
+            }
+          }
+        },
+        "payload": {
+          "schemaFormat": "application/schema+json;version=draft-07",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "inventory-changed V1",
+            "type": "object",
+            "required": [
+              "eventId",
+              "eventType",
+              "schemaVersion",
+              "tenantId",
+              "aggregateType",
+              "aggregateId",
+              "aggregateVersion",
+              "occurredAt",
+              "producer",
+              "traceId",
+              "data"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "eventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "eventType": {
+                "const": "trade.inventory-changed.v1"
+              },
+              "schemaVersion": {
+                "const": 1
+              },
+              "tenantId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}$",
+                "description": "正十进制ID，数值不得超过9223372036854775807"
+              },
+              "aggregateType": {
+                "const": "INVENTORY_BALANCE"
+              },
+              "aggregateId": {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,18}:[1-9][0-9]{0,18}$"
+              },
+              "aggregateVersion": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "producer": {
+                "const": "transaction-center"
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "data": {
+                "type": "object",
+                "required": [
+                  "warehouseId",
+                  "skuId",
+                  "operationNo",
+                  "available",
+                  "reserved",
+                  "sold",
+                  "stockTotal",
+                  "balanceVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "warehouseId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "skuId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,18}$",
+                    "description": "正十进制ID，数值不得超过9223372036854775807"
+                  },
+                  "operationNo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "available": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9223372036854775807
+                  },
+                  "reserved": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9223372036854775807
+                  },
+                  "sold": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9223372036854775807
+                  },
+                  "stockTotal": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9223372036854775807
+                  },
+                  "balanceVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9223372036854775807
+                  }
+                }
+              }
+            },
+            "description": "完整余额快照。typed合同额外验证aggregateId=warehouseId:skuId、aggregateVersion=balanceVersion和available+reserved+sold=stockTotal；JSON Schema文件不代替这些语义校验。"
+          }
+        },
+        "correlationId": {
+          "location": "$message.payload#/traceId",
+          "description": "持久事件UUID与traceparent共享128位trace ID；历史全零UUID出站新根。HTTP与Job传播已实现，外部消费者与生产采集验收待完成。"
+        },
+        "bindings": {
+          "kafka": {
+            "bindingVersion": "0.5.0",
+            "key": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*:INVENTORY_BALANCE:.+$",
+              "maxLength": 128
+            }
+          }
+        },
+        "x-kafka-key-expression": "tenantId + \":\" + aggregateType + \":\" + aggregateId",
+        "x-source-schema": "contracts/inventory-changed-v1/schema.json",
+        "x-semantic-validation": "对应Java EventCodec验证跨字段版本、归属和金额关系；JSON Schema只验证结构。",
+        "examples": [
+          {
+            "name": "minimal",
+            "headers": {
+              "eventId": "11111111-1111-4111-8111-111111111111",
+              "traceparent": "00-22222222222242228222222222222222-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "11111111-1111-4111-8111-111111111111",
+              "eventType": "trade.inventory-changed.v1",
+              "schemaVersion": 1,
+              "tenantId": "1",
+              "aggregateType": "INVENTORY_BALANCE",
+              "aggregateId": "2:3",
+              "aggregateVersion": 3,
+              "occurredAt": "2026-09-08T00:00:00Z",
+              "producer": "transaction-center",
+              "traceId": "22222222-2222-4222-8222-222222222222",
+              "data": {
+                "warehouseId": "2",
+                "skuId": "3",
+                "operationNo": "33333333-3333-4333-8333-333333333333",
+                "available": 8,
+                "reserved": 0,
+                "sold": 2,
+                "stockTotal": 10,
+                "balanceVersion": 3
+              }
+            }
+          },
+          {
+            "name": "complete",
+            "headers": {
+              "eventId": "11111111-1111-4111-8111-111111111111",
+              "traceparent": "00-22222222222242228222222222222222-0000000000000001-00"
+            },
+            "payload": {
+              "eventId": "11111111-1111-4111-8111-111111111111",
+              "eventType": "trade.inventory-changed.v1",
+              "schemaVersion": 1,
+              "tenantId": "1",
+              "aggregateType": "INVENTORY_BALANCE",
+              "aggregateId": "2:3",
+              "aggregateVersion": 3,
+              "occurredAt": "2026-09-08T00:00:00Z",
+              "producer": "transaction-center",
+              "traceId": "22222222-2222-4222-8222-222222222222",
+              "data": {
+                "warehouseId": "2",
+                "skuId": "3",
+                "operationNo": "33333333-3333-4333-8333-333333333333:OUT",
+                "available": 8,
+                "reserved": 0,
+                "sold": 2,
+                "stockTotal": 10,
+                "balanceVersion": 3
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "x-delivery-guarantee": "at-least-once",
+  "x-production-validation": "pending"
+}

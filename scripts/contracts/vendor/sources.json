@@ -1,0 +1,12 @@
+[
+  {
+    "file": "asyncapi-3.0.0.schema.json",
+    "source": "https://raw.githubusercontent.com/asyncapi/spec-json-schemas/master/schemas/3.0.0.json",
+    "sha256": "1786a007ac00344a8f529e5a6fc5db786b0be6757e0b94a8b95a8a6a52b7fe9a"
+  },
+  {
+    "file": "ASYNCAPI-LICENSE",
+    "source": "https://raw.githubusercontent.com/asyncapi/spec-json-schemas/master/LICENSE",
+    "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1"
+  }
+]
