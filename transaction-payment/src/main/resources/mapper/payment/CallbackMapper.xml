@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.CallbackMapper">
+  <resultMap id="record" type="com.lrj.trade.payment.model.CallbackRecord">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="callback_no" javaType="java.lang.String"/>
+      <arg column="attempt_id" javaType="java.lang.String"/>
+      <arg column="channel_code" javaType="java.lang.String"/>
+      <arg column="channel_merchant_no" javaType="java.lang.String"/>
+      <arg column="provider_event_id" javaType="java.lang.String"/>
+      <arg column="request_no" javaType="java.lang.String"/>
+      <arg column="observation_kind" javaType="java.lang.String"/>
+      <arg column="provider_transaction_no" javaType="java.lang.String"/>
+      <arg column="amount" javaType="java.lang.Long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="provider_paid_at" javaType="java.time.Instant"/>
+      <arg column="payload_hash" javaType="_byte[]"/>
+      <arg column="fact_hash" javaType="java.lang.String"/>
+      <arg column="payload_cipher" javaType="_byte[]"/>
+      <arg column="key_version" javaType="java.lang.String"/>
+      <arg column="signature_version" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="received_at" javaType="java.time.Instant"/>
+      <arg column="processed_at" javaType="java.time.Instant"/>
+      <arg column="last_error" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <!-- 首个有效事件不可变；回放不重置处理状态或密钥版本。 -->
+  <insert id="insert">
+    INSERT INTO tc_payment_callback(tenant_id,callback_no,attempt_id,channel_code,channel_merchant_no,provider_event_id,request_no,
+      observation_kind,provider_transaction_no,amount,currency,provider_paid_at,payload_hash,fact_hash,payload_cipher,key_version,signature_version,
+      status,received_at,created_at,updated_at)
+    VALUES(#{tenant},#{number},#{attempt},#{code},#{merchant},#{event},#{request},
+      #{kind},#{transaction},#{amount},#{currency},#{paid},#{payloadHash},#{factHash},#{cipher},#{keyVersion},#{signature},
+      'PENDING',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))
+    ON DUPLICATE KEY UPDATE id=tc_payment_callback.id
+  </insert>
+  <select id="lockEvent" resultMap="record" useCache="false">
+    SELECT id,callback_no,attempt_id,channel_code,channel_merchant_no,provider_event_id,request_no,observation_kind,provider_transaction_no,amount,currency,provider_paid_at,payload_hash,fact_hash,payload_cipher,key_version,signature_version,status,received_at,processed_at,last_error FROM tc_payment_callback
+    WHERE tenant_id=#{tenant} AND channel_code=#{code} AND channel_merchant_no=#{merchant} AND provider_event_id=#{event} FOR UPDATE
+  </select>
+  <select id="find" resultMap="record" useCache="false">
+    SELECT id,callback_no,attempt_id,channel_code,channel_merchant_no,provider_event_id,request_no,observation_kind,provider_transaction_no,amount,currency,provider_paid_at,payload_hash,fact_hash,payload_cipher,key_version,signature_version,status,received_at,processed_at,last_error FROM tc_payment_callback WHERE tenant_id=#{tenant} AND callback_no=#{number}
+  </select>
+  <update id="processed">
+    UPDATE tc_payment_callback SET status='PROCESSED',processed_at=UTC_TIMESTAMP(3),last_error=NULL,updated_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND callback_no=#{number} AND status='PENDING'
+  </update>
+  <update id="review">
+    UPDATE tc_payment_callback SET status='REVIEW',last_error=#{error},updated_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND callback_no=#{number} AND status='PENDING'
+  </update>
+</mapper>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.order.mapper.OrderEvidenceMapper">
+ <resultMap id="Evidence" type="com.lrj.trade.order.model.OrderEvidenceRow" autoMapping="false"><constructor><arg column="orderId" javaType="java.lang.String"/><arg column="orderNo" javaType="java.lang.String"/><arg column="memberId" javaType="java.lang.String"/><arg column="status" javaType="java.lang.String"/><arg column="financialStatus" javaType="java.lang.String"/><arg column="payableAmount" javaType="_long"/><arg column="currency" javaType="java.lang.String"/><arg column="paidAt" javaType="java.time.Instant"/><arg column="completedAt" javaType="java.time.Instant"/><arg column="evidenceVersion" javaType="_long"/></constructor></resultMap>
+ <select id="read" resultMap="Evidence" useCache="false">
+ SELECT id AS orderId,order_no AS orderNo,member_id AS memberId,status,financial_status AS financialStatus,payable_amount AS payableAmount,currency,paid_at AS paidAt,completed_at AS completedAt,version AS evidenceVersion FROM tc_order WHERE tenant_id=#{tenant} AND id IN
+ <foreach collection="orders" item="orderId" open="(" separator="," close=")">#{orderId}</foreach>
+ </select>
+</mapper>

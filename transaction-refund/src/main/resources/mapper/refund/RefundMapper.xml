@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.refund.mapper.RefundMapper">
+  <resultMap id="RefundQueueItem" type="com.lrj.trade.refund.model.RefundQueueItem" autoMapping="false"><constructor>
+    <arg column="id" javaType="java.lang.String"/>
+    <arg column="refund_no" javaType="java.lang.String"/>
+    <arg column="order_no" javaType="java.lang.String"/>
+    <arg column="amount" javaType="_long"/>
+    <arg column="currency" javaType="java.lang.String"/>
+    <arg column="status" javaType="java.lang.String"/>
+    <arg column="approval_ref" javaType="java.lang.String"/>
+    <arg column="approval_deadline" javaType="java.time.Instant"/>
+    <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <!-- 固定状态过滤命中ix_refund_state，不用OFFSET深翻页或逐行读取组件。 -->
+  <select id="listQueue" resultMap="RefundQueueItem" useCache="false">
+    SELECT id,refund_no,order_no,amount,currency,status,approval_ref,approval_deadline,version
+    FROM tc_refund WHERE tenant_id=#{tenant} AND status=#{status} AND id &gt; #{after}
+    ORDER BY id LIMIT #{limit}
+  </select>
+  <update id="markExpired">UPDATE tc_refund SET status='EXPIRED',updated_at=#{now},version=version+1 WHERE tenant_id=#{tenant} AND refund_no=#{number} AND version=#{version} AND status='PENDING_APPROVAL' AND approval_deadline &lt;= #{now}</update>
+  <resultMap id="RefundRow" type="com.lrj.trade.refund.model.RefundRow"><constructor>
+    <arg column="refund_id" javaType="_long"/>
+    <arg column="refund_no" javaType="java.lang.String"/>
+    <arg column="applicant_key" javaType="java.lang.String"/>
+    <arg column="member_id" javaType="_long"/>
+    <arg column="order_id" javaType="_long"/>
+    <arg column="order_no" javaType="java.lang.String"/>
+    <arg column="receipt_no" javaType="java.lang.String"/>
+    <arg column="merchant_refund_no" javaType="java.lang.String"/>
+    <arg column="amount" javaType="_long"/>
+    <arg column="currency" javaType="java.lang.String"/>
+    <arg column="reason" javaType="java.lang.String"/>
+    <arg column="request_hash" javaType="java.lang.String"/>
+    <arg column="status" javaType="java.lang.String"/>
+    <arg column="policy_version" javaType="_long"/>
+    <arg column="policy_limit" javaType="_long"/>
+    <arg column="approval_ref" javaType="java.lang.String"/>
+    <arg column="approval_deadline" javaType="java.time.Instant"/>
+    <arg column="approval_decision_version" javaType="java.lang.Long"/>
+    <arg column="approval_actor_key" javaType="java.lang.String"/>
+    <arg column="approval_decision" javaType="java.lang.String"/>
+    <arg column="approval_evidence" javaType="java.lang.String"/>
+    <arg column="provider_refund_no" javaType="java.lang.String"/>
+    <arg column="version" javaType="_long"/>
+    <arg column="created_at" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <resultMap id="RefundPolicy" type="com.lrj.trade.refund.model.RefundPolicy"><constructor>
+    <arg column="currency" javaType="java.lang.String"/>
+    <arg column="auto_approve_limit" javaType="_long"/>
+    <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <resultMap id="RefundItemRow" type="com.lrj.trade.refund.model.RefundItemRow"><constructor>
+    <arg column="component_key" javaType="java.lang.String"/>
+    <arg column="component_type" javaType="java.lang.String"/>
+    <arg column="order_item_id" javaType="java.lang.Long"/>
+    <arg column="quantity" javaType="_long"/>
+    <arg column="amount" javaType="_long"/>
+  </constructor></resultMap>
+  <!-- 读取租户当前政策快照，不锁外部网络。 -->
+  <select id="findPolicy" resultMap="RefundPolicy" useCache="false">SELECT currency,auto_approve_limit,version FROM tc_refund_policy WHERE tenant_id=#{tenant}</select>
+  <!-- 配置变更前当前读策略版本。 -->
+  <select id="lockPolicy" resultMap="RefundPolicy" useCache="false">SELECT currency,auto_approve_limit,version FROM tc_refund_policy WHERE tenant_id=#{tenant} FOR UPDATE</select>
+  <!-- 先占唯一键再当前读，不能覆盖已配置的政策。 -->
+  <insert id="initializePolicy">INSERT INTO tc_refund_policy(tenant_id,currency,created_at,updated_at) VALUES(#{tenant},#{currency},#{now},#{now}) ON DUPLICATE KEY UPDATE tenant_id=tc_refund_policy.tenant_id</insert>
+  <!-- 按版本更新并由服务同事务审计。 -->
+  <update id="updatePolicy">UPDATE tc_refund_policy SET currency=#{currency},auto_approve_limit=#{limit},version=version+1,updated_at=#{now} WHERE tenant_id=#{tenant} AND version=#{version}</update>
+  <!-- 已持订单和来源锁后读取永久收款关联，重放不能按新身份再创建。 -->
+  <select id="lockCompensation" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND compensation_receipt_id=#{receipt} FOR UPDATE</select>
+  <!-- 永久主体请求号去重，新插入尚不可见，资金/明细随后在同事务建立。 -->
+  <insert id="insertRefund">INSERT INTO tc_refund(tenant_id,refund_no,source_request_id,applicant_key,member_id,order_id,order_no,receipt_id,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,created_at,updated_at,compensation_receipt_id) VALUES(#{tenant},#{number},#{request},#{actor},#{member},#{order},#{orderNo},#{receipt},#{receiptNo},#{merchantRefund},#{amount},#{currency},#{reason},#{hash},#{status},#{policyVersion},#{policyLimit},#{approval},#{deadline},#{now},#{now},#{compensation}) ON DUPLICATE KEY UPDATE id=tc_refund.id</insert>
+  <!-- 永久请求键占位后精确当前读，重放返回原聚合。 -->
+  <select id="lockByRequest" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND applicant_key=#{actor} AND source_request_id=#{request} FOR UPDATE</select>
+  <!-- 只读归属或展示，不据此作状态转换。 -->
+  <select id="findRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND refund_no=#{number}</select>
+  <select id="recoveryCandidates" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND id &gt; #{after} AND status IN ('PENDING_APPROVAL','READY','SUBMITTED') ORDER BY id LIMIT #{limit}</select>
+  <select id="findByMerchantRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND merchant_refund_no=#{number}</select>
+  <!-- 在订单/资金资源锁之后精确锁定现有退款聚合。 -->
+  <select id="lockRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND refund_no=#{number} FOR UPDATE</select>
+  <!-- 按规范化组件键读取固定归属，确定性更新额度。 -->
+  <select id="items" resultMap="RefundItemRow" useCache="false">SELECT component_key,component_type,order_item_id,quantity,amount FROM tc_refund_item WHERE tenant_id=#{tenant} AND refund_id=#{refund} ORDER BY component_key</select>
+  <!-- 额度上限来自冻结订单，重复初始化不覆盖累计退款。 -->
+  <insert id="initializeBudget">INSERT INTO tc_refund_component_budget(tenant_id,order_id,component_key,component_type,order_item_id,amount_limit,created_at,updated_at) VALUES(#{tenant},#{order},#{key},#{type},#{item},#{limit},#{now},#{now}) ON DUPLICATE KEY UPDATE amount_limit=tc_refund_component_budget.amount_limit</insert>
+  <!-- 组件额度必须与冻结上限相同，条件更新防超退。 -->
+  <update id="reserveBudget">UPDATE tc_refund_component_budget SET reserved_amount=reserved_amount+#{amount},updated_at=#{now} WHERE tenant_id=#{tenant} AND order_id=#{order} AND component_key=#{key} AND amount_limit=#{limit} AND amount_limit-refunded_amount-reserved_amount &gt;= #{amount}</update>
+  <!-- 固定每笔退款金额归属，不能事后换商品或组件。 -->
+  <insert id="insertItem">INSERT INTO tc_refund_item(tenant_id,refund_id,order_id,component_key,component_type,order_item_id,quantity,amount,created_at) VALUES(#{tenant},#{refund},#{order},#{key},#{type},#{item},#{quantity},#{amount},#{now})</insert>
+  <!-- 可靠释放与资金Port、应用终态同事务。 -->
+  <update id="releaseBudget">UPDATE tc_refund_component_budget SET reserved_amount=reserved_amount-#{amount},updated_at=#{now} WHERE tenant_id=#{tenant} AND order_id=#{order} AND component_key=#{key} AND reserved_amount &gt;= #{amount}</update>
+  <!-- 成功原子转移组件预占到累计已退。 -->
+  <update id="confirmBudget">UPDATE tc_refund_component_budget SET reserved_amount=reserved_amount-#{amount},refunded_amount=refunded_amount+#{amount},updated_at=#{now} WHERE tenant_id=#{tenant} AND order_id=#{order} AND component_key=#{key} AND reserved_amount &gt;= #{amount}</update>
+  <!-- 仅待审批且版本匹配可受理唯一决定，不允许覆盖已执行申请。 -->
+  <update id="decide">UPDATE tc_refund SET status=#{status},approval_decision_version=#{decisionVersion},approval_actor_key=#{actor},approval_decision=#{decision},approval_evidence=#{evidence},updated_at=#{now},version=version+1 WHERE tenant_id=#{tenant} AND refund_no=#{number} AND version=#{version} AND status='PENDING_APPROVAL'</update>
+  <!-- 只有免审或已批准的就绪申请可获得本地派发屏障。 -->
+  <update id="markSubmitted">UPDATE tc_refund SET status='SUBMITTED',updated_at=#{now},version=version+1 WHERE tenant_id=#{tenant} AND refund_no=#{number} AND version=#{version} AND status='READY'</update>
+  <!-- 实际成功当前读裁决，必须和资金账本及组件余额一起提交。 -->
+  <update id="markSucceeded">UPDATE tc_refund SET status='SUCCEEDED',provider_refund_no=#{provider},updated_at=#{now},version=version+1 WHERE tenant_id=#{tenant} AND refund_no=#{number} AND version=#{version} AND status='SUBMITTED'</update>
+  <!-- 可靠不可再成功结果才允许结束已派发申请并释放额度。 -->
+  <update id="markFailed">UPDATE tc_refund SET status='FAILED',updated_at=#{now},version=version+1 WHERE tenant_id=#{tenant} AND refund_no=#{number} AND version=#{version} AND status='SUBMITTED'</update>
+</mapper>

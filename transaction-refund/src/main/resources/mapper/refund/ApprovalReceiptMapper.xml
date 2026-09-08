@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.refund.mapper.ApprovalReceiptMapper">
+  <resultMap id="record" type="com.lrj.trade.refund.model.ApprovalReceiptRecord" autoMapping="false"><constructor>
+    <arg column="receipt_no" javaType="java.lang.String"/>
+    <arg column="refund_no" javaType="java.lang.String"/>
+    <arg column="fact_hash" javaType="java.lang.String"/>
+    <arg column="payload_hash" javaType="java.lang.String"/>
+    <arg column="payload_cipher" javaType="_byte[]"/>
+    <arg column="key_version" javaType="java.lang.String"/>
+  </constructor></resultMap>
+  <!-- 先永久占来源键，再进入申请固定锁序；不以FK提前锁申请行而反转订单锁序。 -->
+  <insert id="insert">
+    INSERT INTO tc_refund_approval_receipt(tenant_id,receipt_no,source_issuer,source_subject,event_id,refund_no,fact_hash,payload_hash,payload_cipher,key_version,created_at)
+    VALUES(#{tenant},#{number},#{issuer},#{subject},#{event},#{refund},#{facts},#{hash},#{cipher},#{key},UTC_TIMESTAMP(3))
+    ON DUPLICATE KEY UPDATE id=tc_refund_approval_receipt.id
+  </insert>
+  <select id="lockEvent" resultMap="record" useCache="false">
+    SELECT receipt_no,refund_no,fact_hash,payload_hash,payload_cipher,key_version FROM tc_refund_approval_receipt
+    WHERE tenant_id=#{tenant} AND source_issuer=#{issuer} AND source_subject=#{subject} AND event_id=#{event} FOR UPDATE
+  </select>
+</mapper>

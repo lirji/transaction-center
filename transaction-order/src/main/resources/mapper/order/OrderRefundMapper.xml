@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.order.mapper.OrderRefundMapper">
+  <resultMap id="charges" type="com.lrj.trade.order.OrderRefundPort$Charges"><constructor>
+    <arg column="freight_amount" javaType="_long"/><arg column="tax_amount" javaType="_long"/>
+  </constructor></resultMap>
+  <select id="charges" resultMap="charges" useCache="false">SELECT freight_amount,tax_amount FROM tc_order WHERE tenant_id=#{tenant} AND id=#{order}</select>
+  <update id="updateFinancial">UPDATE tc_order SET financial_status=#{financial},version=version+1,updated_at=#{now} WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version}</update>
+</mapper>

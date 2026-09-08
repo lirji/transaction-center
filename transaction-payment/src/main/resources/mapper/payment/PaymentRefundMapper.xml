@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.PaymentRefundMapper">
+  <resultMap id="source" type="com.lrj.trade.payment.model.RefundSource"><constructor>
+    <arg column="receipt_id" javaType="java.lang.String"/>
+    <arg column="receipt_no" javaType="java.lang.String"/>
+    <arg column="order_id" javaType="java.lang.String"/>
+    <arg column="attempt_id" javaType="java.lang.String"/>
+    <arg column="amount" javaType="_long"/>
+    <arg column="currency" javaType="java.lang.String"/>
+    <arg column="disposition" javaType="java.lang.String"/>
+    <arg column="refunded_amount" javaType="_long"/>
+    <arg column="refund_reserved_amount" javaType="_long"/>
+    <arg column="channel_code" javaType="java.lang.String"/>
+    <arg column="channel_merchant_no" javaType="java.lang.String"/>
+    <arg column="provider_transaction_no" javaType="java.lang.String"/>
+  </constructor></resultMap>
+  <resultMap id="hold" type="com.lrj.trade.payment.model.RefundHold"><constructor>
+    <arg column="reservation_no" javaType="java.lang.String"/>
+    <arg column="refund_no" javaType="java.lang.String"/>
+    <arg column="receipt_id" javaType="java.lang.String"/>
+    <arg column="receipt_no" javaType="java.lang.String"/>
+    <arg column="order_id" javaType="java.lang.String"/>
+    <arg column="amount" javaType="_long"/>
+    <arg column="currency" javaType="java.lang.String"/>
+    <arg column="channel_code" javaType="java.lang.String"/>
+    <arg column="channel_merchant_no" javaType="java.lang.String"/>
+    <arg column="state" javaType="java.lang.String"/>
+    <arg column="provider_refund_no" javaType="java.lang.String"/>
+    <arg column="submitted_at" javaType="java.time.Instant"/>
+    <arg column="provider_succeeded_at" javaType="java.time.Instant"/>
+    <arg column="confirmed_at" javaType="java.time.Instant"/>
+    <arg column="released_at" javaType="java.time.Instant"/>
+    <arg column="evidence_ref" javaType="java.lang.String"/>
+  </constructor></resultMap>
+  <select id="lockSourceById" resultMap="source" useCache="false">SELECT id AS receipt_id,receipt_no,order_id,attempt_id,amount,currency,disposition,refunded_amount,refund_reserved_amount,channel_code,channel_merchant_no,provider_transaction_no FROM tc_payment_receipt WHERE tenant_id=#{tenant} AND id=#{receipt} FOR UPDATE</select>
+  <select id="findSource" resultMap="source" useCache="false">SELECT id AS receipt_id,receipt_no,order_id,attempt_id,amount,currency,disposition,refunded_amount,refund_reserved_amount,channel_code,channel_merchant_no,provider_transaction_no FROM tc_payment_receipt WHERE tenant_id=#{tenant} AND receipt_no=#{number}</select>
+  <select id="lockSource" resultMap="source" useCache="false">SELECT id AS receipt_id,receipt_no,order_id,attempt_id,amount,currency,disposition,refunded_amount,refund_reserved_amount,channel_code,channel_merchant_no,provider_transaction_no FROM tc_payment_receipt WHERE tenant_id=#{tenant} AND receipt_no=#{number} FOR UPDATE</select>
+  <select id="findHold" resultMap="hold" useCache="false">SELECT reservation_no,refund_no,receipt_id,receipt_no,order_id,amount,currency,channel_code,channel_merchant_no,state,provider_refund_no,submitted_at,provider_succeeded_at,confirmed_at,released_at,evidence_ref FROM tc_payment_refund_hold WHERE tenant_id=#{tenant} AND refund_no=#{refund}</select>
+  <select id="lockHold" resultMap="hold" useCache="false">SELECT reservation_no,refund_no,receipt_id,receipt_no,order_id,amount,currency,channel_code,channel_merchant_no,state,provider_refund_no,submitted_at,provider_succeeded_at,confirmed_at,released_at,evidence_ref FROM tc_payment_refund_hold WHERE tenant_id=#{tenant} AND refund_no=#{refund} FOR UPDATE</select>
+  <insert id="insertHold">
+    INSERT INTO tc_payment_refund_hold(tenant_id,reservation_no,refund_no,receipt_id,receipt_no,order_id,amount,currency,channel_code,channel_merchant_no,created_at,updated_at)
+    VALUES(#{tenant},#{reservation},#{refund},#{receipt},#{receiptNo},#{order},#{amount},#{currency},#{channel},#{merchant},#{now},#{now})
+    ON DUPLICATE KEY UPDATE id=tc_payment_refund_hold.id
+  </insert>
+  <update id="reserveAmount">
+    UPDATE tc_payment_receipt SET refund_reserved_amount=refund_reserved_amount+#{amount},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{receipt} AND currency=#{currency}
+      AND amount-refunded_amount-refund_reserved_amount &gt;= #{amount}
+  </update>
+  <update id="markSubmitted">
+    UPDATE tc_payment_refund_hold SET state='SUBMITTED',submitted_at=#{now},updated_at=#{now}
+    WHERE tenant_id=#{tenant} AND refund_no=#{refund} AND state='HELD'
+  </update>
+  <update id="releaseAmount">
+    UPDATE tc_payment_receipt SET refund_reserved_amount=refund_reserved_amount-#{amount},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{receipt} AND refund_reserved_amount &gt;= #{amount}
+  </update>
+  <update id="releaseHold">
+    UPDATE tc_payment_refund_hold SET state='RELEASED',released_at=#{now},evidence_ref=#{evidence},updated_at=#{now}
+    WHERE tenant_id=#{tenant} AND refund_no=#{refund} AND state=#{expected}
+  </update>
+  <update id="confirmAmount">
+    UPDATE tc_payment_receipt SET refund_reserved_amount=refund_reserved_amount-#{amount},refunded_amount=refunded_amount+#{amount},updated_at=#{now},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{receipt} AND refund_reserved_amount &gt;= #{amount}
+  </update>
+  <update id="confirmHold">
+    UPDATE tc_payment_refund_hold SET state='SUCCEEDED',provider_refund_no=#{provider},provider_succeeded_at=#{occurred},
+      confirmed_at=#{now},evidence_ref=#{evidence},updated_at=#{now}
+    WHERE tenant_id=#{tenant} AND refund_no=#{refund} AND state IN ('HELD','SUBMITTED')
+  </update>
+  <insert id="insertLedger">
+    INSERT INTO tc_money_ledger(tenant_id,receipt_id,refund_no,ledger_no,business_key,entry_type,amount,currency,evidence_ref,created_at,updated_at)
+    VALUES(#{tenant},#{receipt},#{refund},#{number},CONCAT('refund:',#{reservation}),'REFUND',#{amount},#{currency},#{evidence},#{now},#{now})
+  </insert>
+</mapper>

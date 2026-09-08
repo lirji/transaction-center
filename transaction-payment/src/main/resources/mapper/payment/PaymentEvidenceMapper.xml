@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.PaymentEvidenceMapper">
+ <resultMap id="Evidence" type="com.lrj.trade.payment.model.PaymentEvidenceRow" autoMapping="false"><constructor><arg column="orderId" javaType="java.lang.String"/><arg column="receiptNo" javaType="java.lang.String"/><arg column="paidAmount" javaType="_long"/><arg column="refundedAmount" javaType="_long"/><arg column="pendingRefundAmount" javaType="_long"/><arg column="currency" javaType="java.lang.String"/></constructor></resultMap>
+ <select id="read" resultMap="Evidence" useCache="false">
+ SELECT order_id AS orderId,receipt_no AS receiptNo,amount AS paidAmount,refunded_amount AS refundedAmount,refund_reserved_amount AS pendingRefundAmount,currency FROM tc_payment_receipt WHERE tenant_id=#{tenant} AND disposition='NORMAL' AND order_id IN
+ <foreach collection="orders" item="orderId" open="(" separator="," close=")">#{orderId}</foreach>
+ </select>
+</mapper>

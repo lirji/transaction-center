@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.ReconciliationOwnershipMapper">
+ <select id="attempt" resultType="java.lang.Long" useCache="false">SELECT channel_id FROM tc_payment_attempt WHERE tenant_id=#{tenant} AND merchant_request_no=#{reference}</select>
+ <select id="receipt" resultType="java.lang.Long" useCache="false">SELECT a.channel_id FROM tc_payment_receipt r JOIN tc_payment_attempt a ON a.tenant_id=r.tenant_id AND a.id=r.attempt_id WHERE r.tenant_id=#{tenant} AND r.receipt_no=#{reference}</select>
+ <select id="refund" resultType="java.lang.Long" useCache="false">SELECT a.channel_id FROM tc_payment_refund_hold h JOIN tc_payment_receipt r ON r.tenant_id=h.tenant_id AND r.id=h.receipt_id JOIN tc_payment_attempt a ON a.tenant_id=r.tenant_id AND a.id=r.attempt_id WHERE h.tenant_id=#{tenant} AND h.refund_no=#{reference}</select>
+</mapper>

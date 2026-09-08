@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.refund.mapper.RefundFinancialSnapshotMapper">
+  <resultMap id="Snapshot" type="com.lrj.trade.core.FinancialSnapshotPort$Row"><constructor>
+    <arg column="metric" javaType="java.lang.String"/><arg column="count_lower_bound" javaType="_long"/>
+    <arg column="oldest_at" javaType="java.time.Instant"/><arg column="observed_at" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <!-- 固定全局状态窄例外，无租户/订单/金额明细，覆盖索引及LIMIT共同限定扫描成本。 -->
+  <select id="snapshot" resultMap="Snapshot" useCache="false" timeout="3">
+    SELECT 0 AS position,'callback_pending' AS metric,COUNT(*) AS count_lower_bound,MIN(received_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT received_at FROM tc_refund_callback FORCE INDEX(ix_refund_callback_observation)
+      WHERE status='PENDING' ORDER BY received_at,id LIMIT 10001) AS bounded_callback_pending
+    UNION ALL
+    SELECT 1 AS position,'callback_review' AS metric,COUNT(*) AS count_lower_bound,MIN(received_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT received_at FROM tc_refund_callback FORCE INDEX(ix_refund_callback_observation)
+      WHERE status='REVIEW' ORDER BY received_at,id LIMIT 10001) AS bounded_callback_review
+    ORDER BY position
+  </select>
+</mapper>
