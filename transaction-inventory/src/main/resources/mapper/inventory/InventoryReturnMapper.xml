@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.inventory.mapper.InventoryReturnMapper">
+ <resultMap id="Operation" type="com.lrj.trade.inventory.model.ReturnOperation"><constructor>
+  <arg column="request_hash" javaType="java.lang.String"/><arg column="claim_token" javaType="java.lang.String"/>
+ </constructor></resultMap>
+ <insert id="insertOperation">INSERT INTO tc_inventory_return_operation(tenant_id,operation_no,reservation_id,warehouse_id,quantity,request_hash,claim_token)
+ VALUES(#{tenant},#{operation},#{reservation},#{warehouse},#{quantity},#{hash},#{token}) ON DUPLICATE KEY UPDATE id=id</insert>
+ <select id="lockOperation" resultMap="Operation" useCache="false">SELECT request_hash,claim_token FROM tc_inventory_return_operation
+ WHERE tenant_id=#{tenant} AND operation_no=#{operation} FOR UPDATE</select>
+ <update id="consumeBudget"><![CDATA[UPDATE tc_inventory_reservation SET restocked_quantity=restocked_quantity+#{quantity},version=version+1
+ WHERE tenant_id=#{tenant} AND id=#{reservation} AND status='CONFIRMED' AND quantity-restocked_quantity>=#{quantity}]]></update>
+ <update id="moveBalance"><![CDATA[UPDATE tc_inventory_balance SET available=available+#{available},sold=sold+#{sold},stock_total=stock_total+#{total},version=version+1
+ WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouse} AND sku_id=#{sku} AND sold>=#{minimumSold}]]></update>
+</mapper>

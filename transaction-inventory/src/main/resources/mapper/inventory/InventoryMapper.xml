@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.inventory.mapper.InventoryMapper">
+  <!-- 显式字段映射和绑定参数；保留租户条件、行锁及原子更新，禁止字符串拼接。 -->
+  <resultMap id="Reservation" type="com.lrj.trade.inventory.model.Reservation" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="warehouse" javaType="_long"/>
+      <arg column="sku" javaType="_long"/>
+      <arg column="quantity" javaType="_long"/>
+      <arg column="status" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="Balance" type="com.lrj.trade.inventory.model.Balance" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="warehouseId" javaType="java.lang.String"/>
+      <arg column="skuId" javaType="java.lang.String"/>
+      <arg column="stockTotal" javaType="_long"/>
+      <arg column="available" javaType="_long"/>
+      <arg column="reserved" javaType="_long"/>
+      <arg column="sold" javaType="_long"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="Warehouse" type="com.lrj.trade.inventory.model.Warehouse" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="warehouseNo" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <resultMap id="LedgerEntry" type="com.lrj.trade.inventory.model.LedgerEntry" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="operationRef" javaType="java.lang.String"/>
+      <arg column="warehouseId" javaType="java.lang.String"/>
+      <arg column="skuId" javaType="java.lang.String"/>
+      <arg column="operationType" javaType="java.lang.String"/>
+      <arg column="availableDelta" javaType="_long"/>
+      <arg column="reservedDelta" javaType="_long"/>
+      <arg column="soldDelta" javaType="_long"/>
+      <arg column="totalDelta" javaType="_long"/>
+      <arg column="reason" javaType="java.lang.String"/>
+      <arg column="occurredAt" javaType="java.lang.String" typeHandler="com.lrj.trade.core.mapper.typehandler.UtcInstantStringTypeHandler"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 新增租户仓库，重复业务编号由唯一约束拒绝。 -->
+  <insert id="insertWarehouse">
+    <![CDATA[
+      INSERT INTO tc_warehouse(tenant_id,warehouse_no,name) VALUES (#{tenant},#{warehouseNo},#{name})
+    ]]>
+  </insert>
+
+  <!-- 读取本事务创建的仓库编号。 -->
+  <select id="findWarehouseId" resultType="java.lang.String" useCache="false">
+    <![CDATA[
+      SELECT CAST(id AS CHAR) FROM tc_warehouse WHERE tenant_id=#{tenant} AND warehouse_no=#{warehouseNo}
+    ]]>
+  </select>
+
+  <!-- 建立库存余额行，已存在时不覆盖任何库存数量。 -->
+  <insert id="insertBalanceIfAbsent">
+    <![CDATA[
+      INSERT INTO tc_inventory_balance(tenant_id,warehouse_id,sku_id) VALUES (#{tenant},#{warehouseId},#{skuId}) ON DUPLICATE KEY UPDATE id=id
+    ]]>
+  </insert>
+
+  <!-- 原子条件更新可售量及总量，不能扣减至负库存。 -->
+  <update id="adjustBalance">
+    <![CDATA[
+      UPDATE tc_inventory_balance SET available=available+#{availableDelta},stock_total=stock_total+#{totalDelta},version=version+1
+      WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND available>=#{minimumAvailable}
+    ]]>
+  </update>
+
+  <!-- 条件扣减可售并增加预占，防止并发超卖。 -->
+  <update id="reserveBalance">
+    <![CDATA[
+      UPDATE tc_inventory_balance SET available=available-#{availableDelta},reserved=reserved+#{reservedDelta},version=version+1
+      WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND available>=#{minimumAvailable}
+    ]]>
+  </update>
+
+  <!-- 追加预占事实，与余额及流水在同一事务提交。 -->
+  <insert id="insertReservation">
+    <![CDATA[
+      INSERT INTO tc_inventory_reservation(tenant_id,reservation_key,warehouse_id,sku_id,quantity) VALUES (#{tenant},#{reservationKey},#{warehouseId},#{skuId},#{quantity})
+    ]]>
+  </insert>
+
+  <!-- 按租户稳定键读取预占编号。 -->
+  <select id="findReservationId" resultType="java.lang.String" useCache="false">
+    <![CDATA[
+      SELECT CAST(id AS CHAR) FROM tc_inventory_reservation WHERE tenant_id=#{tenant} AND reservation_key=#{reservationKey}
+    ]]>
+  </select>
+
+  <!-- 锁定预占事实，防止确认与释放同时生效。 -->
+  <select id="lockReservation" resultMap="Reservation" useCache="false">
+    <![CDATA[
+      SELECT id AS id,warehouse_id AS warehouse,sku_id AS sku,quantity AS quantity,status AS status
+      FROM tc_inventory_reservation
+      WHERE tenant_id=#{tenant} AND reservation_key=#{reservationKey} FOR UPDATE
+    ]]>
+  </select>
+
+  <!-- 原子转移预占数量，必须满足预占余额下限。 -->
+  <update id="settleReservedBalance">
+    <![CDATA[
+      UPDATE tc_inventory_balance SET available=available+#{availableDelta},reserved=reserved-#{reservedDelta},sold=sold+#{soldDelta},version=version+1
+      WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND reserved>=#{minimumReserved}
+    ]]>
+  </update>
+
+  <!-- 持有预占锁时更新终态，不独立判断支付或关单事实。 -->
+  <update id="updateReservationStatus">
+    <![CDATA[
+      UPDATE tc_inventory_reservation SET status=#{status},version=version+1 WHERE tenant_id=#{tenant} AND id=#{reservationId}
+    ]]>
+  </update>
+
+  <!-- 租户内有界分页库存余额。 -->
+  <select id="listBalances" resultMap="Balance" useCache="false">
+    <![CDATA[
+      SELECT id AS id,warehouse_id AS warehouseId,sku_id AS skuId,stock_total AS stockTotal,available AS available,reserved AS reserved,sold AS sold,version AS version
+      FROM tc_inventory_balance WHERE tenant_id=#{tenant} AND id>#{after} ORDER BY id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 租户内有界分页仓库，前端无需硬编码编号。 -->
+  <select id="listWarehouses" resultMap="Warehouse" useCache="false">
+    <![CDATA[
+      SELECT id AS id,warehouse_no AS warehouseNo,name AS name,version AS version
+      FROM tc_warehouse WHERE tenant_id=#{tenant} AND id>#{after} ORDER BY id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 强制仓库及规格过滤，使用索引有界查询流水。 -->
+  <select id="listLedgerEntries" resultMap="LedgerEntry" useCache="false">
+    <![CDATA[
+      SELECT id AS id,operation_ref AS operationRef,warehouse_id AS warehouseId,sku_id AS skuId,operation_type AS operationType,available_delta AS availableDelta,reserved_delta AS reservedDelta,sold_delta AS soldDelta,total_delta AS totalDelta,reason AS reason,created_at AS occurredAt
+      FROM tc_inventory_ledger WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND id>#{after}
+      ORDER BY id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 核验目标仓库归属，防止跨租户库存调整。 -->
+  <select id="countWarehouse" resultType="java.lang.Integer" useCache="false">
+    <![CDATA[
+      SELECT COUNT(*) FROM tc_warehouse WHERE tenant_id=#{tenant} AND id=#{warehouseId}
+    ]]>
+  </select>
+
+  <!-- 追加库存守恒流水，必须与余额修改共同提交。 -->
+  <insert id="insertLedger">
+    <![CDATA[
+      INSERT INTO tc_inventory_ledger(tenant_id,operation_ref,warehouse_id,sku_id,operation_type,
+      available_delta,reserved_delta,sold_delta,total_delta,reason,actor_key)
+      VALUES (#{tenant},#{operationRef},#{warehouseId},#{skuId},#{operationType},#{availableDelta},#{reservedDelta},#{soldDelta},#{totalDelta},#{reason},#{actorKey})
+    ]]>
+  </insert>
+  <!-- 复用余额复合唯一键，当前读只重入已持有的余额行锁。 -->
+  <select id="lockBalance" resultMap="Balance" useCache="false">
+    SELECT id,warehouse_id AS warehouseId,sku_id AS skuId,stock_total AS stockTotal,available,reserved,sold,version
+    FROM tc_inventory_balance WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId} FOR UPDATE
+  </select>
+</mapper>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.member.mapper.ConsentDocumentMapper">
+  <!-- 显式字段映射和绑定参数；保留租户条件、行锁及原子更新，禁止字符串拼接。 -->
+  <resultMap id="Document" type="com.lrj.trade.member.model.Document" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="purpose" javaType="java.lang.String"/>
+      <arg column="documentVersion" javaType="java.lang.String"/>
+      <arg column="title" javaType="java.lang.String"/>
+      <arg column="contentUrl" javaType="java.lang.String"/>
+      <arg column="contentHash" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 追加不可变条款版本，重复版本由唯一约束拒绝。 -->
+  <insert id="insertDocument">
+    <![CDATA[
+      INSERT INTO tc_consent_document(tenant_id,purpose,document_version,title,content_url,content_hash) VALUES (#{tenant},#{purpose},#{documentVersion},#{title},#{contentUrl},#{contentHash})
+    ]]>
+  </insert>
+
+  <!-- 按租户用途版本精确读取条款编号。 -->
+  <select id="findDocumentId" resultType="java.lang.String" useCache="false">
+    <![CDATA[
+      SELECT CAST(id AS CHAR) FROM tc_consent_document WHERE tenant_id=#{tenant} AND purpose=#{purpose} AND document_version=#{documentVersion}
+    ]]>
+  </select>
+
+  <!-- 有界查询已发布条款，不跨租户合并版本。 -->
+  <select id="listDocuments" resultMap="Document" useCache="false">
+    <![CDATA[
+      SELECT id AS id,purpose AS purpose,document_version AS documentVersion,title AS title,content_url AS contentUrl,content_hash AS contentHash
+      FROM tc_consent_document
+      WHERE tenant_id=#{tenant} AND id>#{after} ORDER BY id LIMIT #{limit}
+    ]]>
+  </select>
+</mapper>

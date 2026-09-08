@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.core.mapper.OutboxMaintenanceMapper">
+  <!-- 内部维护发现唯一跨租户例外；没有对外业务查询入口。 -->
+  <select id="nextTenant" resultType="java.lang.Long" useCache="false">
+    SELECT tenant_id FROM tc_outbox WHERE tenant_id&gt;#{after} ORDER BY tenant_id LIMIT 1
+  </select>
+  <resultMap id="State" type="com.lrj.trade.core.OutboxMaintenanceState"><constructor>
+    <arg column="cursor_id" javaType="_long"/><arg column="round_upper_id" javaType="_long"/>
+    <arg column="round_active" javaType="_boolean"/><arg column="scanned_count" javaType="_long"/>
+    <arg column="candidate_count" javaType="_long"/><arg column="due" javaType="_boolean"/>
+  </constructor></resultMap>
+  <resultMap id="Candidate" type="com.lrj.trade.core.OutboxMaintenanceCandidate"><constructor>
+    <arg column="id" javaType="_long"/><arg column="event_id" javaType="java.lang.String"/>
+    <arg column="event_type" javaType="java.lang.String"/><arg column="status" javaType="java.lang.String"/>
+  </constructor></resultMap>
+  <insert id="ensure">
+    INSERT INTO tc_outbox_maintenance(tenant_id,next_round_at) VALUES(#{tenant},UTC_TIMESTAMP(3))
+    ON DUPLICATE KEY UPDATE tenant_id=tc_outbox_maintenance.tenant_id
+  </insert>
+  <select id="lock" resultMap="State" useCache="false">
+    SELECT cursor_id,round_upper_id,round_active,scanned_count,candidate_count,(next_round_at&lt;=UTC_TIMESTAMP(3)) AS due
+    FROM tc_outbox_maintenance WHERE tenant_id=#{tenant} FOR UPDATE
+  </select>
+  <select id="upper" resultType="java.lang.Long" useCache="false">
+    SELECT MAX(id) FROM tc_outbox WHERE tenant_id=#{tenant}
+  </select>
+  <update id="start">
+    UPDATE tc_outbox_maintenance SET cursor_id=0,round_upper_id=#{upper},round_active=1,scanned_count=0,candidate_count=0,
+      round_started_at=UTC_TIMESTAMP(3),version=version+1 WHERE tenant_id=#{tenant}
+  </update>
+  <select id="page" resultMap="Candidate" useCache="false">
+    SELECT id,event_id,event_type,status FROM tc_outbox
+    WHERE tenant_id=#{tenant} AND id&gt;#{after} AND id&lt;=#{upper} ORDER BY id LIMIT #{limit}
+  </select>
+  <update id="advance">
+    UPDATE tc_outbox_maintenance SET cursor_id=#{cursor},scanned_count=#{scanned},candidate_count=#{candidates},
+      round_active=CASE WHEN #{complete} THEN 0 ELSE 1 END,
+      completed_rounds=completed_rounds+CASE WHEN #{complete} THEN 1 ELSE 0 END,
+      last_completed_at=CASE WHEN #{complete} THEN UTC_TIMESTAMP(3) ELSE last_completed_at END,
+      last_upper_id=CASE WHEN #{complete} THEN round_upper_id ELSE last_upper_id END,
+      last_scanned_count=CASE WHEN #{complete} THEN #{scanned} ELSE last_scanned_count END,
+      last_candidate_count=CASE WHEN #{complete} THEN #{candidates} ELSE last_candidate_count END,
+      next_round_at=CASE WHEN #{complete} THEN TIMESTAMPADD(MICROSECOND,#{intervalMicros},UTC_TIMESTAMP(3)) ELSE next_round_at END,
+      version=version+1 WHERE tenant_id=#{tenant}
+  </update>
+</mapper>

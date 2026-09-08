@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.catalog.mapper.QuoteMapper">
+  <!-- 报价不可变，显式类型保留金额整数和UTC时刻，不使用查询缓存。 -->
+  <resultMap id="header" type="com.lrj.trade.catalog.model.QuoteHeader" autoMapping="false">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="payable_amount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="pricing_policy" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.Instant"/>
+      <arg column="expires_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="item" type="com.lrj.trade.catalog.model.QuoteItem" autoMapping="false">
+    <constructor>
+      <arg column="sku_id" javaType="java.lang.String"/>
+      <arg column="sku_revision" javaType="_long"/>
+      <arg column="title" javaType="java.lang.String"/>
+      <arg column="specification" javaType="java.util.Map" typeHandler="com.lrj.trade.catalog.mapper.typehandler.SpecificationTypeHandler"/>
+      <arg column="stock_type" javaType="java.lang.String"/>
+      <arg column="quantity" javaType="_long"/>
+      <arg column="unit_price" javaType="_long"/>
+      <arg column="payable_amount" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <!-- 主表、明细、命令引用同事务，不能返回未持久化的临时报价。 -->
+  <insert id="insertQuote">
+    INSERT INTO tc_quote(tenant_id,member_id,payable_amount,currency,pricing_policy,expires_at,created_at,updated_at)
+    VALUES (#{tenant},#{member},#{amount},#{currency},#{policy},#{expires},#{created},#{created})
+  </insert>
+  <select id="lastInsertedQuoteId" resultType="java.lang.Long" useCache="false">
+    SELECT id FROM tc_quote WHERE tenant_id=#{tenant} AND id=LAST_INSERT_ID()
+  </select>
+  <insert id="insertItem">
+    INSERT INTO tc_quote_item(tenant_id,quote_id,sku_id,sku_revision,title,specification,stock_type,quantity,
+      unit_price,payable_amount,created_at,updated_at)
+    VALUES (#{tenant},#{quote},#{sku},#{revision},#{title},#{specification},#{stockType},#{quantity},
+      #{price},#{amount},#{created},#{created})
+  </insert>
+  <select id="findOwn" resultMap="header" useCache="false">
+    SELECT id,payable_amount,currency,pricing_policy,created_at,expires_at
+    FROM tc_quote WHERE tenant_id=#{tenant} AND member_id=#{member} AND id=#{quote}
+  </select>
+  <select id="listItems" resultMap="item" useCache="false">
+    SELECT sku_id,sku_revision,title,specification,stock_type,quantity,unit_price,payable_amount
+    FROM tc_quote_item WHERE tenant_id=#{tenant} AND quote_id=#{quote} ORDER BY sku_id
+  </select>
+</mapper>

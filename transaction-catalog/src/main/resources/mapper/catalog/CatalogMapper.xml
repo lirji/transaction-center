@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.catalog.mapper.CatalogMapper">
+  <!-- 显式字段映射和绑定参数；保留租户条件、行锁及原子更新，禁止字符串拼接。 -->
+  <resultMap id="Product" type="com.lrj.trade.catalog.model.Product" autoMapping="false">
+    <constructor>
+      <arg column="productId" javaType="java.lang.String"/>
+      <arg column="skuId" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+      <arg column="unitPrice" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="publishedRevision" javaType="java.lang.Long"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 新增商品草稿，商品业务编号在租户内唯一。 -->
+  <insert id="insertProduct">
+    <![CDATA[
+      INSERT INTO tc_product(tenant_id,product_no,name) VALUES (#{tenant},#{productNo},#{name})
+    ]]>
+  </insert>
+
+  <!-- 读取本事务创建的商品编号。 -->
+  <select id="findProductId" resultType="java.lang.Long" useCache="false">
+    <![CDATA[
+      SELECT id FROM tc_product WHERE tenant_id=#{tenant} AND product_no=#{productNo}
+    ]]>
+  </select>
+
+  <!-- 兼容原创建入口，新增首个主规格。 -->
+  <insert id="insertPrimarySku">
+    <![CDATA[
+      INSERT INTO tc_sku(tenant_id,product_id,sku_no,unit_price,currency) VALUES (#{tenant},#{productId},#{skuNo},#{price},#{currency})
+    ]]>
+  </insert>
+
+  <!-- 以状态及版本条件更新草稿，禁止直接编辑线上商品。 -->
+  <update id="updateDraftName">
+    <![CDATA[
+      UPDATE tc_product SET name=#{name},version=version+1
+      WHERE tenant_id=#{tenant} AND id=#{productId} AND version=#{expectedVersion} AND status<>'PUBLISHED'
+    ]]>
+  </update>
+
+  <!-- 只更新最早创建的主规格，不能覆盖其他规格价格。 -->
+  <update id="updatePrimarySkuPrice">
+    <![CDATA[
+      UPDATE tc_sku SET unit_price=#{price},currency=#{currency},version=version+1 WHERE tenant_id=#{tenant} AND product_id=#{productId} ORDER BY id LIMIT 1
+    ]]>
+  </update>
+
+  <!-- 以版本条件发布并推进快照版本，与快照写入同事务。 -->
+  <update id="publishProduct">
+    <![CDATA[
+      UPDATE tc_product SET status='PUBLISHED',published_revision=version+1,version=version+1
+      WHERE tenant_id=#{tenant} AND id=#{productId} AND version=#{expectedVersion} AND status<>'PUBLISHED'
+    ]]>
+  </update>
+
+  <!-- 复制全量规格为不可变快照，不覆盖历史发布版本。 -->
+  <insert id="insertPublishedSnapshots">
+    <![CDATA[
+      INSERT INTO tc_sku_revision(tenant_id,sku_id,revision,title,unit_price,currency,specification,stock_type)
+      SELECT s.tenant_id,s.id,p.published_revision,p.name,s.unit_price,s.currency,s.specification,s.stock_type
+      FROM tc_sku s JOIN tc_product p ON p.tenant_id=s.tenant_id AND p.id=s.product_id
+      WHERE p.tenant_id=#{tenant} AND p.id=#{productId}
+    ]]>
+  </insert>
+
+  <!-- 以状态及版本条件下架，不删除历史快照。 -->
+  <update id="unpublishProduct">
+    <![CDATA[
+      UPDATE tc_product SET status='OFFLINE',version=version+1 WHERE tenant_id=#{tenant} AND id=#{productId} AND version=#{expectedVersion} AND status='PUBLISHED'
+    ]]>
+  </update>
+
+  <!-- 每商品只取主规格，避免多规格破坏商品游标分页。 -->
+  <select id="listProducts" resultMap="Product" useCache="false">
+    <![CDATA[
+      SELECT p.id AS productId,s.id AS skuId,p.name AS name,p.status AS status,p.version AS version,s.unit_price AS unitPrice,s.currency AS currency,p.published_revision AS publishedRevision
+      FROM tc_product p JOIN tc_sku s ON s.tenant_id=p.tenant_id AND s.product_id=p.id
+      WHERE p.tenant_id=#{tenant} AND p.id>#{after} AND (#{admin} OR p.status='PUBLISHED')
+      AND s.id=(SELECT MIN(s2.id) FROM tc_sku s2 WHERE s2.tenant_id=p.tenant_id AND s2.product_id=p.id)
+      ORDER BY p.id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 读取主规格展示视图，会员只允许读取已发布商品。 -->
+  <select id="findProduct" resultMap="Product" useCache="false">
+    <![CDATA[
+      SELECT p.id AS productId,s.id AS skuId,p.name AS name,p.status AS status,p.version AS version,s.unit_price AS unitPrice,s.currency AS currency,p.published_revision AS publishedRevision
+      FROM tc_product p JOIN tc_sku s ON s.tenant_id=p.tenant_id AND s.product_id=p.id
+      WHERE p.tenant_id=#{tenant} AND p.id=#{productId} AND (#{admin} OR p.status='PUBLISHED')
+      AND s.id=(SELECT MIN(s2.id) FROM tc_sku s2 WHERE s2.tenant_id=p.tenant_id AND s2.product_id=p.id)
+    ]]>
+  </select>
+
+  <!-- 按租户及发布要求核验规格，供库存公开端口使用。 -->
+  <select id="countEligibleSku" resultType="java.lang.Integer" useCache="false">
+    <![CDATA[
+      SELECT COUNT(*) FROM tc_sku s JOIN tc_product p ON p.tenant_id=s.tenant_id AND p.id=s.product_id
+      WHERE s.tenant_id=#{tenant} AND s.id=#{skuId} AND (#{published}=FALSE OR p.status='PUBLISHED')
+    ]]>
+  </select>
+  <!-- 当前锁读只发生于失败路径，避免旧RR快照把当前状态错误归因为版本过期。 -->
+  <select id="lockMutationVersion" resultType="java.lang.Long" useCache="false">
+    SELECT version FROM tc_product WHERE tenant_id=#{tenant} AND id=#{productId} FOR UPDATE
+  </select>
+</mapper>

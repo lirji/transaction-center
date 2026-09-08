@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.member.mapper.CustomerFactMapper">
+ <resultMap id="Fact" type="com.lrj.trade.member.model.CustomerFact" autoMapping="false"><constructor>
+  <arg column="member_id" javaType="java.lang.String"/><arg column="registered_at" javaType="java.time.Instant"/>
+  <arg column="ever_paid" javaType="_boolean"/><arg column="first_paid_order_id" javaType="java.lang.String"/>
+  <arg column="first_confirmed_at" javaType="java.time.Instant"/><arg column="version" javaType="_long"/>
+ </constructor></resultMap>
+ <select id="read" resultMap="Fact" useCache="false">
+ SELECT f.member_id,m.registered_at,f.ever_paid,f.first_paid_order_id,f.first_confirmed_at,f.version
+ FROM tc_member m JOIN tc_member_trade_fact f ON f.tenant_id=m.tenant_id AND f.member_id=m.id
+ WHERE m.tenant_id=#{tenant} AND m.id=#{member}
+ </select>
+</mapper>

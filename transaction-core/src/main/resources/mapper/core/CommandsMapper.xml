@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.core.mapper.CommandsMapper">
+  <!-- 显式字段映射和绑定参数；保留租户条件、行锁及原子更新，禁止字符串拼接。 -->
+  <resultMap id="commandRow" type="com.lrj.trade.core.model.CommandRow" autoMapping="false">
+    <constructor>
+      <arg column="request_hash" javaType="java.lang.String"/>
+      <arg column="result_ref" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 唯一键建立命令占位，与业务操作共用事务，重复键不能覆盖原摘要。 -->
+  <insert id="insertIfAbsent">
+    <![CDATA[
+      INSERT INTO tc_command(tenant_id,actor_key,operation,request_key,request_hash)
+      VALUES (#{tenant},#{actorKey},#{operation},#{requestKey},#{requestHash}) ON DUPLICATE KEY UPDATE id=id
+    ]]>
+  </insert>
+
+  <select id="findCommand" resultMap="commandRow" useCache="false">
+    SELECT request_hash,result_ref FROM tc_command
+    WHERE tenant_id=#{tenant} AND actor_key=#{actorKey} AND operation=#{operation} AND request_key=#{requestKey}
+  </select>
+
+  <!-- 当前读锁定幂等记录，等待并发提交后读取已保存结果。 -->
+  <select id="lockCommand" resultMap="commandRow" useCache="false">
+    <![CDATA[
+      SELECT request_hash,result_ref FROM tc_command
+      WHERE tenant_id=#{tenant} AND actor_key=#{actorKey} AND operation=#{operation} AND request_key=#{requestKey} FOR UPDATE
+    ]]>
+  </select>
+
+  <!-- 业务成功后保存引用，不能单独提交幂等成功状态。 -->
+  <update id="saveResult">
+    <![CDATA[
+      UPDATE tc_command SET result_ref=#{result},version=version+1
+      WHERE tenant_id=#{tenant} AND actor_key=#{actorKey} AND operation=#{operation} AND request_key=#{requestKey}
+    ]]>
+  </update>
+</mapper>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.core.mapper.OutboxDeliveryMapper">
+  <resultMap id="Row" type="com.lrj.trade.core.OutboxDeliveryPort$Row">
+    <constructor>
+      <idArg column="id" javaType="_long"/><arg column="tenant_id" javaType="_long"/>
+      <arg column="event_id" javaType="java.lang.String"/><arg column="event_type" javaType="java.lang.String"/>
+      <arg column="aggregate_id" javaType="java.lang.String"/><arg column="payload" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/><arg column="publish_attempt_base" javaType="_long"/><arg column="replay_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <!-- 同一事件先锁Outbox再校验任务租约，所有写路径保持顺序一致。 -->
+  <select id="lock" resultMap="Row" useCache="false">
+    SELECT id,tenant_id,event_id,event_type,aggregate_id,payload,status,version,publish_attempt_base,replay_count FROM tc_outbox
+    WHERE tenant_id=#{tenant} AND event_id=#{eventId} FOR UPDATE
+  </select>
+  <update id="sent">
+    UPDATE tc_outbox SET status='SENT',published_at=UTC_TIMESTAMP(3),published_topic=#{topic},
+      published_partition=#{partition},published_offset=#{offset},version=version+1
+    WHERE tenant_id=#{tenant} AND event_id=#{eventId} AND status='PENDING'
+  </update>
+  <update id="failed">
+    UPDATE tc_outbox SET status=#{status},first_failure_at=COALESCE(first_failure_at,UTC_TIMESTAMP(3)),
+      last_failure_at=UTC_TIMESTAMP(3),failure_count=failure_count+1,last_publish_error=#{code},version=version+1
+    WHERE tenant_id=#{tenant} AND event_id=#{eventId} AND status='PENDING'
+  </update>
+  <select id="page" resultMap="Row" useCache="false">
+    SELECT id,tenant_id,event_id,event_type,aggregate_id,payload,status,version,publish_attempt_base,replay_count FROM tc_outbox
+    WHERE tenant_id=#{tenant} AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+</mapper>

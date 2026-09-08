@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.catalog.mapper.SkuMapper">
+  <!-- 显式字段映射和绑定参数；保留租户条件、行锁及原子更新，禁止字符串拼接。 -->
+  <resultMap id="Sku" type="com.lrj.trade.catalog.model.Sku" autoMapping="false">
+    <constructor>
+      <arg column="skuId" javaType="java.lang.String"/>
+      <arg column="skuNo" javaType="java.lang.String"/>
+      <arg column="productId" javaType="java.lang.String"/>
+      <arg column="title" javaType="java.lang.String"/>
+      <arg column="unitPrice" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="stockType" javaType="java.lang.String"/>
+      <arg column="specification" javaType="java.util.Map" typeHandler="com.lrj.trade.catalog.mapper.typehandler.SpecificationTypeHandler"/>
+      <arg column="revision" javaType="_long"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 在持有商品锁时统计规格数量，防止并发突破上限。 -->
+  <select id="countSkus" resultType="java.lang.Long" useCache="false">
+    <![CDATA[
+      SELECT COUNT(*) FROM tc_sku WHERE tenant_id=#{tenant} AND product_id=#{productId}
+    ]]>
+  </select>
+
+  <!-- 新增独立规格草稿，规格JSON通过绑定参数传入。 -->
+  <insert id="insertSku">
+    <![CDATA[
+      INSERT INTO tc_sku(tenant_id,product_id,sku_no,unit_price,currency,stock_type,specification) VALUES (#{tenant},#{productId},#{skuNo},#{price},#{currency},#{stockType},#{specification})
+    ]]>
+  </insert>
+
+  <!-- 读取租户内规格编号，禁止跨租户定位。 -->
+  <select id="findSkuId" resultType="java.lang.String" useCache="false">
+    <![CDATA[
+      SELECT CAST(id AS CHAR) FROM tc_sku WHERE tenant_id=#{tenant} AND sku_no=#{skuNo}
+    ]]>
+  </select>
+
+  <!-- 只更新指定商品下的目标规格，不影响其他规格。 -->
+  <update id="updateSku">
+    <![CDATA[
+      UPDATE tc_sku SET unit_price=#{price},currency=#{currency},stock_type=#{stockType},specification=#{specification},version=version+1 WHERE tenant_id=#{tenant} AND product_id=#{productId} AND id=#{skuId}
+    ]]>
+  </update>
+
+  <!-- 后台有界读取规格草稿，版本为整体商品版本。 -->
+  <select id="listDraftSkus" resultMap="Sku" useCache="false">
+    <![CDATA[
+      SELECT s.id AS skuId,s.sku_no AS skuNo,s.product_id AS productId,p.name AS title,s.unit_price AS unitPrice,s.currency AS currency,s.stock_type AS stockType,s.specification AS specification,p.version AS revision
+      FROM tc_sku s JOIN tc_product p ON p.tenant_id=s.tenant_id AND p.id=s.product_id
+      WHERE s.tenant_id=#{tenant} AND s.product_id=#{productId} AND s.id>#{after} ORDER BY s.id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 会员只读取已发布版本快照，不暴露未发布草稿。 -->
+  <select id="listPublishedSkus" resultMap="Sku" useCache="false">
+    <![CDATA[
+      SELECT s.id AS skuId,s.sku_no AS skuNo,s.product_id AS productId,r.title AS title,r.unit_price AS unitPrice,r.currency AS currency,r.stock_type AS stockType,r.specification AS specification,r.revision AS revision
+      FROM tc_sku s JOIN tc_product p ON p.tenant_id=s.tenant_id AND p.id=s.product_id
+      JOIN tc_sku_revision r ON r.tenant_id=s.tenant_id AND r.sku_id=s.id AND r.revision=p.published_revision
+      WHERE s.tenant_id=#{tenant} AND s.product_id=#{productId} AND s.id>#{after} AND p.status='PUBLISHED' ORDER BY s.id LIMIT #{limit}
+    ]]>
+  </select>
+
+  <!-- 读取规格所属商品，所属关系创建后不变。 -->
+  <select id="findProductIds" resultType="java.lang.Long" useCache="false">
+    <![CDATA[
+      SELECT product_id FROM tc_sku WHERE tenant_id=#{tenant} AND id=#{skuId}
+    ]]>
+  </select>
+
+  <!-- 共享锁当前已发布商品，报价读取必须参与业务事务。 -->
+  <select id="lockPublishedRevision" resultType="java.lang.Long" useCache="false">
+    <![CDATA[
+      SELECT published_revision FROM tc_product WHERE tenant_id=#{tenant} AND id=#{productId} AND status='PUBLISHED' FOR SHARE
+    ]]>
+  </select>
+
+  <!-- 当前读不可变发布快照，避免等待发布后仍读到旧快照。 -->
+  <select id="lockPublishedSku" resultMap="Sku" useCache="false">
+    <![CDATA[
+      SELECT s.id AS skuId,s.sku_no AS skuNo,s.product_id AS productId,r.title AS title,r.unit_price AS unitPrice,r.currency AS currency,r.stock_type AS stockType,r.specification AS specification,r.revision AS revision
+      FROM tc_sku s JOIN tc_sku_revision r ON r.tenant_id=s.tenant_id AND r.sku_id=s.id
+      WHERE s.tenant_id=#{tenant} AND s.id=#{skuId} AND r.revision=#{revision} FOR SHARE
+    ]]>
+  </select>
+
+  <!-- 通过商品版本条件更新串行化规格编辑与发布。 -->
+  <update id="advanceDraftVersion">
+    <![CDATA[
+      UPDATE tc_product SET version=version+1 WHERE tenant_id=#{tenant} AND id=#{productId} AND version=#{expectedVersion} AND status<>'PUBLISHED'
+    ]]>
+  </update>
+  <!-- 当前锁读只发生于失败路径，避免旧RR快照把当前状态错误归因为版本过期。 -->
+  <select id="lockMutationVersion" resultType="java.lang.Long" useCache="false">
+    SELECT version FROM tc_product WHERE tenant_id=#{tenant} AND id=#{productId} FOR UPDATE
+  </select>
+</mapper>
