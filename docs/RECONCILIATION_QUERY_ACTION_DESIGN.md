@@ -1,0 +1,23 @@
+# 对账差异的只查单处置边界
+
+差异受理完成后仍需可审计处置。第一类动作仅 QUERY_PAYMENT / QUERY_REFUND，不允许透传动作字符串。原 PaymentRecoveryWorker / RefundRecoveryWorker 可能执行 CREATE、CLOSE、审批超时释放或同号补建，因此不能用唤醒普通恢复任务冒充“仅查单”。这项边界必须在实现与测试中明确保持。
+
+计划建立独立查询计划Port：支付请求引用来自case已经核验的PAYMENT_ATTEMPT或RECEIPT；退款引用来自原资金refundNo，且解析到已有退款申请及原merchantRefundNo。服务端重新核tenant/channel/原请求绑定，不能采用客户端新传provider号。查询计划只允许QUERY动作，不调用带CREATE/派发屏障/审批超时语义的prepare方法。尚未提交的退款拒绝“渠道查单”，不借查询触发提交。
+
+管理员提交caseNo、expectedVersion、固定action、原因、工单引用、Idempotency-Key，并具备专用trade.reconciliation.query权限。永久操作回执保护主体+幂等键，绑定完整内容，原caseVersion有效时一次把case关联PROCESSING和独立任务写入同事务，审计失败全部回滚。独立任务RECON_QUERY及固定处理器不能被现有恢复Worker领取；共享租约fencing规则、原号、网络事务外。全局attempts不能重置；重复操作重放永久结果，不重复请求资金。
+
+处理器拿到QUERY计划并fence后只调用原ChannelPort查询。遇REPLAYABLE_ABSENCE不得进入prepareReplay或CREATE；记录查无/待核对，保留原金额和预占。真实认证证据仍通过既有耐久Inbox接收路径处理，但任务完成只表示已获得/受理查询结果，不能自动把case标CLOSED。UNKNOWN/不可用使用有界重试后REVIEW；网络例外/失租不覆盖他人结果，不释放退款额度，不清everPaid。
+
+需另建有界查询操作视图，让运营区分QUEUED/RUNNING/RESULT_ACCEPTED/REVIEW，避免“请求已接受”被展示成差异已解决。归属冲突或原计划不支持只读查询则留OPEN并说明原因，不降级成任意恢复。已有共享V001～V024冻结，新DDL合并对账阶段后一次全量，再按授权迁移。
+
+后续异常收款补偿仍进入原强制审批申请流程；人工核对结案需要独立可信证据合同及版本审计，不能以任意reason/approvalRef直接改变资金或结案。生产渠道真实QUERY语义、超时、签名与账单完整性保留外部验收。
+
+## 原渠道计划已实现
+
+PaymentQueryPlanPort按tenant+attempt.channel_id核PAYMENT_ATTEMPT/RECEIPT，原credentials仅留内部redacted计划。RefundQueryPlanPort核申请/hold/receipt/attempt、原merchantRefundNo、submitted_at和bindingCurrency；不支持异常币种时拒绝，不调整币种。ReconciliationQueryExecutor执行NEVER+显式事务防护和QUERY二次白名单，REPLAYABLE_ABSENCE仅返回观察结果。该部分独立源码审查无确定阻断；操作永久回执、RECON_QUERY Worker及fencing/操作列表尚未实现。
+
+## 操作与运行时当前实现
+
+V027操作表保存actor请求键的永久首次QUEUED结果与可变执行状态。申请采用RC和operation→case→job；旧操作仅普通读终态后允许新轮次，不逆向锁旧操作。Worker固定RECON_QUERY、默认零线程、总容量16、每租约最多一次QUERY、五次后REVIEW；缺失/坏键隔离，fencing失败回滚操作状态和结果审计。结果审计绑定操作本身版本，不虚构case版本变化。case保持PROCESSING，未实现人工证据结案或补偿动作。
+
+管理POST同时要求trade.admin和trade.reconciliation.query，query-enabled默认false；GET独立展示当前执行状态。此次内部Worker测试使用人工结果替身，不能代表真实渠道文件/签名/网络/证据联调已完成。

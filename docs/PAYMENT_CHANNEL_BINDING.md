@@ -1,0 +1,21 @@
+# 原支付渠道绑定
+
+## 原渠道绑定最终接线验证（2026-09-07）
+
+PaymentChannelBindingPort/Service、原尝试Mapper XML、RefundChannelService强制绑定及Adapter三参数合同已实现，缺引用Worker重试保留资金。exec16378全量verify退出0，223项全部通过；此后新增凭据缺失Worker测试，首次exec36871测试变量类型编译错误已修复，exec11413最终专项22项全部通过（Foundation新增1＋Binding4＋RefundChannel13＋Mapper1＋Quality3）。不能声称单次224项全量通过。实际生产代码的全量验证已通过，最后测试变更另有专项证据。
+
+独立只读channel_binding_review未发现确定安全缺陷，建议的缺引用Worker案例已补并通过。原始报告、失败日志及审查位于.codex/tasks/referral-end-to-end/evidence/channel-binding/。真实MySQL验证原路解析、跨租户拒绝、冻结历史配置与事务外网络，合同测试验证错渠道/商户/币种/租户/尝试/凭据拒绝，以及Binding原样传递。22Mapper/172SQL；无DDL和HTTP变化，共享V016；无应用部署、共享业务写入或其他平台改造。
+
+真实供应商/托管密钥权限与轮换/强制超时仍未完成。下一步继续可信审批与退款后台、异常多付补偿、独立退货、正式资格事件、生产门禁和完整裂变；不要重做已经通过的原路接线。以下较旧状态为历史记录。
+
+PaymentChannelBindingPort.resolve(tenant,attemptId)为可信内部调用提供原支付尝试引用的历史channel_id、渠道代码、渠道商户、币种、credentialRef和配置版本。不返回密钥内容或回跳地址；Binding默认日志全部脱敏。配置版本不是托管密钥版本，托管引用是否指向不可变密钥版本仍需真实供应商和密钥服务合同保证。
+
+PaymentChannelBindingService使用支付域自己的PaymentMapper.findAttemptById与ChannelMapper.findById，两个查询都绑定tenant。后者故意不限定ACTIVE：冻结配置不阻断历史合法退款，不能按最新商户配置重选。尝试缺失返回NOT_FOUND；配置或凭据引用缺失返回PAYMENT_CHANNEL_BINDING_UNAVAILABLE。十秒只读事务；本Port只解析路由，不是退款许可，网络仍必须事务外调用。
+
+RefundChannelService已强制注入本Port：CREATE和QUERY在调用前解析原尝试，核对租户、尝试号、渠道、渠道商户、币种及非空托管引用；不一致抛REFUND_CHANNEL_BINDING_CONFLICT，禁止访问外部渠道。Adapter.execute仅保留(plan,binding,timeout)签名，原有两参数入口及不带解析器的构造器已移除。调用前再次确认没有数据库事务。解析缺配置时恢复Worker持久重试，不释放资金；缺原尝试则进入人工核对。
+
+该Port不替代退款申请、资金来源与本地派发许可；Plan仅由可信内部退款编排提供。这里不是对客户端开放的任意尝试/任意退款派发API。托管引用解析和供应商验签仍需真实适配器认证，不能把String引用当成密钥安全系统。
+
+2026-09-07 exec66862专项退出0：4项解析单测、1项Mapper合同和3项质量门禁通过，报告在evidence/channel-binding。单测覆盖冻结历史配置、不调用当前配置查询、错误租户、缺失配置、空托管引用及脱敏；这些Mock单测不替代真实Mapper映射及端到端退款测试。前一版217项全量是V016恢复基线，新增解析代码还未全量验证。
+
+接线后的旧合同专项exec12424退出0。最后补充错路拒绝、原引用传递及真实MySQL历史冻结/网络无事务断言后，exec16378全量运行中；结果以CODEX_PROGRESS及最终原报告为准，不能将运行中记为通过。无DDL或HTTP变更，共享仍V016。SQL只在XML；新增1条操作，共22Mapper/172SQL。真实渠道/密钥托管/生产容量验收仍未完成。

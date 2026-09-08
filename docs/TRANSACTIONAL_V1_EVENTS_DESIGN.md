@@ -1,0 +1,15 @@
+# V1事务事件：不可变载荷与实施顺序
+
+沿用原交易合同第5节及REFERRAL_EVIDENCE_V1_DESIGN，不把内部v0资源引用直接发送给营销。外部canonicalSubject/组织店铺映射未签收不阻止交易原生事件实现，但阻止宣称C02/C03已联通。
+
+先落实会员注册V1：完整envelope与注册事实在注册命令事务内生成和保存，永久eventId随数据库事实存储，幂等重试返回原注册结果、不生成第二事件。采用已有tc_outbox JSON列，无需新迁移；只替换尚无外部消费者的member.registered.internal.v0，其他内部v0保留并禁止发布。后续发布器仅接受显式支持且schema通过的V1类型，不凭字符串后缀放行。
+
+Envelope固定schemaVersion=1、producer=transaction-center，tenantId/aggregateId字符串、aggregateType=MEMBER，aggregateVersion取新会员实际初始version=0。occurredAt和data.registeredAt使用同一注入Clock毫秒时间；registrationSource=AUTHENTICATED_IDENTITY，表示交易本地经认证身份注册路径，不携带issuer/subject/displayName。traceId在没有上游跟踪上下文时生成独立关联ID并原样存储；不能伪称已接通端到端traceparent。
+
+核心Outbox只接受不可变类型化数据，固定事件类型和聚合映射；调用必须MANDATORY，本地序列化/数据库错误使会员、空消费事实、命令、事件整体回滚。发布时直接使用已存完整payload，不按会员最新状态重建。已有历史v0不回填为伪造历史V1；如消费者需要基线，另做有水位的快照导出合同。
+
+验证包括真实数据库注册/重放唯一、外层回滚、载荷时间/租户/聚合字段、注册后修改资料不改变历史payload、禁止事务外写入，以及最小/完整/错误JSON固件与合同测试。
+
+后续顺序：正常支付/退款/取消/独立完成及库存的完整同事务事件，特别正常退款预占/释放的order-evidence-changed；随后持久租约Kafka发布、ACK丢失重放与DLQ。需解决写事务快照和当前锁定事实，不调用REQUIRES_NEW只读查询构造Outbox。原生产broker、ACL、容量、KMS、外部签收仍独立待验。
+
+独立审查落实：规范正十进制ID/UUID、零版本字段必填、JSON根null/重复键拒绝，实际Outbox与golden测试共用MemberEventCodec。codec验证类型化语义，JSON Schema引擎验证另计；后续外部消费者的可选字段兼容合同不由本地Outbox损坏校验替代。

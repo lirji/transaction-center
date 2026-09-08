@@ -1,0 +1,51 @@
+{
+  "scope": "transaction-center only; selected non-database tests, not full regression or production acceptance",
+  "source_commit": "fb5aef4fe0d844bf26bb41e2f29f5f82f42a3957",
+  "maven_package_exit": 0,
+  "suites": [
+    {
+      "name": "com.lrj.trade.server.OpenApiTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.lrj.trade.server.QualityGateTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.lrj.trade.server.MapperContractTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.lrj.trade.server.AuthoritativeReferralMappingAdapterTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.lrj.trade.client.RetryDecisionTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "selected_java_tests": 20,
+  "contract_exit": 0,
+  "error_codes": 80,
+  "emitted_error_codes": 79,
+  "event_types": 7,
+  "positive_examples": 12,
+  "python_tests": 9,
+  "database_full_regression_rerun": false,
+  "source_manifest_files": 498
+}

@@ -1,0 +1,17 @@
+# 原生会员新客策略证据
+
+`CustomerEligibilityService.query(tenant,memberId,policyVersion,campaignStartAt,evaluatedAt)` 在交易主库独立只读RR快照评估，不写资格预占。当前只有内部交易memberId入口，尚未开放HTTP或接入权威canonicalSubject映射，不能称为完整裂变C02。NOT_FOUND不带证据，也不默认新客。
+
+- REGISTERED_DURING_CAMPAIGN_V1：注册时间不早于活动开始，且不晚于评估时点。是否付过款不改变这个独立的注册时点策略。
+- NEVER_CONFIRMED_PAID_V1：默认当前查询依据快照内不可逆everPaid；显式历史时点仅用不可变registeredAt/firstConfirmedAt作限定策略投影。查询后发生支付仍可能改变资格，最终消费奖励由首单事实确认。
+- 缺省evaluatedAt不在建立快照前冻结时间，避免把“已在当前快照中读到”的首付排除。显式未来时点拒绝；当前读到的事实时间若超出本地时钟则失败关闭。数据库快照建立后发生的支付属于正常竞争，不是资格预占失效。
+
+响应包含当前everPaid、当前firstPaidOrderNo、当前factVersion，以及eligible/reasonCodes、policyVersion、evaluatedAt、everPaidAtEvaluation、observedAt。明确区分当前永久历史与历史时点评估：退款到零后everPaid仍真；过去首次确认之前可有eligible=true、everPaidAtEvaluation=false，但当前everPaid不会被伪装为false。factVersion表示本次采用的当前事实版本，observedAt表示读取完成时间；两者都不冒充历史MVCC版本/时间。
+
+会员注册和首付属于同一业务时间口径：新注册registered_at改用注入Clock，避免数据库默认时钟与应用首付时钟混用；既有注册记录和迁移不改写。跨实例时钟保障仍是生产前置，单进程Clock不等于全局时间一致。若首确认早于注册或首单不存在/归属不符，EVIDENCE_UNAVAILABLE，不能放宽为新客。
+
+只读Port仅普通一致读，并加入编排的同一主库事务。查询有意看不到调用者外层未提交写入，不能拿来构造写事务V1事件。冻结状态与历史策略分层，查询不授予交易权限；权威合并或映射未就绪必须由后续adapter返回PENDING/MERGED，不伪造READY。
+
+测试覆盖注册/活动/首次确认边界、两策略不同含义、显式历史与全退后不变、租户/不存在、快照前首付提交及快照后首付竞争。验证证据见任务evidence/order-evidence，最终全量通过前仍视为实现中。
+
+最终验证：`mvn -q -l build-evidence-final.log verify`退出0，279项全部通过（0失败/错误/跳过），独立审查无待修项。共享V021不变；HTTP与外部映射尚未接线。原始报告见evidence/order-evidence。
