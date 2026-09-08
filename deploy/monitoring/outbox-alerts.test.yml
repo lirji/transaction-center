@@ -1,0 +1,39 @@
+rule_files:
+  - outbox-alerts.yml
+evaluation_interval: 1m
+tests:
+  - name: stale-instance-must-not-keep-cleared-queue-alerting
+    interval: 1m
+    input_series:
+      - series: 'trade_outbox_queue_observed_at_seconds{job="transaction-center-worker",instance="failed"}'
+        values: '0+0x6'
+      - series: 'trade_outbox_queue_observed_at_seconds{job="transaction-center-worker",instance="healthy"}'
+        values: '0+60x6'
+      - series: 'trade_outbox_queue_count_lower_bound{job="transaction-center-worker",instance="failed",status="REVIEW"}'
+        values: '1+0x6'
+      - series: 'trade_outbox_queue_count_lower_bound{job="transaction-center-worker",instance="healthy",status="REVIEW"}'
+        values: '0+0x6'
+      - series: 'trade_outbox_queue_oldest_age_seconds{job="transaction-center-worker",instance="failed",status="READY"}'
+        values: '90+60x6'
+      - series: 'trade_outbox_queue_oldest_age_seconds{job="transaction-center-worker",instance="healthy",status="READY"}'
+        values: '0+0x6'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: TradeOutboxReviewRequired
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: TradeOutboxPublicationDelayed
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: TradeOutboxObservationMissing
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: TradeOutboxObservationStale
+        exp_alerts:
+          - exp_labels:
+              job: transaction-center-worker
+              instance: failed
+              severity: warning
+            exp_annotations:
+              summary: 发布队列没有新鲜观测
+              description: 采样失败保留旧值，不能将旧样本或首次采样失败解释为零积压。
