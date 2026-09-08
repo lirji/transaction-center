@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "inventory-changed V1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "tenantId",
+    "aggregateType",
+    "aggregateId",
+    "aggregateVersion",
+    "occurredAt",
+    "producer",
+    "traceId",
+    "data"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "trade.inventory-changed.v1"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$",
+      "description": "正十进制ID，数值不得超过9223372036854775807"
+    },
+    "aggregateType": {
+      "const": "INVENTORY_BALANCE"
+    },
+    "aggregateId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}:[1-9][0-9]{0,18}$"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "producer": {
+      "const": "transaction-center"
+    },
+    "traceId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "warehouseId",
+        "skuId",
+        "operationNo",
+        "available",
+        "reserved",
+        "sold",
+        "stockTotal",
+        "balanceVersion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "warehouseId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "description": "正十进制ID，数值不得超过9223372036854775807"
+        },
+        "skuId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "description": "正十进制ID，数值不得超过9223372036854775807"
+        },
+        "operationNo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "available": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "reserved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "sold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "stockTotal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "balanceVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        }
+      }
+    }
+  },
+  "description": "完整余额快照。typed合同额外验证aggregateId=warehouseId:skuId、aggregateVersion=balanceVersion和available+reserved+sold=stockTotal；JSON Schema文件不代替这些语义校验。"
+}

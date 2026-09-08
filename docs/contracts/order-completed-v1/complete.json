@@ -1,0 +1,18 @@
+{
+  "eventId": "b2962ee4-d15b-4c2a-a018-6f6518fc8e83",
+  "eventType": "trade.order-completed.v1",
+  "schemaVersion": 1,
+  "tenantId": "1001",
+  "aggregateType": "ORDER",
+  "aggregateId": "9001",
+  "aggregateVersion": 7,
+  "occurredAt": "2026-09-07T08:00:00.123Z",
+  "producer": "transaction-center",
+  "traceId": "e980d615-5b03-4d6c-9e2c-339459d66528",
+  "data": {
+    "orderId": "9001",
+    "memberId": "8001",
+    "completedAt": "2026-09-07T08:00:00.123Z",
+    "evidenceVersion": 7
+  }
+}

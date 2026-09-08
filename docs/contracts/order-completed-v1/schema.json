@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "order-completed V1",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "schemaVersion",
+    "tenantId",
+    "aggregateType",
+    "aggregateId",
+    "aggregateVersion",
+    "occurredAt",
+    "producer",
+    "traceId",
+    "data"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "trade.order-completed.v1"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$",
+      "description": "正十进制ID，数值不得超过9223372036854775807"
+    },
+    "aggregateType": {
+      "const": "ORDER"
+    },
+    "aggregateId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$",
+      "description": "正十进制ID，数值不得超过9223372036854775807"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "producer": {
+      "const": "transaction-center"
+    },
+    "traceId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "orderId",
+        "memberId",
+        "completedAt",
+        "evidenceVersion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "description": "正十进制ID，数值不得超过9223372036854775807"
+        },
+        "memberId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "description": "正十进制ID，数值不得超过9223372036854775807"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidenceVersion": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

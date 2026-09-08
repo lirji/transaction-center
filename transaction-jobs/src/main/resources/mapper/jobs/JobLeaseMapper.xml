@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.jobs.mapper.JobLeaseMapper">
+  <!-- 内部全租户调度唯一例外；无HTTP入口，游标每次跨过整个租户且结果至多1行。 -->
+  <select id="nextTenant" resultType="java.lang.Long" useCache="false">
+    SELECT tenant_id FROM tc_job_lease FORCE INDEX (idx_job_tenant_rotation)
+    WHERE job_type=#{type} AND runnable=1 AND tenant_id&gt;#{after}
+    ORDER BY tenant_id LIMIT 1
+  </select>
+  <resultMap id="lease" type="com.lrj.trade.jobs.model.JobLease">
+    <constructor>
+      <arg column="id" javaType="java.lang.String"/>
+      <arg column="tenant_id" javaType="_long"/>
+      <arg column="job_type" javaType="java.lang.String"/>
+      <arg column="business_key" javaType="java.lang.String"/>
+      <arg column="owner" javaType="java.lang.String"/>
+      <arg column="fencing_token" javaType="_long"/>
+      <arg column="attempts" javaType="_long"/>
+      <arg column="lease_until" javaType="java.time.Instant"/>
+      <arg column="trace_parent" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <!-- 重放只触及已有主键，不延迟任务或重启终态。 -->
+  <insert id="insertJob">
+    INSERT INTO tc_job_lease(tenant_id,job_type,business_key,status,next_run_at,created_at,updated_at,trace_parent)
+    VALUES(#{tenant},#{type},#{business},'READY',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),#{traceParent})
+    ON DUPLICATE KEY UPDATE id=tc_job_lease.id
+  </insert>
+  <insert id="schedule">
+    INSERT INTO tc_job_lease(tenant_id,job_type,business_key,status,next_run_at,created_at,updated_at,trace_parent)
+    VALUES(#{tenant},#{type},#{business},'READY',#{runAt},UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),#{traceParent})
+    ON DUPLICATE KEY UPDATE id=tc_job_lease.id
+  </insert>
+  <!-- 不改RUNNING的next_run_at，保持其与lease_until相等；后续退避识别未消费唤醒。 -->
+  <update id="wake">
+    UPDATE tc_job_lease SET wake_generation=wake_generation+1,
+      next_run_at=CASE WHEN status='READY' THEN LEAST(next_run_at,UTC_TIMESTAMP(3)) ELSE next_run_at END,
+      updated_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND job_type=#{type} AND business_key=#{business} AND status IN ('READY','RUNNING')
+  </update>
+  <!-- 运行中任务的next_run_at就是租约到期点，复用索引回收宕机工作。 -->
+  <select id="claimable" resultType="java.lang.Long" useCache="false">
+    SELECT id FROM tc_job_lease
+    WHERE tenant_id=#{tenant} AND job_type=#{type} AND runnable=1
+      AND next_run_at &lt;= UTC_TIMESTAMP(3)
+    ORDER BY next_run_at,id LIMIT #{limit} FOR UPDATE SKIP LOCKED
+  </select>
+  <update id="claim">
+    UPDATE tc_job_lease SET status='RUNNING',owner=#{owner},
+      lease_until=TIMESTAMPADD(MICROSECOND,#{leaseMicros},UTC_TIMESTAMP(3)),
+      next_run_at=lease_until,fencing_token=fencing_token+1,attempts=attempts+1,
+      claimed_wake_generation=wake_generation,
+      updated_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{id} AND status IN ('READY','RUNNING') AND next_run_at &lt;= UTC_TIMESTAMP(3)
+  </update>
+  <select id="read" resultMap="lease" useCache="false">
+    SELECT id,tenant_id,job_type,business_key,owner,fencing_token,attempts,lease_until,trace_parent
+    FROM tc_job_lease WHERE tenant_id=#{tenant} AND id=#{id}
+  </select>
+  <select id="lock" resultMap="lease" useCache="false">
+    SELECT id,tenant_id,job_type,business_key,owner,fencing_token,attempts,lease_until,trace_parent
+    FROM tc_job_lease WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+  </select>
+  <update id="renew">
+    UPDATE tc_job_lease SET lease_until=GREATEST(lease_until,TIMESTAMPADD(MICROSECOND,#{leaseMicros},UTC_TIMESTAMP(3))),
+      next_run_at=lease_until,updated_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{id} AND status='RUNNING' AND owner=#{owner}
+      AND fencing_token=#{token} AND lease_until &gt; UTC_TIMESTAMP(3)
+      AND job_type=#{type} AND business_key=#{business}
+  </update>
+  <update id="finish">
+    UPDATE tc_job_lease SET status=#{state},owner=NULL,lease_until=NULL,
+      next_run_at=CASE WHEN #{state}='READY' AND wake_generation&gt;claimed_wake_generation
+        THEN UTC_TIMESTAMP(3) ELSE TIMESTAMPADD(MICROSECOND,#{delayMicros},UTC_TIMESTAMP(3)) END,
+      last_error=#{error},updated_at=UTC_TIMESTAMP(3),version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{id} AND status='RUNNING' AND owner=#{owner}
+      AND fencing_token=#{token} AND lease_until &gt; UTC_TIMESTAMP(3)
+      AND job_type=#{type} AND business_key=#{business}
+  </update>
+  <select id="lockReviewedPublication" resultMap="lease" useCache="false">
+    SELECT id,tenant_id,job_type,business_key,owner,fencing_token,attempts,lease_until,trace_parent FROM tc_job_lease
+    WHERE tenant_id=#{tenant} AND job_type='OUTBOX_PUBLISH' AND business_key=#{eventId} AND status='REVIEW' FOR UPDATE
+  </select>
+  <update id="requeuePublication">
+    UPDATE tc_job_lease SET status='READY',next_run_at=UTC_TIMESTAMP(3),version=version+1,updated_at=UTC_TIMESTAMP(3)
+    WHERE tenant_id=#{tenant} AND job_type='OUTBOX_PUBLISH' AND business_key=#{eventId} AND status='REVIEW'
+  </update>
+  <resultMap id="publicationTask" type="com.lrj.trade.jobs.model.PublicationTask"><constructor>
+    <arg column="id" javaType="java.lang.String"/><arg column="business_key" javaType="java.lang.String"/>
+    <arg column="status" javaType="java.lang.String"/><arg column="attempts" javaType="_long"/>
+    <arg column="next_run_at" javaType="java.time.Instant"/><arg column="last_error" javaType="java.lang.String"/>
+  </constructor></resultMap>
+  <select id="publicationTasks" resultMap="publicationTask" useCache="false">
+    SELECT id,business_key,status,attempts,next_run_at,last_error FROM tc_job_lease
+    WHERE tenant_id=#{tenant} AND job_type='OUTBOX_PUBLISH' AND status=#{state} AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+</mapper>

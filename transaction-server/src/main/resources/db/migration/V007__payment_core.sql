@@ -1,0 +1,135 @@
+CREATE TABLE tc_merchant_channel (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '内部主键，对外标识以字符串表示',
+  tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户，所有业务读写必须限定',
+  created_at DATETIME(3) NOT NULL COMMENT '创建UTC时间，毫秒精度',
+  updated_at DATETIME(3) NOT NULL COMMENT '最近更新UTC时间，毫秒精度',
+  version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '并发版本，每次可变状态更新递增',
+merchant_no VARCHAR(64) NOT NULL COMMENT '租户内逻辑商户编号，不接受支付请求指定',
+  channel_code VARCHAR(64) NOT NULL COMMENT '支付渠道适配器类型代码',
+  channel_merchant_no VARCHAR(255) NOT NULL COMMENT '渠道收款主体，全局明确绑定租户',
+  currency CHAR(3) NOT NULL COMMENT '当前绑定允许的三位大写币种',
+  credential_ref VARCHAR(255) NOT NULL COMMENT '密钥托管引用而非密钥内容，历史尝试引用不变',
+  return_url_id VARCHAR(64) NOT NULL COMMENT '预登记支付回跳地址别名',
+  return_url VARCHAR(1000) NOT NULL COMMENT '预登记HTTPS回跳地址，客户端不得传任意地址',
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT '渠道启停状态，冻结不删除历史配置',
+  UNIQUE KEY uk_channel_binding (tenant_id,merchant_no,channel_code,currency),
+  UNIQUE KEY uk_channel_route (channel_code,channel_merchant_no),
+  UNIQUE KEY uk_channel_tenant_id (tenant_id,id),
+  CHECK (status IN ('ACTIVE','FROZEN')),
+  CHECK (currency REGEXP '^[A-Z]{3}$'),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin COMMENT='商户支付渠道不可变配置及回调路由表';
+
+CREATE TABLE tc_payment_intent (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '内部主键，对外标识以字符串表示',
+  tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户，所有业务读写必须限定',
+  created_at DATETIME(3) NOT NULL COMMENT '创建UTC时间，毫秒精度',
+  updated_at DATETIME(3) NOT NULL COMMENT '最近更新UTC时间，毫秒精度',
+  version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '并发版本，每次可变状态更新递增',
+payment_no VARCHAR(64) NOT NULL COMMENT '对外稳定支付意图编号',
+  order_id BIGINT UNSIGNED NOT NULL COMMENT '绑定订单，首期一订单一个支付意图',
+  member_id BIGINT UNSIGNED NOT NULL COMMENT '订单所属会员，用于本人查询过滤',
+  status VARCHAR(16) NOT NULL DEFAULT 'READY' COMMENT '待尝试未决已付关闭或待人工核对状态',
+  expected_amount BIGINT UNSIGNED NOT NULL COMMENT '订单冻结应付最小币种单位，禁止客户端定价',
+  currency CHAR(3) NOT NULL COMMENT '订单冻结币种',
+  active_attempt_no VARCHAR(64) NULL COMMENT '唯一当前活跃或未知渠道请求号',
+  succeeded_receipt_id BIGINT UNSIGNED NULL COMMENT '唯一用于正常订单确认的收款事实',
+  close_fence_at DATETIME(3) NULL COMMENT '禁止新尝试的本地关闭屏障，不等于渠道不可支付证明',
+  UNIQUE KEY uk_payment_no (tenant_id,payment_no),
+  UNIQUE KEY uk_payment_order (tenant_id,order_id),
+  UNIQUE KEY uk_intent_tenant_id (tenant_id,id),
+  UNIQUE KEY uk_intent_order (tenant_id,id,order_id),
+  FOREIGN KEY (tenant_id,order_id,member_id) REFERENCES tc_order(tenant_id,id,member_id),
+  CHECK (expected_amount>0 AND expected_amount<=9007199254740991),
+  CHECK (status IN ('READY','PENDING','SUCCEEDED','CLOSED','REVIEW')),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin COMMENT='订单支付意图及正常收款裁决表';
+
+CREATE TABLE tc_payment_attempt (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '内部主键，对外标识以字符串表示',
+  tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户，所有业务读写必须限定',
+  created_at DATETIME(3) NOT NULL COMMENT '创建UTC时间，毫秒精度',
+  updated_at DATETIME(3) NOT NULL COMMENT '最近更新UTC时间，毫秒精度',
+  version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '并发版本，每次可变状态更新递增',
+intent_id BIGINT UNSIGNED NOT NULL COMMENT '所属支付意图主键',
+  order_id BIGINT UNSIGNED NOT NULL COMMENT '所属订单，用于固定订单到意图到尝试锁序',
+  channel_id BIGINT UNSIGNED NOT NULL COMMENT '不可变渠道绑定版本主键，含收款主体及密钥引用',
+  merchant_request_no VARCHAR(64) NOT NULL COMMENT '终身稳定渠道幂等请求号，未知状态只按此号恢复',
+  status VARCHAR(16) NOT NULL DEFAULT 'PREPARED' COMMENT '已准备未知成功或可靠关闭状态',
+  submitted_at DATETIME(3) NULL COMMENT '首次许可外部调用UTC时间，不证明渠道已受理',
+  closed_at DATETIME(3) NULL COMMENT '可靠不可支付终态本地确认UTC时间',
+  close_evidence_ref VARCHAR(255) NULL COMMENT '可靠渠道终态证明引用，不以HTTP状态码替代',
+  UNIQUE KEY uk_attempt_no (merchant_request_no),
+  UNIQUE KEY uk_attempt_tenant_id (tenant_id,id),
+  UNIQUE KEY uk_intent_attempt (tenant_id,intent_id,merchant_request_no),
+  UNIQUE KEY uk_attempt_order (tenant_id,id,intent_id,order_id),
+  FOREIGN KEY (tenant_id,intent_id,order_id) REFERENCES tc_payment_intent(tenant_id,id,order_id),
+  FOREIGN KEY (tenant_id,channel_id) REFERENCES tc_merchant_channel(tenant_id,id),
+  CHECK (status IN ('PREPARED','UNKNOWN','SUCCEEDED','CLOSED')),
+  CHECK ((status='CLOSED' AND closed_at IS NOT NULL AND close_evidence_ref IS NOT NULL)
+     OR (status<>'CLOSED' AND closed_at IS NULL AND close_evidence_ref IS NULL)),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin COMMENT='渠道支付尝试及不可复用请求号表';
+
+CREATE TABLE tc_payment_receipt (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '内部主键，对外标识以字符串表示',
+  tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户，所有业务读写必须限定',
+  created_at DATETIME(3) NOT NULL COMMENT '创建UTC时间，毫秒精度',
+  updated_at DATETIME(3) NOT NULL COMMENT '最近更新UTC时间，毫秒精度',
+  version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '并发版本，每次可变状态更新递增',
+  receipt_no VARCHAR(64) NOT NULL COMMENT '本地收款业务编号，用于识别唯一键插入或历史重放，不依赖驱动影响行数',
+intent_id BIGINT UNSIGNED NOT NULL COMMENT '关联支付意图主键',
+  attempt_id BIGINT UNSIGNED NOT NULL COMMENT '关联渠道尝试主键',
+  order_id BIGINT UNSIGNED NOT NULL COMMENT '关联订单，异常资金也必须保留',
+  channel_code VARCHAR(64) NOT NULL COMMENT '渠道类型快照',
+  channel_merchant_no VARCHAR(255) NOT NULL COMMENT '渠道收款主体快照',
+  provider_transaction_no VARCHAR(255) NOT NULL COMMENT '真实扣款交易号，去重不依赖回调事件号',
+  amount BIGINT UNSIGNED NOT NULL COMMENT '渠道真实实收最小币种单位，包括异常多付',
+  currency CHAR(3) NOT NULL COMMENT '渠道实际收款币种，异常币种仍记录事实',
+  provider_paid_at DATETIME(3) NOT NULL COMMENT '渠道扣款UTC时间，不用于重选首单',
+  confirmed_at DATETIME(3) NOT NULL COMMENT '本地确认此收款UTC时间',
+  disposition VARCHAR(32) NOT NULL COMMENT '正常多付金额异常或关闭后矛盾资金分类',
+  normal_slot TINYINT GENERATED ALWAYS AS (CASE WHEN disposition='NORMAL' THEN 1 ELSE NULL END) STORED COMMENT '正常订单收款唯一槽位，异常收款不限制笔数',
+  evidence_ref VARCHAR(255) NOT NULL COMMENT '可信验签或查单证据引用，不存敏感原文',
+  refunded_amount BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '已成功原路退款金额，后续退款模块维护',
+  refund_reserved_amount BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '进行中及未知退款预占额度',
+  UNIQUE KEY uk_provider_transaction (channel_code,channel_merchant_no,provider_transaction_no),
+  UNIQUE KEY uk_receipt_no (tenant_id,receipt_no),
+  UNIQUE KEY uk_receipt_tenant_id (tenant_id,id),
+  UNIQUE KEY uk_intent_receipt (tenant_id,intent_id,id),
+  UNIQUE KEY uk_normal_receipt (tenant_id,order_id,normal_slot),
+  FOREIGN KEY (tenant_id,attempt_id,intent_id,order_id) REFERENCES tc_payment_attempt(tenant_id,id,intent_id,order_id),
+  CHECK (amount>0 AND amount<=9007199254740991),
+  CHECK (refunded_amount+refund_reserved_amount<=amount),
+  CHECK (currency REGEXP '^[A-Z]{3}$'),
+  CHECK (disposition IN ('NORMAL','EXCESS','AMOUNT_MISMATCH','AFTER_CLOSE','AFTER_TERMINAL')),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin COMMENT='真实收款不可变事实及退款额度表';
+
+CREATE TABLE tc_money_ledger (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '内部主键，对外标识以字符串表示',
+  tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户，所有业务读写必须限定',
+  created_at DATETIME(3) NOT NULL COMMENT '创建UTC时间，毫秒精度',
+  updated_at DATETIME(3) NOT NULL COMMENT '最近更新UTC时间，毫秒精度',
+  version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '并发版本，每次可变状态更新递增',
+receipt_id BIGINT UNSIGNED NOT NULL COMMENT '原始真实收款事实主键',
+  ledger_no VARCHAR(64) NOT NULL COMMENT '流水唯一业务编号',
+  business_key VARCHAR(64) NOT NULL COMMENT '按收款或退款事实生成的稳定业务去重键',
+  entry_type VARCHAR(16) NOT NULL COMMENT '资金方向，当前仅收款，退款通过后续迁移扩展',
+  amount BIGINT UNSIGNED NOT NULL COMMENT '真实资金量最小币种单位，正数',
+  currency CHAR(3) NOT NULL COMMENT '实际资金币种',
+  evidence_ref VARCHAR(255) NOT NULL COMMENT '可信渠道证据引用',
+  UNIQUE KEY uk_money_ledger_no (tenant_id,ledger_no),
+  UNIQUE KEY uk_money_business (tenant_id,business_key),
+  FOREIGN KEY (tenant_id,receipt_id) REFERENCES tc_payment_receipt(tenant_id,id),
+  CHECK (entry_type='RECEIPT'),
+  CHECK (amount>0 AND amount<=9007199254740991),
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin COMMENT='交易运营资金收款流水表';
+
+-- 指针与意图绑定，禁止把其他订单的尝试或收款作为本意图的成功依据。
+ALTER TABLE tc_payment_intent
+  ADD CONSTRAINT fk_intent_active_attempt FOREIGN KEY (tenant_id,id,active_attempt_no)
+    REFERENCES tc_payment_attempt(tenant_id,intent_id,merchant_request_no),
+  ADD CONSTRAINT fk_intent_success_receipt FOREIGN KEY (tenant_id,id,succeeded_receipt_id)
+    REFERENCES tc_payment_receipt(tenant_id,intent_id,id);

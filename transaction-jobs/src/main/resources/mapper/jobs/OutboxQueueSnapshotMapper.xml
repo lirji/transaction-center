@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.jobs.mapper.OutboxQueueSnapshotMapper">
+  <resultMap id="Snapshot" type="com.lrj.trade.jobs.model.OutboxQueueSnapshotRow"><constructor>
+    <arg column="status" javaType="java.lang.String"/><arg column="count_lower_bound" javaType="_long"/>
+    <arg column="oldest_at" javaType="java.time.Instant"/><arg column="observed_at" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <!-- 唯一全局聚合例外：常量任务类型/状态、有界覆盖索引，不输出任何业务引用。 -->
+  <select id="snapshot" resultMap="Snapshot" useCache="false">
+    SELECT 'READY' AS status,COUNT(*) AS count_lower_bound,MIN(created_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT created_at FROM tc_job_lease FORCE INDEX(ix_job_publication_age)
+      WHERE job_type='OUTBOX_PUBLISH' AND status='READY' ORDER BY created_at,id LIMIT 10001) AS bounded_ready
+    UNION ALL
+    SELECT 'RUNNING' AS status,COUNT(*) AS count_lower_bound,MIN(created_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT created_at FROM tc_job_lease FORCE INDEX(ix_job_publication_age)
+      WHERE job_type='OUTBOX_PUBLISH' AND status='RUNNING' ORDER BY created_at,id LIMIT 10001) AS bounded_running
+    UNION ALL
+    SELECT 'REVIEW' AS status,COUNT(*) AS count_lower_bound,MIN(created_at) AS oldest_at,UTC_TIMESTAMP(3) AS observed_at
+    FROM (SELECT created_at FROM tc_job_lease FORCE INDEX(ix_job_publication_age)
+      WHERE job_type='OUTBOX_PUBLISH' AND status='REVIEW' ORDER BY created_at,id LIMIT 10001) AS bounded_review
+  </select>
+</mapper>

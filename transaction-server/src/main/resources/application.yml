@@ -1,0 +1,134 @@
+spring:
+  application:
+    name: transaction-center
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+      # 数量、金额和版本必须是整数，禁止把1.5静默截断成1。
+      accept-float-as-int: false
+  datasource:
+    url: ${TRADE_DB_URL:jdbc:mysql://localhost:43306/transaction_center?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    username: ${TRADE_DB_USER}
+    password: ${TRADE_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 3000
+  flyway:
+    enabled: true
+    user: ${TRADE_MIGRATION_USER:${TRADE_DB_USER}}
+    password: ${TRADE_MIGRATION_PASSWORD:${TRADE_DB_PASSWORD}}
+    clean-disabled: true
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    # 显式resultMap避免字段重名或类型推断悄悄改变接口契约。
+    map-underscore-to-camel-case: false
+    # 锁定读必须到达数据库；不得用会话缓存替代当前读。
+    local-cache-scope: STATEMENT
+    cache-enabled: false
+    default-statement-timeout: 10
+server:
+  port: ${TRADE_PORT:8400}
+  address: ${TRADE_BIND:127.0.0.1}
+  shutdown: graceful
+trade:
+  order-attribution:
+    enabled: false
+    issuer: ${TRADE_ORDER_ATTRIBUTION_ISSUER:}
+    jwks: ${TRADE_ORDER_ATTRIBUTION_JWKS:}
+  automatic-admission:
+    enabled: ${TRADE_AUTOMATIC_ADMISSION_ENABLED:false}
+    disk-path: ${TRADE_AUTOMATIC_ADMISSION_DISK_PATH:}
+    disk-store: ${TRADE_AUTOMATIC_ADMISSION_DISK_STORE:}
+    backlog-high: ${TRADE_AUTOMATIC_ADMISSION_BACKLOG_HIGH:10000}
+    backlog-low: ${TRADE_AUTOMATIC_ADMISSION_BACKLOG_LOW:5000}
+    disk-min-bytes: ${TRADE_AUTOMATIC_ADMISSION_DISK_MIN_BYTES:5368709120}
+    disk-recovery-bytes: ${TRADE_AUTOMATIC_ADMISSION_DISK_RECOVERY_BYTES:10737418240}
+    interval-millis: ${TRADE_AUTOMATIC_ADMISSION_INTERVAL_MILLIS:15000}
+    max-age-millis: ${TRADE_AUTOMATIC_ADMISSION_MAX_AGE_MILLIS:45000}
+  financial-observation:
+    interval-millis: ${TRADE_FINANCIAL_OBSERVATION_INTERVAL_MILLIS:15000}
+  catalog:
+    cache-enabled: ${TRADE_CATALOG_CACHE_ENABLED:false}
+    cache-environment: ${TRADE_CATALOG_CACHE_ENVIRONMENT:dev}
+    redis-host: ${TRADE_CATALOG_REDIS_HOST:127.0.0.1}
+    redis-port: ${TRADE_CATALOG_REDIS_PORT:46379}
+    redis-user: ${TRADE_CATALOG_REDIS_USER:}
+    redis-password: ${TRADE_CATALOG_REDIS_PASSWORD:}
+    redis-io-limit: ${TRADE_CATALOG_REDIS_IO_LIMIT:32}
+    redis-timeout-ms: ${TRADE_CATALOG_REDIS_TIMEOUT_MS:50}
+    query-max-keys: ${TRADE_CATALOG_QUERY_MAX_KEYS:1024}
+    query-db-concurrency: ${TRADE_CATALOG_QUERY_DB_CONCURRENCY:2}
+    query-db-rate: ${TRADE_CATALOG_QUERY_DB_RATE:64}
+    query-wait-ms: ${TRADE_CATALOG_QUERY_WAIT_MS:150}
+  inventory:
+    hot-sku-permits: ${TRADE_HOT_SKU_PERMITS:32}
+    hot-sku-max-keys: ${TRADE_HOT_SKU_MAX_KEYS:4096}
+  fulfillment:
+    enabled: ${TRADE_FULFILLMENT_ENABLED:false}
+    allowed-delivery-actor-keys: ${TRADE_FULFILLMENT_ALLOWED_DELIVERY_ACTOR_KEYS:}
+    allowed-completion-actor-keys: ${TRADE_FULFILLMENT_ALLOWED_COMPLETION_ACTOR_KEYS:}
+    allowed-return-actor-keys: ${TRADE_FULFILLMENT_ALLOWED_RETURN_ACTOR_KEYS:}
+  reconciliation:
+    query-enabled: ${TRADE_RECONCILIATION_QUERY_ENABLED:false}
+    report-enabled: ${TRADE_RECONCILIATION_REPORT_ENABLED:false}
+    report-allowed-actor-keys: ${TRADE_RECONCILIATION_REPORT_ALLOWED_ACTOR_KEYS:}
+    report-source-id: ${TRADE_RECONCILIATION_REPORT_SOURCE_ID:recon-platform}
+    enabled: ${TRADE_RECONCILIATION_ENABLED:false}
+    allowed-actor-keys: ${TRADE_RECONCILIATION_ALLOWED_ACTOR_KEYS:}
+  evidence:
+    enabled: ${TRADE_EVIDENCE_ENABLED:false}
+    allowed-actor-keys: ${TRADE_EVIDENCE_ALLOWED_ACTOR_KEYS:}
+  outbox:
+    observation-interval-millis: ${TRADE_OUTBOX_OBSERVATION_INTERVAL_MILLIS:15000}
+    maintenance-enabled: ${TRADE_OUTBOX_MAINTENANCE_ENABLED:false}
+    maintenance-page-size: ${TRADE_OUTBOX_MAINTENANCE_PAGE_SIZE:100}
+    maintenance-interval-millis: ${TRADE_OUTBOX_MAINTENANCE_INTERVAL_MILLIS:300000}
+    maintenance-tick-millis: ${TRADE_OUTBOX_MAINTENANCE_TICK_MILLIS:200}
+    enabled: ${TRADE_OUTBOX_ENABLED:false}
+    bootstrap-servers: ${TRADE_OUTBOX_BOOTSTRAP_SERVERS:}
+    topic-prefix: ${TRADE_OUTBOX_TOPIC_PREFIX:}
+  worker:
+    # 普通API默认不领取任何后台任务；启用前先完成对应版本数据库迁移和运行资源配置。
+    enabled: ${TRADE_WORKER_ENABLED:false}
+    callback-threads: ${TRADE_WORKER_CALLBACK_THREADS:2}
+    payment-threads: ${TRADE_WORKER_PAYMENT_THREADS:1}
+    order-threads: ${TRADE_WORKER_ORDER_THREADS:1}
+    refund-callback-threads: ${TRADE_WORKER_REFUND_CALLBACK_THREADS:1}
+    query-threads: ${TRADE_WORKER_QUERY_THREADS:1}
+    outbox-threads: ${TRADE_WORKER_OUTBOX_THREADS:1}
+    compensation-threads: ${TRADE_WORKER_COMPENSATION_THREADS:1}
+    refund-recovery-threads: ${TRADE_WORKER_REFUND_RECOVERY_THREADS:1}
+    idle-millis: ${TRADE_WORKER_IDLE_MILLIS:250}
+    shutdown-millis: ${TRADE_WORKER_SHUTDOWN_MILLIS:30000}
+  callback:
+    # 仅外部Secret注入版本密钥环，不设置默认密钥；历史版本必须保留至积压处理完毕。
+    active-key-version: ${TRADE_CALLBACK_ACTIVE_KEY_VERSION:}
+    keys: ${TRADE_CALLBACK_KEYS:}
+  address:
+    # 只能由外部Secret注入；为空时拒绝实物下单，不生成默认密钥。
+    key-base64: ${TRADE_ADDRESS_KEY_BASE64:}
+    key-version: ${TRADE_ADDRESS_KEY_VERSION:}
+  order:
+    ttl-seconds: ${TRADE_ORDER_TTL_SECONDS:900}
+  security:
+    # 下方访问令牌配置与审批回执配置相互独立，不能互换接收方。
+    issuer: ${TRADE_JWT_ISSUER}
+    jwk-set-uri: ${TRADE_JWT_JWKS}
+    audience: ${TRADE_JWT_AUDIENCE:transaction-center}
+  refund-approval:
+    enabled: ${TRADE_REFUND_APPROVAL_ENABLED:false}
+    issuer: ${TRADE_REFUND_APPROVAL_ISSUER:}
+    jwks: ${TRADE_REFUND_APPROVAL_JWKS:}
+    audience: ${TRADE_REFUND_APPROVAL_AUDIENCE:}
+    service-subject: ${TRADE_REFUND_APPROVAL_SERVICE_SUBJECT:}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
