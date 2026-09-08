@@ -1,0 +1,14 @@
+# C02/C03身份与范围映射的内部边界
+
+依据原07-EXTERNAL_CONTRACTS的C01/C02/C03与09-PRODUCTION_DESIGN隐私要求。本文是下一切片内部设计，不定义外部系统尚未签收的权威来源或合并协议。
+
+1. 交易原生memberId与tenant+issuer+subject只是本地身份键。canonicalSubject必须来自明确受信的权威映射；不能用subject、memberId或其哈希冒充。organizationId/shopId也必须单独映射，不能用tenant/merchant猜测。
+2. 映射持久记录来源、来源事件身份、版本/修订、有效时间及READY/PENDING/MERGED状态。同来源事件不同内容冲突隔离；旧修订不能覆盖新值；同修订不同内容不能任选一个。可信来源缺失、超时、无法判断合并时PENDING；只有权威不存在事实才能作为NOT_FOUND依据。
+3. 原生多个会员不能直接合并消费历史。MERGED需要old/new主体、mergeRevision、effectiveAt及已签收处理协议；首期相关未完成关系暂停/REVIEW，不自动合并历史首单、邀请归因或奖励额度。
+4. canonicalSubject按精确字节比较；持久化采用密文和独立版本HMAC索引，加密/索引密钥分离。轮换需双索引回填和冲突检查，不能直接更换索引密钥造成重复身份。当前交易identity_hash不等于这一隐私合同已经满足。
+5. 只读映射Port与原生事实查询必须有明确一致性边界；证据身份含映射修订和原生事实版本。同orderRevision因映射变化产生不同主体/范围时，adapter不得复用原evidenceId让消费者无法辨别。跨服务无法原子快照时返回所采用水位并在修订竞争时失败关闭。
+6. C02策略名称/版本显式映射，会员version=0、消费factVersion与目标正数customerRevision不能混用。C03 paidAt不是settledAt；需要独立商业完成证据与双方结算语义约定。gross/net/conservative金额与PENDING/SETTLED/CANCELLED/REFUNDED状态均用显式适配和golden fixtures。
+7. 原生orderIds批量与C03主体期间补查两形状同时保留，禁止混合字段。未就绪映射只能PENDING/不可用，不返回伪false的新客值或READY订单证据。
+8. 外部认证、签名/撤销/时效/合并协议、来源负责人和测试环境目前未签收。可先实现Port、类型和失败关闭adapter与契约测试；真实READY写入入口必须等有效认证边界落地，不能让普通admin直接填权威映射。
+
+本阶段先继续不依赖此映射的原生V1不可变事务事件。上述缺口保留在完整目标中，不能因原生查询已通过测试而宣称营销合同接通。

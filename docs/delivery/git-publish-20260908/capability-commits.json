@@ -1,0 +1,49 @@
+[
+  {
+    "branch": "main",
+    "bootstrap": true,
+    "commit": "17ac240c7f572976a4a3c292e2352fa19eff3db7",
+    "message": "chore: 初始化交易中心 Maven 聚合工程",
+    "files": 2
+  },
+  {
+    "branch": "feat/member-catalog-inventory",
+    "commit": "082be483ef6bd3890612e81ff37e7a4324c6b365",
+    "merge": "5c1a8764c53d9bc8079220dadbe1f653fb2388dd",
+    "message": "feat: 建立可信身份及会员商品库存领域能力",
+    "files": 149,
+    "validation": "mvn --batch-mode -o validate PASS"
+  },
+  {
+    "branch": "feat/order-payment-refund",
+    "commit": "cf26e646b6cbf681e607187de4772279c0710582",
+    "merge": "e4b8b5b18bcb841437a489723228b7fb9cd4cfe6",
+    "message": "feat: 接入订单归因支付退款及永久业务回放",
+    "files": 155,
+    "validation": "mvn --batch-mode -o validate PASS"
+  },
+  {
+    "branch": "feat/runtime-attribution-api",
+    "commit": "f13cc961eace32953a77f391441065c709b6de16",
+    "merge": "7bb99e3b3e3629eacf5c5eeb1f95a41e2d212b53",
+    "message": "feat: 集成任务恢复HTTP鉴权归因及数据库迁移",
+    "files": 171,
+    "validation": "mvn --batch-mode -o validate PASS"
+  },
+  {
+    "branch": "feat/error-sdk-contracts",
+    "commit": "d17b9fcc3489f9f214e3d55a976ec9ecb7f3fcf4",
+    "merge": "f02758a9d2951e1d9723cc84ad804636674cc198",
+    "message": "feat: 提供错误SDK与V1事件机器合同检查",
+    "files": 18,
+    "validation": "mvn --batch-mode -o validate PASS"
+  },
+  {
+    "branch": "chore/deployment-ci",
+    "commit": "0a092a4ca464f3ca4e5e48299b86a26b8c278aac",
+    "merge": "fb5aef4fe0d844bf26bb41e2f29f5f82f42a3957",
+    "message": "chore: 添加开发部署监控及持续验证入口",
+    "files": 7,
+    "validation": "mvn --batch-mode -o validate PASS"
+  }
+]

@@ -1,0 +1,13 @@
+# 正常收款V1事务事件
+
+沿用原trade.order-paid.v1字段与FIRST_CONFIRMED_PAID_ORDER_V1，不把异常多付/错金额/已关闭后到账当成订单消费，也不为零元订单生成支付事实。
+
+生成位置在PaymentObservationService首次NORMAL收款事务内：真实收款唯一记录及账本 → OrderPaymentPort确认库存/永久会员首单/订单版本 → 成功实收指针 → 完整order-paid载荷。事件、收款、资金账本、库存、会员事实与订单状态一起提交或回滚。重复渠道交易号在永久receipt重放分支返回，不能再生成V1事件。
+
+OrderPaymentPort.confirmPayment返回该次已经提交到当前事务的PaymentConfirmation：会员、确认时间、首单策略/标志、订单evidenceVersion。返回的是刚执行原子状态转换所持有的确定值，不在独立RR快照中再查，不读取“发布时最新值”。此方法当前仅首次有效转换可调用；不是新增幂等接口，已确认状态继续按原合同拒绝。
+
+PAYMENT模块将此返回值与当前receiptNo/amount/currency组成类型化OrderPaidEvent。aggregateType=ORDER，aggregateId=原生订单ID，aggregateVersion=data.evidenceVersion=确认后的订单version；data包含原合同必填orderId/memberId/receiptNo/paidAmount/currency/paidAt/firstOrderPolicy/isFirstConfirmedPaidOrder/evidenceVersion。paidAt与occurredAt使用订单本地首确认时间，渠道原始时间不能改变首单排序。traceId当前本地生成且持久不变。
+
+此原生事件不携带canonicalSubject/组织店铺猜测值。保留现有order.paid.internal.v0及payment.received.internal.v0内部事件，外部发布器仍只能显式认可完整V1。全部JSON在写事务内构建，不调用OrderReferralEvidenceService的独立REQUIRES_NEW查询。
+
+验证：正常首/次单、迟到渠道时间、重复真实收款永久重放、异常实收/零元排除；载荷与同一事务完成的订单版本/消费事实相等；退款和后续状态变更不改原事件；外层故障整体回滚。完整schema/golden样例与独立审查后跑受影响支付/退款和全量测试。共享V021不变，无新增DDL或外部消息发送。
