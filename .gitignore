@@ -89,3 +89,6 @@ frontend/**/dist/
 frontend/**/playwright-report/
 frontend/**/test-results/
 frontend/**/*.tsbuildinfo
+
+# 本机持久演示数据业务号清单
+/deploy/demo-business-manifest.json

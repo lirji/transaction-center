@@ -74,7 +74,9 @@ def main():
         assert status == 200 and marker in json.dumps(body, ensure_ascii=False), resource + '缺少演示种子'
         print('PASS admin ' + resource + ': HTTP 200，读取数据库种子')
     status, inventory = call(API + '/api/v1/trade/admin/inventories', token=admin)
-    assert status == 200 and len(inventory) == 1 and inventory[0]['available'] == 100, '库存种子不等于100件'
+    assert status == 200 and inventory, '缺少数据库库存记录'
+    # 演示环境允许追加交易种子及人工操作，身份验收不假定全库只有一行或余额永远100。
+    assert all(row['available'] >= 0 for row in inventory), '库存出现负可用量'
     print('PASS admin inventories: HTTP 200')
     reader = issue(credentials['fixtures']['reader'], 'openid profile trade.admin')
     assert 'trade.admin' not in claims(reader).get('scope', []), '用户可通过请求参数自授scope'
