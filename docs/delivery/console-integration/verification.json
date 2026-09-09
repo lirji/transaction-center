@@ -1,0 +1,211 @@
+{
+  "date": "2026-09-09",
+  "branch": "feat/console-integration-delivery",
+  "base": "49c0c05",
+  "scope": "isolated backend and browser; not external vendor acceptance",
+  "backend": {
+    "command": "TESTCONTAINERS_RYUK_DISABLED=true MAVEN_ARGS=-Dtrade.test.mysql-image=mysql:8.4.11 bash scripts/verify.sh",
+    "result": "PASS",
+    "tests": 454,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": [
+      {
+        "name": "com.lrj.trade.client.RetryDecisionTest",
+        "tests": 5
+      },
+      {
+        "name": "com.lrj.trade.server.RefundApprovalRejectionAuditTest",
+        "tests": 5
+      },
+      {
+        "name": "com.lrj.trade.server.ReconciliationQueryExecutorTest",
+        "tests": 2
+      },
+      {
+        "name": "com.lrj.trade.server.TraceContextTest",
+        "tests": 5
+      },
+      {
+        "name": "com.lrj.trade.server.PaymentChannelBindingTest",
+        "tests": 4
+      },
+      {
+        "name": "com.lrj.trade.server.OrderPaidEventContractTest",
+        "tests": 1
+      },
+      {
+        "name": "com.lrj.trade.server.PaymentRiskProviderContractTest",
+        "tests": 4
+      },
+      {
+        "name": "com.lrj.trade.server.MapperContractTest",
+        "tests": 1
+      },
+      {
+        "name": "com.lrj.trade.server.OrderAttributionVerifierTest",
+        "tests": 4
+      },
+      {
+        "name": "com.lrj.trade.server.AddressProtectionTest",
+        "tests": 2
+      },
+      {
+        "name": "com.lrj.trade.server.WorkerRuntimeTest",
+        "tests": 10
+      },
+      {
+        "name": "com.lrj.trade.server.KafkaEventPublisherTest",
+        "tests": 4
+      },
+      {
+        "name": "com.lrj.trade.server.AdminVersionTest",
+        "tests": 2
+      },
+      {
+        "name": "com.lrj.trade.server.LifecycleRefundEventContractTest",
+        "tests": 1
+      },
+      {
+        "name": "com.lrj.trade.server.CatalogQueryTest",
+        "tests": 6
+      },
+      {
+        "name": "com.lrj.trade.server.EvidenceAccessTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.InventoryEventContractTest",
+        "tests": 1
+      },
+      {
+        "name": "com.lrj.trade.server.JwtValidationTest",
+        "tests": 1
+      },
+      {
+        "name": "com.lrj.trade.server.OutboxMaintenanceRuntimeTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.RefundApprovalVerifierTest",
+        "tests": 4
+      },
+      {
+        "name": "com.lrj.trade.server.RefundChannelContractTest",
+        "tests": 13
+      },
+      {
+        "name": "com.lrj.trade.server.PaymentChannelContractTest",
+        "tests": 5
+      },
+      {
+        "name": "com.lrj.trade.server.AutomaticAdmissionTest",
+        "tests": 7
+      },
+      {
+        "name": "com.lrj.trade.server.FulfillmentAccessTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.FinancialObservationTest",
+        "tests": 2
+      },
+      {
+        "name": "com.lrj.trade.server.ReconciliationAccessTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.MemberEventContractTest",
+        "tests": 2
+      },
+      {
+        "name": "com.lrj.trade.server.QualityGateTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.RefundApprovalIngressTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.RedisCatalogCacheTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.OpenApiTest",
+        "tests": 1
+      },
+      {
+        "name": "com.lrj.trade.server.CallbackProtectionTest",
+        "tests": 4
+      },
+      {
+        "name": "com.lrj.trade.server.FoundationTest",
+        "tests": 316
+      },
+      {
+        "name": "com.lrj.trade.server.AdminQueryTest",
+        "tests": 6
+      },
+      {
+        "name": "com.lrj.trade.server.DeploymentConfigurationTest",
+        "tests": 3
+      },
+      {
+        "name": "com.lrj.trade.server.AuthoritativeReferralMappingAdapterTest",
+        "tests": 11
+      },
+      {
+        "name": "com.lrj.trade.server.OutboxEventCatalogTest",
+        "tests": 1
+      }
+    ]
+  },
+  "contracts": {
+    "tests": 9,
+    "result": "PASS"
+  },
+  "frontend": {
+    "unit_tests": 49,
+    "ui_contract_tests": 3,
+    "real_backend_browser_tests": 6,
+    "locked_install": "PASS",
+    "lint": "PASS",
+    "build": "PASS",
+    "node_local": "24.12.0",
+    "node_ci": "22",
+    "pnpm": "9.15.9"
+  },
+  "integration": {
+    "command": "TESTCONTAINERS_RYUK_DISABLED=true bash scripts/verify-console-integration.sh",
+    "outer_java_tests": 1,
+    "result": "PASS",
+    "mysql": "8.4.11",
+    "seed_replay": "PASS",
+    "inventory_after_browser": {
+      "total": 100,
+      "available": 98,
+      "reserved": 2,
+      "sold": 0
+    },
+    "real_business_http": true,
+    "identity": "test-only OIDC RSA/PKCE issuer",
+    "channel": "test-only trusted observations"
+  },
+  "compose": {
+    "variables": 16,
+    "defaults_overrides_roles": "PASS"
+  },
+  "ci": {
+    "yaml_parse": "PASS",
+    "frontend_steps": 12,
+    "remote_run": "not triggered"
+  },
+  "production_jar_excludes_fixtures": true,
+  "logs_sha256": {
+    "/tmp/trade-console-regression.log": "e39af0ea19ea9cc732652a64d292843f034b3d42c0d3e3c59ff2ac46caa92a36",
+    "/tmp/trade-console-it.log": "0735a2072c2fdd106fecac5c870ab8ee6c01dc17f92ca7e7c87ba423dbee09ad",
+    "/tmp/trade-console-e2e.log": "2c7fa631121685cf6c9532e509f207c5dc8b799d03db397642f9f70ca05d0bc0",
+    "transaction-server/target/console-integration/browser.log": "1eb0f3e5cb8e6d1e9a873af82638f7205623f7e7e06b3dcdcf49772b6107528f"
+  }
+}

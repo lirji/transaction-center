@@ -91,7 +91,7 @@ test.describe('transaction console', () => {
 
   test('order list is reachable from the shell', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('link', { name: '订单' }).click()
+    await page.getByRole('link', { name: '订单', exact: true }).click()
     await expect(page.getByRole('heading', { name: '订单' })).toBeVisible()
     await expect(page.getByText('ORD-1')).toBeVisible()
   })

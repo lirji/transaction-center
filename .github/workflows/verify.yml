@@ -47,3 +47,45 @@ jobs:
             **/target/surefire-reports/*.xml
             **/target/failsafe-reports/*.xml
 
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend/apps/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/apps/console/pnpm-lock.yaml
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Browser UI contract tests (intercepted API)
+        run: pnpm e2e
+      - name: Real backend, MySQL and OIDC browser integration
+        working-directory: .
+        run: bash scripts/verify-console-integration.sh > build-console-integration.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-browser-evidence
+          retention-days: 7
+          path: |
+            frontend/apps/console/playwright-report/
+            frontend/apps/console/test-results/
+            transaction-server/target/console-integration/
+            transaction-server/target/surefire-reports/
+            build-console-integration.log

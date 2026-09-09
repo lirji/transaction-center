@@ -22,3 +22,7 @@ pnpm e2e
 Casdoor 应用若尚未签发上述 audience / scope，需要 IAM 侧补齐，前端不会自制 JWT 或加租户请求头。
 
 `public/config.js` 可覆盖 `OIDC_CLIENT_ID` / `OIDC_ORGANIZATION`。Outbox 重放、对账只查单、改准入策略还需要对应额外 scope。
+
+## 隔离浏览器与CI
+
+`pnpm e2e`为拦截API的3项界面合同测试，使用独立4185端口；真实MySQL、Spring HTTP、OIDC登录和业务种子由根目录`bash scripts/verify-console-integration.sh`运行。完整准备步骤、数据覆盖和报告见[联调说明](../../../docs/CONSOLE_INTEGRATION.md)。GitHub Actions已接入锁定安装、lint、单元测试、生产构建及两类浏览器门禁。
