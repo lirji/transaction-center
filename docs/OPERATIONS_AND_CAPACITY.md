@@ -1,10 +1,10 @@
 # 部署运维与容量验证
 
-日期：2026-09-08。运行说明依据当前代码、Compose 与脚本；本次未启动服务、连接数据库或执行压测。返回 [文档导航](README.md)。
+更新日期：2026-09-09。运行说明依据代码基线3187c57。前后端本机部署与演示库V033迁移已完成；验证范围见 [当前交付状态](PROJECT_STATUS.md)。本次仅同步文档，未重新部署、迁移或执行压测。返回 [文档导航](README.md)。
 
 ## 1. 本地运行拓扑与前置条件
 
-使用 Java 21、Maven、Docker Compose、Bash 和 Python 3。公共中间件复用 dev_infra：MySQL 8.4（容器 infra-mysql84:3306，宿主 43306）、Redis 7（infra-redis7:6379，宿主 46379）、Kafka 3.8（infra-kafka38:9092，宿主 49092）。实际地址以目标环境配置为准。
+使用 Docker Compose、Bash 和 Python 3；选择本机构建时另需 Java 21、Maven、Node.js和pnpm。公共中间件复用 dev_infra：MySQL 8.4（容器 infra-mysql84:3306，宿主 43306）、Redis 7（infra-redis7:6379，宿主 46379）、Kafka 3.8（infra-kafka38:9092，宿主 49092）。实际地址以目标环境配置为准。
 
 项目 [Compose](../deploy/compose.yaml) 不启动这些公共组件。运行账号与迁移账号仅访问交易专用库，凭据放在 Git 忽略的配置或外部 Secret 中；不要打印展开后的含密码 Compose 配置。
 
@@ -12,17 +12,17 @@
 | --- | --- | --- |
 | API | 默认 trade-api | HTTP 服务；固定关闭后台领取、Outbox 发布/维护 |
 | Worker | 显式 worker profile | 八类恢复/发布通道；无宿主端口映射 |
-| 运营台 | frontend/apps/console | Casdoor 登录和交易运营；详见前端 README |
+| 运营台 | 默认trade-console，源码frontend/apps/console | Nginx静态页面与/api/代理，宿主4180；Casdoor登录和交易运营 |
 | 演示种子 | dev-seed profile | 仅 transaction_center_dev 专用库，正常业务服务写种子 |
 
-当前本机历史记录中的演示 API 使用 `deploy/.env.demo` 与 `transaction_center_dev`。重新运行前核对配置文件及目标库，不能根据默认值误切回其他库。账号位置和开通步骤见 [Casdoor 接入](CASDOOR_LOCAL_SETUP.md)；这里不复制任何凭据。
+当前本机部署的演示 API 使用 `deploy/.env.demo` 与 `transaction_center_dev`。重新运行前核对配置文件及目标库，不能根据默认值误切回其他库。账号位置和开通步骤见 [Casdoor 接入](CASDOOR_LOCAL_SETUP.md)；这里不复制任何凭据。
 
 ## 2. 运行入口与检查
 
-仓库根 [README](../README.md) 提供首次配置步骤。[docker-start.sh](../scripts/docker-start.sh) 从源码构建镜像并等待健康；本机 Maven 缓存可用时使用 `--local-build`，需要 Worker 时加 `--worker`。以下是已有入口示例，本次未实际运行：
+仓库根 [README](../README.md) 提供首次配置步骤。[docker-start.sh](../scripts/docker-start.sh) 从源码构建镜像并等待健康；本机Java/Maven和Node.js/pnpm可用时使用 `--local-build`，需要 Worker 时加 `--worker`。以下为已使用的启动入口；本次文档同步未重复执行：
 
 ```bash
-# 本机已有演示配置时，用明确的配置文件运行 API。
+# 本机已有演示配置时，用明确的配置文件构建并启动前后端。
 TRADE_ENV_FILE=deploy/.env.demo ./scripts/docker-start.sh --local-build
 
 # 基础存活/数据库健康检查。
@@ -33,7 +33,7 @@ curl -fsS http://127.0.0.1:8400/actuator/health
 
 后台开关不能因任务积压就未经配置直接全部打开。启用前核对对应迁移、密文密钥、渠道适配和来源授权。省略 `--worker` 不会停止此前已运行的 Worker。停机与日志命令见根 README，使用自定义配置时需保持相同 env-file。
 
-后台默认关闭时 READY 任务不会自行消失；运行通道关闭与任务为空是不同状态。Worker 默认收尾预算 30 秒，Compose stop_grace_period 为 60 秒；失联工作由租约到期后接管，不靠人工重置 RUNNING。
+当前本机只部署trade-api与trade-console，未启用trade-worker。后台默认关闭时 READY 任务不会自行消失；运行通道关闭与任务为空是不同状态。Worker 默认收尾预算 30 秒，Compose stop_grace_period 为 60 秒；失联工作由租约到期后接管，不靠人工重置 RUNNING。
 
 ## 3. 配置与资源预算
 
@@ -54,7 +54,7 @@ curl -fsS http://127.0.0.1:8400/actuator/health
 | TRADE_FULFILLMENT_ENABLED | false | 履约写入与会员确认，另需来源权限 |
 | TRADE_AUTOMATIC_ADMISSION_ENABLED | false | 积压与实际数据库磁盘自动保护 |
 
-值来自 [application.yml](../transaction-server/src/main/resources/application.yml)、[Compose](../deploy/compose.yaml)、各配置类。Spring 支持的配置不一定已经由 Compose environment 透传：当前 Compose 没有显式透传自动准入系列及订单归因 enabled，不能只在 `.env` 加一个名字就假定容器已启用；部署时需检查最终有效配置并按授权补齐部署配置。此文档任务不改 Compose。
+值来自 [application.yml](../transaction-server/src/main/resources/application.yml)、[Compose](../deploy/compose.yaml)、各配置类。Spring 支持的配置不一定已经由 Compose environment 透传：当前 Compose 没有显式透传自动准入系列、订单归因 enabled、TRADE_ADMIN_EVIDENCE_ENABLED及TRADE_ADMIN_QUERY_*管理查询限额，不能只在 `.env` 加一个名字就假定容器已启用；部署时需检查最终有效配置并按授权补齐部署配置。此文档任务不改 Compose。
 
 连接预算需要累加：若 API 数量为 A、Worker 数量为 W，各池仍为 10，则应用连接上限约为 `10 × (A + W)`，另留迁移、观测、运维及其他服务连接余量。此式不是吞吐公式。Worker 线程数也不等于数据库连接数，但增加线程会提高竞争，必须联动观察。
 
@@ -152,7 +152,9 @@ curl -fsS http://127.0.0.1:8400/actuator/health
 
 待验证范围包括真实渠道与来源身份、Kafka 生产安全/复制及消费者合同、数据库存储映射、备份恢复演练、应用与数据库容量、可用区故障、告警通知、业务与前端闭环。当前代码具备多项内部机制，但这些环境结果需单独形成证据后才能宣称生产就绪。
 
-## 9. 本次文档整理验证记录
+## 9. 历史文档整理验证记录（2026-09-08）
+
+下述数量只代表当时的源码快照；当前OpenAPI为69路径/81操作，迁移文件为33份。最新测试和部署证据见 [当前交付状态](PROJECT_STATUS.md)。
 
 2026-09-08 完成静态校验：六份新文档的 111 个本地链接均存在；10 个模块及其直接内部 Maven 依赖与 POM 一致；32 份迁移中的 48 张业务建表全部纳入数据目录；OpenAPI 文件统计为 55 路径/66 操作。七个 Mermaid 代码块已检查围栏完整性，未执行图形渲染验证。
 

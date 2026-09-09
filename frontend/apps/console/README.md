@@ -1,5 +1,8 @@
 # 交易中心管理台
 
+交付状态（2026-09-09）：控制台已推送main，并以trade-console容器在本机4180提供服务；订单、支付/尝试、实收、报价、退款详情、退货列表及按权限显示的证据/资格/任务查询已接入。最新验证与待办见 [项目状态](../../../docs/PROJECT_STATUS.md)，接口见 [管理查询合同](../../../docs/ADMIN_QUERY_API.md)。默认启动方式及演示配置见 [根README](../../../README.md)。
+
+
 独立 SPA，调用本仓库 `docs/openapi.json` 已交付的 `/api/v1/trade/admin/**` 接口。不是会员商城，也不并入营销中枢。
 
 ```bash

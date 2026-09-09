@@ -1,5 +1,22 @@
 # 交易中心 Git 交付记录
 
+## 2026-09-09 增量交付
+
+代码从 `59875bb` 经下列五批提交快进合入main并推送origin/main，远程引用已核对为 `3187c579de339a592fc8aee3d2c31531f45870c5`。本轮仅推送main，任务分支保留在本机；后续分支依赖前序提交。
+
+| 提交 | 本地任务分支 | 内容 |
+| --- | --- | --- |
+| 65e89d3 | feat/casdoor-alignment | Casdoor身份校验及演示验收工具 |
+| 8e82666 | feat/admin-query-delivery | 管理查询、V033索引、SDK错误码及合同 |
+| 8868756 | feat/console-delivery | 管理控制台与查询页面 |
+| 939f963 | feat/docker-console-delivery | 前后端Docker构建启动 |
+| 3187c57 | docs/project-guide-delivery | 架构、业务与运维文档 |
+
+本次验证及本机部署见 [当前交付状态](PROJECT_STATUS.md) 和 [提交前验证](delivery/admin-query-apis/prepush-verification.json)。本地凭据与构建产物保持忽略；未确认远程CI运行结果。以下记录保留首次导入的合并方式、验证和证据，不能套用于本次增量发布。
+
+## 2026-09-08 首次导入（历史记录）
+
+
 日期：2026-09-08。用户授权范围仅 `transaction-center`，远程 `git@github.com:lirji/transaction-center.git`。关联营销平台和权益中心不在本次提交或推送范围。
 
 ## 分支与合并顺序

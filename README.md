@@ -1,8 +1,8 @@
-归因阶段428项/34套组合全量通过（含SDK及自动准入），随后3项断言修订专项通过；共享V032已完成，48表678字段中文注释完整。后续映射与原平台新切片不在此全量范围，完整裂变及生产验收仍在推进。
-
 项目全景文档：[文档导航](docs/README.md) · [项目架构](docs/PROJECT_ARCHITECTURE.md) · [业务说明](docs/BUSINESS_GUIDE.md) · [高并发设计](docs/HIGH_CONCURRENCY_DESIGN.md) · [数据架构](docs/DATA_ARCHITECTURE.md) · [部署运维与容量验证](docs/OPERATIONS_AND_CAPACITY.md)。
 
 # 交易中心 transaction-center
+
+当前交付（2026-09-09，代码基线 `3187c57`）：管理查询接口与控制台已实现，V033已应用到演示库，前后端Docker已在本机启动，五批提交已推送origin/main。最新验证范围、部署边界与剩余工作统一见 [当前交付状态](docs/PROJECT_STATUS.md)。
 
 仓库交付边界见 [会话交接](SESSION_HANDOFF.md)；本机恢复状态另见未入库的 CODEX_PROGRESS.md。已有能力与后续缺口见 [剩余内部工作](docs/TRADE_REMAINING_INTERNAL_WORK.md)。
 
@@ -117,7 +117,7 @@ Redis 缓存与 Kafka V1 事件已有开发环境专项证据；生产配置、�
 任何新增表和字段必须中文COMMENT；生产类及公共方法需有中文Javadoc，关键分支说明业务原因。数据库注释与Java语法树注释检查已纳入测试，覆盖度不替代对注释内容的人工复核。
 
 
-近期后端切片：参见[退款审批HTTP与拒绝审计](docs/REFUND_APPROVAL_HTTP.md)、[异常收款唯一补偿](docs/REFUND_COMPENSATION.md)、[实际交付与商业完成](docs/ORDER_FULFILLMENT.md)及[退货唯一回库接续设计](docs/RETURN_RECEIPT_DESIGN.md)。当前验证、共享迁移版本和未完成范围以[会话交接](SESSION_HANDOFF.md)及根CODEX_PROGRESS顶部检查点为准；内部能力不等于真实渠道或完整裂变生产验收。
+近期后端切片：参见[退款审批HTTP与拒绝审计](docs/REFUND_APPROVAL_HTTP.md)、[异常收款唯一补偿](docs/REFUND_COMPENSATION.md)、[实际交付与商业完成](docs/ORDER_FULFILLMENT.md)及[退货唯一回库接续设计](docs/RETURN_RECEIPT_DESIGN.md)。当前验证、演示库迁移版本和未完成范围以[当前交付状态](docs/PROJECT_STATUS.md)为准；[会话交接](SESSION_HANDOFF.md)保留历史过程；内部能力不等于真实渠道或完整裂变生产验收。
 
 ## 持续集成
 

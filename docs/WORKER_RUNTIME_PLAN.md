@@ -1,5 +1,9 @@
 # 常驻Worker设计与运行合同
 
+> 当前运行状态（2026-09-09）：常驻Worker已扩展为八类通道，API固定关闭后台处理，Worker使用显式profile；当前本机仅部署前后端。监控端点和规则已有，但实际抓取、告警通知、容量及真实渠道验收仍待完成。详见 [部署运维](OPERATIONS_AND_CAPACITY.md) 和 [当前状态](PROJECT_STATUS.md)。以下136项/V011及三类通道描述属于早期实现记录。
+
+## V011阶段记录（历史）
+
 状态：内部实现通过最终136项本地回归，V011共享迁移与validate成功。WorkerRuntime调用现有PaymentRecoveryWorker、PaymentCallbackWorker和OrderResolutionWorker；默认不创建运行时Bean。deploy/compose.yaml中API固定禁用，worker为显式profile，未部署或启用共享后台处理。
 
 ## 边界

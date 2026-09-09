@@ -1,6 +1,8 @@
 # 交易中心文档导航
 
-本目录面向产品、后端开发、测试和运维，描述当前仓库中的交易能力。整理日期：2026-09-08；代码基线：`59875bb` 加当前工作区改动，包含尚未提交的 Casdoor 对齐配置。此处是源码快照说明，不代表线上运行状态。
+[当前交付状态](PROJECT_STATUS.md) · [管理查询接口](ADMIN_QUERY_API.md) · [控制台交接](CURSOR_HANDOFF.md)
+
+本目录面向产品、后端开发、测试和运维，描述当前仓库中的交易能力。更新日期：2026-09-09；代码基线：已推送main的 `3187c57`。先阅读 [当前交付状态](PROJECT_STATUS.md)，区分已实现、已在本机部署与待生产验收的范围。
 
 ## 推荐阅读顺序
 
@@ -12,7 +14,7 @@
 | [数据架构](DATA_ARCHITECTURE.md) | 数据归属、核心关系、约束、索引及迁移 | 开发、数据库维护人员 |
 | [部署运维与容量验证](OPERATIONS_AND_CAPACITY.md) | 如何运行、观测、恢复以及验证容量 | 运维、测试、开发 |
 
-先读架构和业务，再结合并发、数据与运维文档阅读代码。接口字段、路径与响应以 [OpenAPI](openapi.json) 和对应 Controller 为依据；事件以 [AsyncAPI](asyncapi.json)、[事件合同](ASYNCAPI_CONTRACT.md) 和 [contracts](contracts/) 为依据。当前 OpenAPI 文件包含 **55 个路径、66 个 HTTP 操作**，这是合同文件统计，不是生产可用接口数量；部分接口需要开关和来源授权。
+先读架构和业务，再结合并发、数据与运维文档阅读代码。接口字段、路径与响应以 [OpenAPI](openapi.json) 和对应 Controller 为依据；事件以 [AsyncAPI](asyncapi.json)、[事件合同](ASYNCAPI_CONTRACT.md) 和 [contracts](contracts/) 为依据。当前 OpenAPI 文件包含 **69 个路径、81 个 HTTP 操作**，这是合同文件统计，不是生产可用接口数量；部分接口需要开关和来源授权。
 
 ## 能力状态
 
@@ -32,6 +34,7 @@
 
 | 主题 | 详细合同与操作说明 |
 | --- | --- |
+| 管理查询与控制台 | [查询合同](ADMIN_QUERY_API.md)、[控制台交接](CURSOR_HANDOFF.md) |
 | 会员与资格 | [会员生命周期](MEMBER_LIFECYCLE.md)、[消费事实](MEMBER_TRADE_FACTS.md)、[资格查询](CUSTOMER_ELIGIBILITY.md) |
 | 商品报价与库存 | [SKU 与报价](SKU_AND_QUOTE.md)、[缓存和热点 SKU](CATALOG_CACHE_AND_HOT_SKU_DESIGN.md)、[库存 V1](INVENTORY_V1_PUBLISHING_DESIGN.md) |
 | 订单 | [订单基础](ORDER_FOUNDATION.md)、[取消/过期恢复](ORDER_RESOLUTION_PLAN.md)、[订单归因](ORDER_REFERRAL_ATTRIBUTION_DESIGN.md) |

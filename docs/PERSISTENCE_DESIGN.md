@@ -1,6 +1,6 @@
 # 交易中心持久化分层设计
 
-> 时效说明（2026-09-08）：本文保留早期 Mapper 分层切片记录；正文的 HTTP 数量和当时待实现范围不是当前总量。当前 OpenAPI 为 55 路径/66 操作（2026-09-08 文件统计），整体分层与数据现状见 [项目架构](PROJECT_ARCHITECTURE.md) 和 [数据架构](DATA_ARCHITECTURE.md)。
+> 时效说明（2026-09-09）：本文保留早期 Mapper 分层切片记录；正文的 HTTP 数量和当时待实现范围不是当前总量。当前 OpenAPI 为69路径/81操作（2026-09-09文件统计），最新交付状态见 [状态页](PROJECT_STATUS.md)，整体分层与数据现状见 [项目架构](PROJECT_ARCHITECTURE.md) 和 [数据架构](DATA_ARCHITECTURE.md)。
 
 ## 决策
 
