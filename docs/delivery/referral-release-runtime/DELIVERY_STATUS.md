@@ -1,3 +1,16 @@
+# 最新进展：R3 本地机制完成（2026-09-09）
+
+用户在明确 R3 本地范围后回复“继续”。营销 `feat/referral-completion` 已提交 `ba93fd8`：持久化激活/熔断单调序号、审计、历史版本回滚、本地新鲜检查及真实签名/并发/独立 JVM 恢复测试。
+
+- 本轮 `verify`：SPI 93、referral 服务 226；架构 JUnit 2 项，全部通过。
+- V13 只在隔离 MySQL 迁移；生产包无测试探针。未推送、合 main 或部署。
+- 详见[本地 R3 交付报告](../../../../marketing-lowcode-platform/docs/delivery/referral-release-runtime/R3_DELIVERY_REPORT.md)。
+- R3 本地机制已完成；真实 READY/ACK、权威活动/身份映射、熔断健康协议、参与事务 epoch 栅栏与 control 开放仍待接线。LocalGuard 不是参与许可，默认发布/参与拒绝保留。
+
+以下是 R1/R2 的历史进展，最新 R3 结论以本节为准。
+
+---
+
 # 裂变发布实施状态
 
 - 日期：2026-09-09
