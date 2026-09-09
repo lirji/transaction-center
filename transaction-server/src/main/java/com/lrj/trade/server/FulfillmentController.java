@@ -32,9 +32,6 @@ public class FulfillmentController {
     /** 整批已收到才能验收，PARTIAL仅表示部分可售。 */
     @PostMapping("/api/v1/trade/admin/returns/{returnNo}:inspect")
     public InspectionResult inspect(@AuthenticationPrincipal Jwt jwt,@PathVariable String returnNo,@RequestHeader("Idempotency-Key") String key,@RequestHeader(value="If-Match",required=false) String match,@Valid @RequestBody Inspection input) {var actor=actor(jwt);access.require(actor,"RETURN");var value=ingress.inspect(actor,key,returnNo,version(match),input.result(),input.restockQuantity(),input.evidenceRef());return new InspectionResult(returnNo,value.resourceNo(),value.status(),value.version());}
-    /** 脱敏管理详情带ETag，为验收条件更新提供当前版本。 */
-    @GetMapping("/api/v1/trade/admin/returns/{returnNo}")
-    public ResponseEntity<ReturnRequest> read(@AuthenticationPrincipal Jwt jwt,@PathVariable String returnNo) {var value=ingress.readReturn(actor(jwt).tenantId(),returnNo);return ResponseEntity.ok().eTag("\""+value.version()+"\"").body(value);}
     private Actor actor(Jwt jwt) {try {return new Actor(Long.parseLong(jwt.getClaimAsString("tenant_id")),jwt.getIssuer().toString(),jwt.getSubject());}catch(RuntimeException invalid) {throw new TradeException("INVALID_IDENTITY","令牌缺少有效身份");}}
     private long id(String text) {try {if(text==null || !text.matches("[1-9][0-9]{0,18}")) throw new NumberFormatException();long value=Long.parseLong(text);Checks.positive(value);return value;}catch(NumberFormatException invalid){throw new TradeException("INVALID_ARGUMENT","资源ID无效");}}
     private long version(String match) {return AdminVersion.parse(match); }

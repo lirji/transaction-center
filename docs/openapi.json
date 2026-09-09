@@ -4896,34 +4896,27 @@
     "/api/v1/trade/admin/refunds": {
       "get": {
         "operationId": "refundQueue",
-        "summary": "后台退款状态队列",
-        "description": "需要已验签JWT及trade.admin作用域。租户只能取自JWT。按状态和主键升序分页，单页最多100；将末条cursor作为after，空数组结束。状态会变化，运营刷新需从0重扫，不是事件消费游标。只读，不授予审批或资金修改权限。",
-        "parameters": [
+        "summary": "RefundList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。 保持原队列数组与默认PENDING_APPROVAL。",
+        "security": [
           {
-            "in": "query",
-            "name": "status",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "PENDING_APPROVAL",
-                "READY",
-                "SUBMITTED",
-                "SUCCEEDED",
-                "FAILED",
-                "REJECTED",
-                "EXPIRED"
-              ],
-              "default": "PENDING_APPROVAL"
-            }
-          },
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
           {
             "in": "query",
             "name": "after",
             "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 0,
-              "default": 0
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
             }
           },
           {
@@ -4935,11 +4928,77 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refundNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "PENDING_APPROVAL",
+                "READY",
+                "SUBMITTED",
+                "SUCCEEDED",
+                "FAILED",
+                "REJECTED",
+                "EXPIRED"
+              ],
+              "default": "PENDING_APPROVAL"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "当前状态队列，不返回申请人身份、原因或渠道凭据",
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -4952,13 +5011,50 @@
             }
           },
           "400": {
-            "description": "状态或分页参数无效"
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未认证"
+            "description": "未认证或令牌无效"
           },
           "403": {
-            "description": "缺少trade.admin作用域"
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
           }
         }
       }
@@ -6957,6 +7053,176 @@
             }
           }
         }
+      },
+      "get": {
+        "operationId": "adminQueryReturnList",
+        "summary": "ReturnList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "returnNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderItemId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "warehouseId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "INSPECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReturnPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/trade/admin/returns/{returnNo}:inspect": {
@@ -7097,95 +7363,1833 @@
     "/api/v1/trade/admin/returns/{returnNo}": {
       "get": {
         "operationId": "readReturnRequest",
-        "description": "本租户管理员查询，ETag为当前申请版本",
+        "summary": "ReturnDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
         "parameters": [
           {
-            "name": "returnNo",
             "in": "path",
+            "name": "returnNo",
             "required": true,
             "schema": {
               "type": "string",
-              "minLength": 1
+              "maxLength": 64
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "永久首次结果或当前只读资源",
-            "content": {
-              "application/json": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "returnNo",
-                    "orderNo",
-                    "orderItemId",
-                    "warehouseId",
-                    "quantity",
-                    "status",
-                    "version"
-                  ],
-                  "properties": {
-                    "returnNo": {
-                      "type": "string"
-                    },
-                    "orderNo": {
-                      "type": "string"
-                    },
-                    "orderItemId": {
-                      "type": "string"
-                    },
-                    "warehouseId": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    },
-                    "quantity": {
-                      "type": "integer",
-                      "format": "int64",
-                      "minimum": 1
-                    },
-                    "version": {
-                      "type": "integer",
-                      "format": "int64",
-                      "minimum": 0
-                    },
-                    "receiptNo": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
-                  }
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "ETag": {
+                "description": "退货申请版本，验收请求使用If-Match。",
+                "schema": {
+                  "type": "string"
                 }
               }
             },
-            "headers": {
-              "ETag": {
+            "content": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "$ref": "#/components/schemas/AdminReturnDetail"
                 }
               }
             }
           },
           "400": {
-            "description": "请求格式无效"
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
           },
           "403": {
-            "description": "权限或可信来源不足"
+            "description": "缺少操作权限"
           },
           "404": {
-            "description": "本租户资源不存在"
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
           },
-          "409": {
-            "description": "来源或幂等内容冲突"
-          },
-          "422": {
-            "description": "交付或退货业务条件不满足"
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
           },
           "503": {
-            "description": "入口尚未启用或暂时不可用"
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/orders": {
+      "get": {
+        "operationId": "adminQueryOrderList",
+        "summary": "OrderList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_PAYMENT",
+                "CLOSING",
+                "CANCELLED",
+                "PAID",
+                "FULFILLING",
+                "COMPLETED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "financialStatus",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UNPAID",
+                "NO_PAYMENT_REQUIRED",
+                "PAID",
+                "PARTIALLY_REFUNDED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "warehouseId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrderPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/orders/{orderNo}": {
+      "get": {
+        "operationId": "adminQueryOrderDetail",
+        "summary": "OrderDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderNo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrderDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/payments": {
+      "get": {
+        "operationId": "adminQueryPaymentList",
+        "summary": "PaymentList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paymentNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "READY",
+                "PENDING",
+                "SUCCEEDED",
+                "CLOSED",
+                "REVIEW"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPaymentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/payments/{paymentNo}": {
+      "get": {
+        "operationId": "adminQueryPaymentDetail",
+        "summary": "PaymentDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "paymentNo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPaymentDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/payment-receipts": {
+      "get": {
+        "operationId": "adminQueryReceiptList",
+        "summary": "ReceiptList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "receiptNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paymentNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channelCode",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "disposition",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NORMAL",
+                "EXCESS",
+                "AMOUNT_MISMATCH",
+                "AFTER_CLOSE",
+                "AFTER_TERMINAL"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "abnormalOnly",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReceiptPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/payment-receipts/{receiptNo}": {
+      "get": {
+        "operationId": "adminQueryReceiptDetail",
+        "summary": "ReceiptDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receiptNo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReceiptDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/quotes": {
+      "get": {
+        "operationId": "adminQueryQuoteList",
+        "summary": "QuoteList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quoteId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminQuotePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/quotes/{quoteId}": {
+      "get": {
+        "operationId": "adminQueryQuoteDetail",
+        "summary": "QuoteDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "quoteId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminQuoteDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/refunds/{refundNo}": {
+      "get": {
+        "operationId": "adminQueryRefundDetail",
+        "summary": "RefundDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refundNo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRefundDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/jobs": {
+      "get": {
+        "operationId": "adminQueryJobList",
+        "summary": "JobList",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin + trade.admin.jobs.read。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.jobs.read"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "jobType",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PAYMENT_RECOVER",
+                "PAYMENT_CALLBACK",
+                "ORDER_RESOLVE",
+                "REFUND_CALLBACK",
+                "REFUND_RECOVER",
+                "REFUND_COMPENSATE",
+                "OUTBOX_PUBLISH",
+                "RECON_QUERY"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "READY",
+                "RUNNING",
+                "DONE",
+                "REVIEW"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "leaseExpired",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminJobPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/jobs/{jobId}": {
+      "get": {
+        "operationId": "adminQueryJobDetail",
+        "summary": "JobDetail",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin + trade.admin.jobs.read。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.jobs.read"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminJobDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/payments/{paymentNo}/attempts": {
+      "get": {
+        "operationId": "adminQueryPaymentAttempts",
+        "summary": "PaymentAttempts",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "paymentNo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PREPARED",
+                "UNKNOWN",
+                "SUCCEEDED",
+                "CLOSED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAttemptPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/orders/{orderNo}/referral-evidence": {
+      "get": {
+        "operationId": "adminQueryOrderEvidence",
+        "summary": "OrderEvidence",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin + trade.admin.evidence.read。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.evidence.read"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderNo",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrderEvidence"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/members/{memberId}/eligibility:query": {
+      "post": {
+        "operationId": "adminQueryMemberEligibility",
+        "summary": "MemberEligibility",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前JWT租户只读查询。需要 trade.admin + trade.admin.evidence.read。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.evidence.read"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memberId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerEligibilityResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "policyVersion": {
+                    "type": "string",
+                    "enum": [
+                      "REGISTERED_DURING_CAMPAIGN_V1",
+                      "NEVER_CONFIRMED_PAID_V1"
+                    ]
+                  },
+                  "campaignStartAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "evaluatedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "policyVersion"
+                ],
+                "additionalProperties": false,
+                "description": "活动注册策略必须传campaignStartAt；evaluatedAt可省略，禁止未来时间。只读，不预占资格。"
+              }
+            }
           }
         }
       }
@@ -9398,6 +11402,1903 @@
             ]
           }
         }
+      },
+      "AdminPaymentView": {
+        "type": "object",
+        "properties": {
+          "paymentNo": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "PENDING",
+              "SUCCEEDED",
+              "CLOSED",
+              "REVIEW"
+            ]
+          },
+          "expectedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "activeAttemptNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "succeededReceiptNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closeFenceAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "paymentNo",
+          "orderId",
+          "orderNo",
+          "memberId",
+          "status",
+          "expectedAmount",
+          "currency",
+          "activeAttemptNo",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "succeededReceiptNo",
+          "closeFenceAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAttemptView": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "paymentNo": {
+            "type": "string"
+          },
+          "attemptNo": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          },
+          "channelCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PREPARED",
+              "UNKNOWN",
+              "SUCCEEDED",
+              "CLOSED"
+            ]
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "hasCloseEvidence": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "attemptId",
+          "paymentNo",
+          "attemptNo",
+          "channelId",
+          "channelCode",
+          "status",
+          "submittedAt",
+          "closedAt",
+          "hasCloseEvidence",
+          "createdAt",
+          "updatedAt",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReceiptView": {
+        "type": "object",
+        "properties": {
+          "receiptNo": {
+            "type": "string"
+          },
+          "paymentNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "attemptNo": {
+            "type": "string"
+          },
+          "channelCode": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "EXCESS",
+              "AMOUNT_MISMATCH",
+              "AFTER_CLOSE",
+              "AFTER_TERMINAL"
+            ]
+          },
+          "providerPaidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "refundReservedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unreservedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "receiptNo",
+          "paymentNo",
+          "orderNo",
+          "attemptNo",
+          "channelCode",
+          "amount",
+          "currency",
+          "disposition",
+          "providerPaidAt",
+          "confirmedAt",
+          "createdAt",
+          "refundedAmount",
+          "refundReservedAmount",
+          "unreservedAmount",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "AdminQuoteView": {
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "payableAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "pricingPolicy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "quoteId",
+          "memberId",
+          "payableAmount",
+          "currency",
+          "pricingPolicy",
+          "createdAt",
+          "expiresAt",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "AdminJobView": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "jobType": {
+            "type": "string",
+            "enum": [
+              "PAYMENT_RECOVER",
+              "PAYMENT_CALLBACK",
+              "ORDER_RESOLVE",
+              "REFUND_CALLBACK",
+              "REFUND_RECOVER",
+              "REFUND_COMPENSATE",
+              "OUTBOX_PUBLISH",
+              "RECON_QUERY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "RUNNING",
+              "DONE",
+              "REVIEW"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "nextRunAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leaseUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "leaseExpired": {
+            "type": "boolean"
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "jobId",
+          "jobType",
+          "status",
+          "attempts",
+          "nextRunAt",
+          "leaseUntil",
+          "leaseExpired",
+          "lastError",
+          "createdAt",
+          "updatedAt",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "AdminBusinessReference": {
+        "type": "object",
+        "properties": {
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceNo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resourceType",
+          "resourceNo"
+        ],
+        "additionalProperties": false
+      },
+      "AdminRefundView": {
+        "type": "object",
+        "properties": {
+          "refundNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_APPROVAL",
+              "READY",
+              "SUBMITTED",
+              "SUCCEEDED",
+              "FAILED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "approvalRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approvalDeadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "refundNo",
+          "orderNo",
+          "memberId",
+          "amount",
+          "currency",
+          "status",
+          "approvalRef",
+          "approvalDeadline",
+          "policyVersion",
+          "version",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminRefundItem": {
+        "type": "object",
+        "properties": {
+          "componentType": {
+            "type": "string"
+          },
+          "orderItemId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "componentType",
+          "orderItemId",
+          "quantity",
+          "amount"
+        ],
+        "additionalProperties": false
+      },
+      "AdminOrderItem": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "skuId": {
+            "type": "string"
+          },
+          "skuRevision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string"
+          },
+          "specification": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "stockType": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unitPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "payableAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "returnedQuantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "itemId",
+          "skuId",
+          "skuRevision",
+          "title",
+          "specification",
+          "stockType",
+          "quantity",
+          "unitPrice",
+          "payableAmount",
+          "returnedQuantity"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReturnView": {
+        "type": "object",
+        "properties": {
+          "returnId": {
+            "type": "string"
+          },
+          "returnNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "orderItemId": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "INSPECTED"
+            ]
+          },
+          "receiptNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "returnId",
+          "returnNo",
+          "orderNo",
+          "memberId",
+          "orderItemId",
+          "warehouseId",
+          "quantity",
+          "status",
+          "receiptNo",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminOrderView": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string"
+          },
+          "merchantNo": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_PAYMENT",
+              "CLOSING",
+              "CANCELLED",
+              "PAID",
+              "FULFILLING",
+              "COMPLETED"
+            ]
+          },
+          "financialStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "NO_PAYMENT_REQUIRED",
+              "PAID",
+              "PARTIALLY_REFUNDED",
+              "REFUNDED"
+            ]
+          },
+          "payableAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "paymentStartedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "orderId",
+          "orderNo",
+          "memberId",
+          "quoteId",
+          "merchantNo",
+          "warehouseId",
+          "status",
+          "financialStatus",
+          "payableAmount",
+          "currency",
+          "expiresAt",
+          "paidAt",
+          "completedAt",
+          "createdAt",
+          "version",
+          "paymentStartedAt",
+          "cancelledAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminInspectionView": {
+        "type": "object",
+        "properties": {
+          "receiptNo": {
+            "type": "string"
+          },
+          "receivedQuantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "restockQuantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "receiptNo",
+          "receivedQuantity",
+          "restockQuantity",
+          "recordedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminFulfillmentView": {
+        "type": "object",
+        "properties": {
+          "fulfillmentNo": {
+            "type": "string"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "fulfillmentNo",
+          "deliveredAt",
+          "completedAt",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "AdminOrderPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminOrderView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminOrderDetail": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "quoteId": {
+            "type": "string"
+          },
+          "merchantNo": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_PAYMENT",
+              "CLOSING",
+              "CANCELLED",
+              "PAID",
+              "FULFILLING",
+              "COMPLETED"
+            ]
+          },
+          "financialStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "NO_PAYMENT_REQUIRED",
+              "PAID",
+              "PARTIALLY_REFUNDED",
+              "REFUNDED"
+            ]
+          },
+          "payableAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "paymentStartedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "cancelledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminOrderItem"
+            }
+          },
+          "fulfillment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminFulfillmentView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "orderId",
+          "orderNo",
+          "memberId",
+          "quoteId",
+          "merchantNo",
+          "warehouseId",
+          "status",
+          "financialStatus",
+          "payableAmount",
+          "currency",
+          "expiresAt",
+          "paidAt",
+          "completedAt",
+          "createdAt",
+          "version",
+          "paymentStartedAt",
+          "cancelledAt",
+          "updatedAt",
+          "observedAt",
+          "items",
+          "fulfillment"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReturnPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminReturnView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReturnDetail": {
+        "type": "object",
+        "properties": {
+          "returnId": {
+            "type": "string"
+          },
+          "returnNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "orderItemId": {
+            "type": "string"
+          },
+          "warehouseId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "INSPECTED"
+            ]
+          },
+          "receiptNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "inspection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminInspectionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "returnId",
+          "returnNo",
+          "orderNo",
+          "memberId",
+          "orderItemId",
+          "warehouseId",
+          "quantity",
+          "status",
+          "receiptNo",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "observedAt",
+          "inspection"
+        ],
+        "additionalProperties": false
+      },
+      "AdminPaymentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPaymentView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminPaymentDetail": {
+        "type": "object",
+        "properties": {
+          "paymentNo": {
+            "type": "string"
+          },
+          "orderId": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "PENDING",
+              "SUCCEEDED",
+              "CLOSED",
+              "REVIEW"
+            ]
+          },
+          "expectedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "activeAttemptNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "succeededReceiptNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "closeFenceAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "paymentNo",
+          "orderId",
+          "orderNo",
+          "memberId",
+          "status",
+          "expectedAmount",
+          "currency",
+          "activeAttemptNo",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "succeededReceiptNo",
+          "closeFenceAt",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAttemptPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAttemptView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAttemptDetail": {
+        "type": "object",
+        "properties": {
+          "attemptId": {
+            "type": "string"
+          },
+          "paymentNo": {
+            "type": "string"
+          },
+          "attemptNo": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          },
+          "channelCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PREPARED",
+              "UNKNOWN",
+              "SUCCEEDED",
+              "CLOSED"
+            ]
+          },
+          "submittedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "hasCloseEvidence": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "attemptId",
+          "paymentNo",
+          "attemptNo",
+          "channelId",
+          "channelCode",
+          "status",
+          "submittedAt",
+          "closedAt",
+          "hasCloseEvidence",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReceiptPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminReceiptView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminReceiptDetail": {
+        "type": "object",
+        "properties": {
+          "receiptNo": {
+            "type": "string"
+          },
+          "paymentNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "attemptNo": {
+            "type": "string"
+          },
+          "channelCode": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "EXCESS",
+              "AMOUNT_MISMATCH",
+              "AFTER_CLOSE",
+              "AFTER_TERMINAL"
+            ]
+          },
+          "providerPaidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "refundReservedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unreservedAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "receiptNo",
+          "paymentNo",
+          "orderNo",
+          "attemptNo",
+          "channelCode",
+          "amount",
+          "currency",
+          "disposition",
+          "providerPaidAt",
+          "confirmedAt",
+          "createdAt",
+          "refundedAmount",
+          "refundReservedAmount",
+          "unreservedAmount",
+          "version",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminRefundPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRefundView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminRefundDetail": {
+        "type": "object",
+        "properties": {
+          "refundNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING_APPROVAL",
+              "READY",
+              "SUBMITTED",
+              "SUCCEEDED",
+              "FAILED",
+              "REJECTED",
+              "EXPIRED"
+            ]
+          },
+          "approvalRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approvalDeadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRefundItem"
+            }
+          },
+          "processingReasonCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "持久REFUND_RECOVER任务的结构化错误分类；无可靠来源时null，不等于渠道最终失败原因。"
+          }
+        },
+        "required": [
+          "refundNo",
+          "orderNo",
+          "memberId",
+          "amount",
+          "currency",
+          "status",
+          "approvalRef",
+          "approvalDeadline",
+          "policyVersion",
+          "version",
+          "createdAt",
+          "observedAt",
+          "items",
+          "processingReasonCode"
+        ],
+        "additionalProperties": false
+      },
+      "AdminJobPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminJobView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminJobDetail": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "jobType": {
+            "type": "string",
+            "enum": [
+              "PAYMENT_RECOVER",
+              "PAYMENT_CALLBACK",
+              "ORDER_RESOLVE",
+              "REFUND_CALLBACK",
+              "REFUND_RECOVER",
+              "REFUND_COMPENSATE",
+              "OUTBOX_PUBLISH",
+              "RECON_QUERY"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "RUNNING",
+              "DONE",
+              "REVIEW"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "nextRunAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leaseUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "leaseExpired": {
+            "type": "boolean"
+          },
+          "lastError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "businessReference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminBusinessReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "jobId",
+          "jobType",
+          "status",
+          "attempts",
+          "nextRunAt",
+          "leaseUntil",
+          "leaseExpired",
+          "lastError",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "observedAt",
+          "businessReference"
+        ],
+        "additionalProperties": false
+      },
+      "AdminQuotePage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminQuoteView"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AdminQuoteDetail": {
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "payableAmount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "pricingPolicy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteItem"
+            }
+          }
+        },
+        "required": [
+          "quoteId",
+          "memberId",
+          "payableAmount",
+          "currency",
+          "pricingPolicy",
+          "createdAt",
+          "expiresAt",
+          "version",
+          "observedAt",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "AdminOrderEvidence": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "正十进制ID，服务端还校验不超过9223372036854775807"
+          },
+          "memberId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "正十进制ID，服务端还校验不超过9223372036854775807"
+          },
+          "evidenceVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "firstOrderPolicy": {
+            "type": "string",
+            "const": "FIRST_CONFIRMED_PAID_ORDER_V1"
+          },
+          "isFirstConfirmedPaidOrder": {
+            "type": "boolean"
+          },
+          "paidAmount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "refundedAmount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pendingRefundAmount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "netPaidAmount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "conservativeEligibleAmount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "paidAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "orderNo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderId",
+          "memberId",
+          "evidenceVersion",
+          "firstOrderPolicy",
+          "isFirstConfirmedPaidOrder",
+          "paidAmount",
+          "refundedAmount",
+          "pendingRefundAmount",
+          "netPaidAmount",
+          "conservativeEligibleAmount",
+          "currency",
+          "paidAt",
+          "completedAt",
+          "asOf",
+          "orderNo"
+        ],
+        "additionalProperties": false
       }
     }
   }

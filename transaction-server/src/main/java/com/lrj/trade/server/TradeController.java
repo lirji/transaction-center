@@ -316,13 +316,6 @@ public class TradeController {
     }
     /** 只接受完整签名载荷；大小限制先于远端JWKS请求，未知JSON字段按既有严格配置拒绝。 */
     public record ApprovalReceiptInput(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=16384) String signedReceipt) {}
-    /** 后台按固定状态查询有界队列；租户来自验签JWT，不提供审批写入或资金终态修改。 */
-    @GetMapping("/admin/refunds")
-    public List<RefundQueueItem> refundQueue(@AuthenticationPrincipal Jwt jwt,
-            @RequestParam(defaultValue="PENDING_APPROVAL") String status,@RequestParam(defaultValue="0") long after,
-            @RequestParam(defaultValue="20") int limit) {
-        return refunds.listQueue(actor(jwt).tenantId(),status,after,limit);
-    }
     /** 后台读取免审策略，未配置时零版本零门槛要求审批。 */
     @GetMapping("/admin/refund-policy")
     public org.springframework.http.ResponseEntity<RefundPolicy> refundPolicy(@AuthenticationPrincipal Jwt jwt) { var value=refundPolicies.read(actor(jwt).tenantId());return org.springframework.http.ResponseEntity.ok().eTag("\""+value.version()+"\"").body(value); }

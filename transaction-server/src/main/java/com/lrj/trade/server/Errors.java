@@ -23,19 +23,19 @@ public class Errors {
     @ExceptionHandler(TradeException.class)
     public ResponseEntity<Failure> business(TradeException error) {
         int status=statusFor(error.code());
-        if(java.util.Set.of("HOT_SKU_BUSY","CATALOG_QUERY_BUSY").contains(error.code())) return ResponseEntity.status(429).header("Retry-After","1").body(new Failure(error.code(),error.getMessage(),com.lrj.trade.core.TraceContext.correlationUuid(),true));
+        if(java.util.Set.of("HOT_SKU_BUSY","CATALOG_QUERY_BUSY","ADMIN_QUERY_BUSY").contains(error.code())) return ResponseEntity.status(429).header("Retry-After","1").body(new Failure(error.code(),error.getMessage(),com.lrj.trade.core.TraceContext.correlationUuid(),true));
         if(error.code().equals("ORDER_ADMISSION_PAUSED") || error.code().equals("PAYMENT_ADMISSION_PAUSED"))
             return ResponseEntity.status(503).header("Retry-After","5").body(new Failure(error.code(),error.getMessage(),com.lrj.trade.core.TraceContext.correlationUuid(),true));
-        return response(status,error.code(),error.getMessage(),java.util.Set.of("REFUND_APPROVAL_AUDIT_UNAVAILABLE","EVIDENCE_UNAVAILABLE").contains(error.code()));
+        return response(status,error.code(),error.getMessage(),java.util.Set.of("REFUND_APPROVAL_AUDIT_UNAVAILABLE","EVIDENCE_UNAVAILABLE","ADMIN_QUERY_UNAVAILABLE").contains(error.code()));
     }
     // 审计包装仅增加关联号，不能改变原业务码的HTTP分类。
     private int statusFor(String code) {
         return switch(code) {
-            case "ORDER_ATTRIBUTION_DISABLED" -> 503;
+            case "ORDER_ATTRIBUTION_DISABLED","ADMIN_QUERY_UNAVAILABLE" -> 503;
             case "ORDER_ATTRIBUTION_UNTRUSTED" -> 403;
             case "ORDER_ATTRIBUTION_TRANSACTION","ORDER_ATTRIBUTION_CONSUMED" -> 409;
             case "NOT_FOUND" -> 404;
-            case "HOT_SKU_BUSY","CATALOG_QUERY_BUSY" -> 429;
+            case "HOT_SKU_BUSY","CATALOG_QUERY_BUSY","ADMIN_QUERY_BUSY" -> 429;
             case "FULFILLMENT_DISABLED","CATALOG_QUERY_UNAVAILABLE" -> 503;
             case "FULFILLMENT_UNTRUSTED" -> 403;
             case "PRECONDITION_FAILED" -> 412;

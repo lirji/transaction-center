@@ -54,7 +54,7 @@ class MapperContractTest {
                         assertFalse(Map.class.isAssignableFrom(parameter.getType()),"不使用通用参数Map替代明确合同");
                     }
                     Set<String> bindings=new HashSet<>();
-                    var matcher=Pattern.compile("#\\{([A-Za-z][A-Za-z0-9]*)(?:\\.([A-Za-z][A-Za-z0-9]*))?}").matcher(statement.getTextContent());
+                    var matcher=Pattern.compile("#\\{([A-Za-z][A-Za-z0-9]*)(?:\\.([A-Za-z][A-Za-z0-9]*))?}").matcher(expandedText(statement,mapper));
                     while(matcher.find()) {
                         String bindingRoot=matcher.group(1);bindings.add(bindingRoot);
                         if(matcher.group(2)!=null) {
@@ -72,7 +72,13 @@ class MapperContractTest {
                         bindings.add(collection);
                     }
                     assertEquals(parameters,bindings,method.toString());
-                    if(!namespace.endsWith("SeedDatabaseMapper")) {
+                    boolean clockQuery=namespace.equals("com.lrj.trade.jobs.mapper.AdminJobMapper") && method.getName().equals("now");
+                    if(clockQuery) {
+                        // 数据库时钟不访问业务表，精确语句断言防止该例外扩展为无租户查询。
+                        assertTrue(parameters.isEmpty());assertEquals("select",statement.getTagName());
+                        assertEquals("SELECT UTC_TIMESTAMP(3)",statement.getTextContent().strip());
+                    }
+                    if(!namespace.endsWith("SeedDatabaseMapper") && !clockQuery) {
                         if(namespace.equals("com.lrj.trade.jobs.mapper.JobLeaseMapper") && method.getName().equals("nextTenant")) {
                             // 仅此内部全租户发现方法例外；写入及其他查询继续强制显式租户。
                             assertEquals(Set.of("type","after"),parameters);
@@ -111,6 +117,22 @@ class MapperContractTest {
                 assertTrue(namespaces.contains(name),"接口缺少XML："+name);
             }
         }
+    }
+    /** 展开静态SQL片段后检查实际绑定，避免漏掉复用投影中的参数。 */
+    private String expandedText(Element element,Element mapper) {
+        var text=new StringBuilder();
+        for(int i=0;i<element.getChildNodes().getLength();i++) {
+            var child=element.getChildNodes().item(i);
+            if(child instanceof Element nested) {
+                if(nested.getTagName().equals("include")) {
+                    String ref=nested.getAttribute("refid");Element found=null;
+                    for(int j=0;j<mapper.getChildNodes().getLength();j++)
+                        if(mapper.getChildNodes().item(j) instanceof Element fragment && fragment.getTagName().equals("sql") && fragment.getAttribute("id").equals(ref)) found=fragment;
+                    assertNotNull(found,"SQL引用必须可解析："+ref);text.append(expandedText(found,mapper));
+                } else text.append(expandedText(nested,mapper));
+            } else text.append(child.getTextContent());
+        }
+        return text.toString();
     }
     // 与源码门禁一样限定目录，避免碰到Surefire正在替换的报告或其他构建产物。
     private List<Path> sourceFiles(Path root,String suffix) throws Exception {

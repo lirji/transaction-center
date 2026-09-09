@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-09",
+  "backend": {
+    "tests": 451,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "commands": [
+    "TESTCONTAINERS_RYUK_DISABLED=true mvn -q -Dtrade.test.mysql-image=mysql:8.4.11 verify",
+    "mvn -q -pl transaction-client-sdk test",
+    "bash scripts/verify-contracts.sh"
+  ],
+  "exitCodes": [
+    0,
+    0,
+    0
+  ],
+  "note": "补齐 ADMIN_QUERY_BUSY/ADMIN_QUERY_UNAVAILABLE 的 SDK 错误码与机器合同；SDK 修改后独立复验通过。"
+}

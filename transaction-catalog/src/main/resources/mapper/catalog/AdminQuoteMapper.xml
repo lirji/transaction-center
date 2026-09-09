@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.catalog.mapper.AdminQuoteMapper">
+  <resultMap id="View" type="com.lrj.trade.catalog.model.AdminQuoteView"><constructor>
+      <arg column="cursor" javaType="java.lang.String"/>
+      <arg column="quoteId" javaType="java.lang.String"/>
+      <arg column="memberId" javaType="java.lang.String"/>
+      <arg column="payableAmount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="pricingPolicy" javaType="java.lang.String"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="expiresAt" javaType="java.time.Instant"/>
+      <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <sql id="columns">r.id AS `cursor`, r.id AS quoteId, r.member_id AS memberId, r.payable_amount AS payableAmount, r.currency AS currency, r.pricing_policy AS pricingPolicy, r.created_at AS createdAt, r.expires_at AS expiresAt, r.version AS version</sql>
+  <sql id="source">FROM tc_quote r </sql>
+  <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.quoteId != null">AND r.id=#{q.filters.quoteId}</if>
+    <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="find" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id=#{number}
+  </select>
+</mapper>

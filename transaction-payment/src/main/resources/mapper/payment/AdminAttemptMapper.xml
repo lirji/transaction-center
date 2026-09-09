@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.AdminAttemptMapper">
+  <resultMap id="View" type="com.lrj.trade.payment.model.AdminAttemptView"><constructor>
+      <arg column="cursor" javaType="java.lang.String"/>
+      <arg column="attemptId" javaType="java.lang.String"/>
+      <arg column="paymentNo" javaType="java.lang.String"/>
+      <arg column="attemptNo" javaType="java.lang.String"/>
+      <arg column="channelId" javaType="java.lang.String"/>
+      <arg column="channelCode" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="submittedAt" javaType="java.time.Instant"/>
+      <arg column="closedAt" javaType="java.time.Instant"/>
+      <arg column="hasCloseEvidence" javaType="_boolean"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="updatedAt" javaType="java.time.Instant"/>
+      <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <sql id="columns">r.id AS `cursor`, r.id AS attemptId, p.payment_no AS paymentNo, r.merchant_request_no AS attemptNo, r.channel_id AS channelId, c.channel_code AS channelCode, r.status AS status, r.submitted_at AS submittedAt, r.closed_at AS closedAt, (r.close_evidence_ref IS NOT NULL) AS hasCloseEvidence, r.created_at AS createdAt, r.updated_at AS updatedAt, r.version AS version</sql>
+  <sql id="source">FROM tc_payment_attempt r JOIN tc_payment_intent p ON p.tenant_id=r.tenant_id AND p.id=r.intent_id JOIN tc_merchant_channel c ON c.tenant_id=r.tenant_id AND c.id=r.channel_id</sql>
+  <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
+    AND p.payment_no=#{paymentNo}
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="find" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.merchant_request_no=#{number}
+  </select>
+</mapper>

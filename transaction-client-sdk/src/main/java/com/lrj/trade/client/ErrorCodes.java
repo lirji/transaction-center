@@ -3,6 +3,10 @@ package com.lrj.trade.client;
 /** 稳定业务错误常量；未来未知码仍通过 TradeFailure 字符串原样保留。 */
 public final class ErrorCodes {
     private ErrorCodes() {}
+    /** 管理查询限流，遵循Retry-After后重试原查询。 */
+    public static final String ADMIN_QUERY_BUSY = "ADMIN_QUERY_BUSY";
+    /** 管理查询存储暂不可用，由查询调用方决定重试，命令SDK默认停止。 */
+    public static final String ADMIN_QUERY_UNAVAILABLE = "ADMIN_QUERY_UNAVAILABLE";
     /** 服务端稳定错误标识，不依赖展示文案判断。 */
     /** 订单归因授权边界错误，默认不自动重试。 */
     public static final String ORDER_ATTRIBUTION_UNTRUSTED = "ORDER_ATTRIBUTION_UNTRUSTED";
@@ -163,5 +167,5 @@ public final class ErrorCodes {
     public static final String TRANSACTION_BOUNDARY = "TRANSACTION_BOUNDARY";
     /** 服务端稳定错误标识，不依赖展示文案判断。 */
     public static final String VERSION_CONFLICT = "VERSION_CONFLICT";
-    static final java.util.Set<String> RETRYABLE = java.util.Set.of(HOT_SKU_BUSY,CATALOG_QUERY_BUSY,ORDER_ADMISSION_PAUSED,PAYMENT_ADMISSION_PAUSED,REFUND_APPROVAL_AUDIT_UNAVAILABLE,EVIDENCE_UNAVAILABLE,RETRY_SAME_KEY);
+    static final java.util.Set<String> RETRYABLE = java.util.Set.of(ADMIN_QUERY_BUSY,HOT_SKU_BUSY,CATALOG_QUERY_BUSY,ORDER_ADMISSION_PAUSED,PAYMENT_ADMISSION_PAUSED,REFUND_APPROVAL_AUDIT_UNAVAILABLE,EVIDENCE_UNAVAILABLE,RETRY_SAME_KEY);
 }

@@ -42,12 +42,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class FoundationTest {
     @org.springframework.beans.factory.annotation.Autowired
     com.lrj.trade.server.mapper.SeedDatabaseMapper seedDatabaseMapper;
-    @Container static final MySQLContainer MYSQL=new MySQLContainer("mysql:8.4").withDatabaseName("transaction_center_dev");
+    @Container static final MySQLContainer MYSQL=new MySQLContainer(System.getProperty("trade.test.mysql-image","mysql:8.4")).withDatabaseName("transaction_center_dev");
     private static final byte[] ADDRESS_TEST_KEY=new java.security.SecureRandom().generateSeed(32);
     private static final byte[] CALLBACK_TEST_KEY=new java.security.SecureRandom().generateSeed(32);
     private static final AtomicLong TENANTS=new AtomicLong(100);
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry r) {
+        r.add("trade.admin-evidence.enabled",()->"true");
+        r.add("trade.admin-query.tenant-rate",()->"10000");
         r.add("trade.fulfillment.enabled",()->"true");
         r.add("trade.fulfillment.allowed-delivery-actor-keys",()->Checks.hash("https://identity.test","fulfillment-admin"));
         r.add("trade.fulfillment.allowed-completion-actor-keys",()->Checks.hash("https://identity.test","fulfillment-service"));
@@ -2489,6 +2491,8 @@ class FoundationTest {
     @Test void refundRecoveryApprovalDeadlineNeverDispatchesAndReleasesOnce() {
         Fixture f=paymentFixture(1); long tenant=f.actor().tenantId();
         var refund=requestRefund(f,paidRefundOrder(f,"waiting",1),"waiting",100);
+        // 主库领取使用真实UTC；不能让固定业务日期使“未来任务”夹具随日历过期。
+        jdbc.update("UPDATE tc_job_lease SET next_run_at=UTC_TIMESTAMP(3)+INTERVAL 1 DAY WHERE tenant_id=? AND job_type='REFUND_RECOVER' AND business_key=? AND status='READY'",tenant,refund.refundNo());
         assertTrue(refundRecoveryWorker.runBatch(tenant,"early",1).isEmpty());
         makeRefundRecoveryDue(tenant);
         var worker=refundRecoveryWith((t,p)->{ fail("待审批和过期都不能派发"); return null; });
@@ -2547,6 +2551,8 @@ class FoundationTest {
     @Test void refundRecoveryBackfillWakesFutureTaskApprovedByLegacyWriter() {
         Fixture f=paymentFixture(1); long tenant=f.actor().tenantId();
         var refund=requestRefund(f,paidRefundOrder(f,"legacy-approval",1),"legacy-approval",100);
+        // 主库领取使用真实UTC；不能让固定业务日期使“未来任务”夹具随日历过期。
+        jdbc.update("UPDATE tc_job_lease SET next_run_at=UTC_TIMESTAMP(3)+INTERVAL 1 DAY WHERE tenant_id=? AND job_type='REFUND_RECOVER' AND business_key=? AND status='READY'",tenant,refund.refundNo());
         var target=org.springframework.test.util.AopTestUtils.<com.lrj.trade.jobs.JobLeaseService>getUltimateTargetObject(jobLeases);
         // 模拟旧V015批准逻辑：保留有效批准事实，但没有新增的任务唤醒。
         doNothing().doCallRealMethod().when(target).wake(eq(tenant),eq(JobType.REFUND_RECOVER),eq(refund.refundNo()));
@@ -5509,6 +5515,112 @@ class FoundationTest {
     private String publishDocument(Actor a,String version) {
         return documents.publish(a,"document-"+version,"MARKETING",version,"营销条款","https://terms.test/"+version,"a".repeat(64));
     }
+    /** 完整HTTP查询验证真实MySQL投影、游标及管理员与会员权限的分离。 */
+    @Test void adminQueryOrdersQuotesAndTenantBoundaries() throws Exception {
+        Fixture f=paymentFixture(5);var one=factOrder(f,"admin-one");var two=factOrder(f,"admin-two");
+        assertEquals(2,application.getBean(com.lrj.trade.order.AdminOrderQueryService.class).page(f.actor().tenantId(),new com.lrj.trade.core.query.AdminQuery(0,20,null,null,Map.of())).items().size());
+        jwt("query-admin","trade.admin",f.actor().tenantId());jwt("query-other","trade.admin",f.actor().tenantId()+100000);
+        jwt("query-member","",f.actor().tenantId());var json=tools.jackson.databind.json.JsonMapper.builder().build();
+        var page=request("GET","/api/v1/trade/admin/orders?limit=1","query-admin",null);assertEquals(200,page.statusCode(),page.body());
+        var root=json.readTree(page.body());assertTrue(root.path("hasMore").asBoolean());assertEquals(one.orderNo(),root.path("items").get(0).path("orderNo").asText());
+        assertFalse(root.path("items").get(0).has("cursor"));assertTrue(root.path("items").get(0).path("orderId").isString());
+        var next=request("GET","/api/v1/trade/admin/orders?limit=1&after="+root.path("nextAfter").asText(),"query-admin",null);
+        assertEquals(two.orderNo(),json.readTree(next.body()).path("items").get(0).path("orderNo").asText());assertFalse(json.readTree(next.body()).path("hasMore").asBoolean());
+        var detail=request("GET","/api/v1/trade/admin/orders/"+one.orderNo(),"query-admin",null);assertEquals(200,detail.statusCode(),detail.body());
+        var orderJson=json.readTree(detail.body());assertEquals(one.orderNo(),orderJson.path("orderNo").asText());assertFalse(orderJson.has("summary"));assertTrue(orderJson.path("items").get(0).path("specification").isObject());
+        assertFalse(detail.body().contains("reservationKey"));assertFalse(detail.body().contains("address"));
+        assertEquals("no-store",detail.headers().firstValue("Cache-Control").orElseThrow());
+        assertEquals(403,request("GET","/api/v1/trade/admin/orders","query-member",null).statusCode());
+        assertEquals(404,request("GET","/api/v1/trade/admin/orders/"+one.orderNo(),"query-other",null).statusCode());
+        assertEquals(0,json.readTree(request("GET","/api/v1/trade/admin/orders?orderNo="+one.orderNo(),"query-other",null).body()).path("items").size());
+        assertNotEquals(200,request("GET","/api/v1/trade/orders/"+one.orderNo(),"query-admin",null).statusCode());
+        var quote=request("GET","/api/v1/trade/admin/quotes/"+one.quoteId(),"query-admin",null);assertEquals(200,quote.statusCode(),quote.body());assertEquals(1,json.readTree(quote.body()).path("items").size());
+        assertEquals(200,request("GET","/api/v1/trade/admin/quotes?quoteId="+one.quoteId(),"query-admin",null).statusCode());
+        assertEquals(404,request("GET","/api/v1/trade/admin/quotes/"+one.quoteId(),"query-other",null).statusCode());
+        for(String query:List.of("?limit=101","?limit=0","?after=01","?memberId=9223372036854775808","?status=SUCCESS","?tenantId=1","?limit=1&limit=2","?createdFrom=2026-09-01T00:00:00Z"))
+            assertEquals(400,request("GET","/api/v1/trade/admin/orders"+query,"query-admin",null).statusCode(),query);
+    }
+    /** 实际收款与异常资金分别展示，尝试子集合不能越过父支付租户。 */
+    @Test void adminQueryPaymentsReceiptsAndAmounts() throws Exception {
+        Fixture f=paymentFixture(4);var order=factOrder(f,"admin-payment");var pay=createPayment(f.actor(),"pay",order.orderNo(),"TEST_A","return");
+        var normal=receive(f,pay,"admin-normal",100,"CNY");var excess=receive(f,pay,"admin-excess",100,"CNY");
+        jwt("query-admin","trade.admin",f.actor().tenantId());jwt("query-other","trade.admin",f.actor().tenantId()+100000);var json=tools.jackson.databind.json.JsonMapper.builder().build();
+        for(String path:List.of("/payments?orderNo="+order.orderNo(),"/payments/"+pay.paymentNo(),"/payments/"+pay.paymentNo()+"/attempts","/payment-receipts?orderNo="+order.orderNo(),"/payment-receipts/"+normal.receiptNo())) {
+            var response=request("GET","/api/v1/trade/admin"+path,"query-admin",null);assertEquals(200,response.statusCode(),response.body());
+            assertFalse(response.body().contains("vault:"));assertFalse(response.body().contains("providerTransactionNo"));assertFalse(response.body().contains("evidenceRef"));
+        }
+        var detail=json.readTree(request("GET","/api/v1/trade/admin/payments/"+pay.paymentNo(),"query-admin",null).body());assertEquals(normal.receiptNo(),detail.path("succeededReceiptNo").asText());
+        var abnormal=json.readTree(request("GET","/api/v1/trade/admin/payment-receipts?abnormalOnly=true","query-admin",null).body());assertEquals(1,abnormal.path("items").size());assertEquals(excess.receiptNo(),abnormal.path("items").get(0).path("receiptNo").asText());
+        assertEquals(404,request("GET","/api/v1/trade/admin/payments/"+pay.paymentNo()+"/attempts","query-other",null).statusCode());
+        assertEquals(404,request("GET","/api/v1/trade/admin/payment-receipts/"+normal.receiptNo(),"query-other",null).statusCode());
+        assertEquals(400,request("GET","/api/v1/trade/admin/payment-receipts?abnormalOnly=true&disposition=NORMAL","query-admin",null).statusCode());
+        var response=request("GET","/api/v1/trade/admin/payment-receipts/"+normal.receiptNo(),"query-admin",null);assertEquals(100,json.readTree(response.body()).path("unreservedAmount").asLong());
+    }
+    /** 退款队列兼容旧数组，详情原因来自持久任务，退款不伪装成实际退货。 */
+    @Test void adminQueryRefundsAndReturnInspection() throws Exception {
+        Fixture f=paymentFixture(2);var order=paidRefundOrder(f,"admin-refund",2);var refund=requestRefund(f,order,"refund",50);
+        jwt("query-admin","trade.admin",f.actor().tenantId());jwt("query-other","trade.admin",f.actor().tenantId()+100000);var json=tools.jackson.databind.json.JsonMapper.builder().build();
+        var queue=request("GET","/api/v1/trade/admin/refunds","query-admin",null);assertEquals(200,queue.statusCode(),queue.body());assertTrue(json.readTree(queue.body()).isArray());assertEquals(refund.refundNo(),json.readTree(queue.body()).get(0).path("refundNo").asText());
+        assertEquals(1,json.readTree(request("GET","/api/v1/trade/admin/refunds?status=ALL&orderNo="+order.orderNo(),"query-admin",null).body()).size());
+        jdbc.update("UPDATE tc_job_lease SET last_error='CHANNEL_UNAVAILABLE' WHERE tenant_id=? AND job_type='REFUND_RECOVER' AND business_key=?",f.actor().tenantId(),refund.refundNo());
+        var detail=request("GET","/api/v1/trade/admin/refunds/"+refund.refundNo(),"query-admin",null);assertEquals(200,detail.statusCode(),detail.body());
+        var refundJson=json.readTree(detail.body());assertEquals("CHANNEL_UNAVAILABLE",refundJson.path("processingReasonCode").asText());assertFalse(refundJson.has("reason"));assertEquals(1,refundJson.path("items").size());
+        assertEquals(404,request("GET","/api/v1/trade/admin/refunds/"+refund.refundNo(),"query-other",null).statusCode());
+        var ingress=application.getBean(com.lrj.trade.order.FulfillmentIngressService.class);ingress.deliver(f.actor(),"deliver",order.orderNo(),"source","proof");
+        var rma=ingress.createReturn(f.actor(),"rma",Long.parseLong(order.items().getFirst().itemId()),f.warehouse(),2);
+        var open=request("GET","/api/v1/trade/admin/returns?status=OPEN&orderNo="+order.orderNo(),"query-admin",null);assertEquals(1,json.readTree(open.body()).path("items").size());
+        var before=request("GET","/api/v1/trade/admin/returns/"+rma.resourceNo(),"query-admin",null);assertEquals("\"0\"",before.headers().firstValue("ETag").orElseThrow());assertTrue(json.readTree(before.body()).path("inspection").isNull());
+        ingress.inspect(f.actor(),"inspect",rma.resourceNo(),0,"PARTIAL",1,"safe-proof");
+        var after=request("GET","/api/v1/trade/admin/returns/"+rma.resourceNo(),"query-admin",null);assertEquals(200,after.statusCode(),after.body());assertEquals("\"1\"",after.headers().firstValue("ETag").orElseThrow());
+        var inspection=json.readTree(after.body()).path("inspection");assertEquals(2,inspection.path("receivedQuantity").asLong());assertEquals(1,inspection.path("restockQuantity").asLong());assertTrue(inspection.has("recordedAt"));
+        assertEquals(404,request("GET","/api/v1/trade/admin/returns/"+rma.resourceNo(),"query-other",null).statusCode());
+        assertEquals(400,request("GET","/api/v1/trade/admin/returns?status=PARTIAL","query-admin",null).statusCode());
+    }
+    /** 证据与租约要求双scope，管理员入口不改变内部可信服务允许列表。 */
+    @Test void adminQueryEvidenceEligibilityAndJobs() throws Exception {
+        Fixture f=paymentFixture(2);var order=paidRefundOrder(f,"admin-evidence",1);long member=Long.parseLong(members.me(f.actor()).memberId());
+        jwt("query-admin","trade.admin",f.actor().tenantId());jwt("query-diag","trade.admin trade.admin.evidence.read trade.admin.jobs.read",f.actor().tenantId());jwt("query-other","trade.admin trade.admin.evidence.read trade.admin.jobs.read",f.actor().tenantId()+100000);
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();String ev="/api/v1/trade/admin/orders/"+order.orderNo()+"/referral-evidence";
+        assertEquals(403,request("HEAD",ev,"query-admin",null).statusCode());assertEquals(403,request("GET",ev,"query-admin",null).statusCode());var evidence=request("GET",ev,"query-diag",null);assertEquals(200,evidence.statusCode(),evidence.body());assertEquals(100,json.readTree(evidence.body()).path("paidAmount").asLong());
+        assertEquals(404,request("GET",ev,"query-other",null).statusCode());
+        String body="{\"policyVersion\":\"NEVER_CONFIRMED_PAID_V1\"}";String path="/api/v1/trade/admin/members/"+member+"/eligibility:query";
+        assertEquals(403,request("POST",path,"query-admin",body).statusCode());var eligible=request("POST",path,"query-diag",body);assertEquals(200,eligible.statusCode(),eligible.body());assertFalse(json.readTree(eligible.body()).path("evidence").path("eligible").asBoolean());
+        assertEquals(404,request("POST",path,"query-other",body).statusCode());
+        assertEquals(400,request("POST",path,"query-diag","{\"policyVersion\":\"NEVER_CONFIRMED_PAID_V1\",\"memberId\":\"1\"}").statusCode());
+        assertEquals(403,request("HEAD","/api/v1/trade/admin/jobs","query-admin",null).statusCode());
+        assertEquals(403,request("GET","/api/v1/trade/admin/jobs","query-admin",null).statusCode());
+        var jobs=request("GET","/api/v1/trade/admin/jobs?jobType=ORDER_RESOLVE","query-diag",null);assertEquals(200,jobs.statusCode(),jobs.body());var job=json.readTree(jobs.body()).path("items").get(0);assertFalse(job.has("fencingToken"));assertFalse(job.has("owner"));assertFalse(job.has("businessKey"));
+        assertEquals(200,request("GET","/api/v1/trade/admin/jobs/"+job.path("jobId").asText(),"query-diag",null).statusCode());
+        assertEquals(404,request("GET","/api/v1/trade/admin/jobs/"+job.path("jobId").asText(),"query-other",null).statusCode());
+        assertEquals(403,request("GET","/internal/v1/orders/"+order.orderId()+"/referral-evidence","query-diag",null).statusCode());
+        assertEquals(403,request("POST","/api/v1/trade/integrations/refund-approvals","query-admin","{\"signedReceipt\":\"fake\"}").statusCode());
+    }
+
+    /** 隔离数据验证选择性索引和实际Mapper执行计划，不能用LIMIT代替索引证明。 */
+    @Test void adminQueryIndexedPlansAndLeaseObservation() throws Exception {
+        long tenant=TENANTS.incrementAndGet();Instant at=Instant.now();
+        var batch=new ArrayList<Object[]>();
+        for(int i=0;i<2000;i++) batch.add(new Object[]{tenant,"plan-"+i,i==1999?"REVIEW":"DONE"});
+        jdbc.batchUpdate("INSERT INTO tc_job_lease(tenant_id,job_type,business_key,status,next_run_at,created_at,updated_at) VALUES(?,'ORDER_RESOLVE',?,?,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))",batch);
+        var query=new com.lrj.trade.core.query.AdminQuery(0,20,null,null,Map.of("status","REVIEW"));
+        var service=application.getBean(com.lrj.trade.jobs.AdminJobQueryService.class);var page=service.page(tenant,query);assertEquals(1,page.items().size());assertFalse(page.items().getFirst().leaseExpired());
+        var config=application.getBean(org.apache.ibatis.session.SqlSessionFactory.class).getConfiguration();
+        var statement=config.getMappedStatement("com.lrj.trade.jobs.mapper.AdminJobMapper.page");
+        Map<String,Object> params=Map.of("tenant",tenant,"q",query,"at",at);var bound=statement.getBoundSql(params);
+        try(var connection=application.getBean(javax.sql.DataSource.class).getConnection();var sql=connection.prepareStatement("EXPLAIN "+bound.getSql())) {
+            new org.apache.ibatis.scripting.defaults.DefaultParameterHandler(statement,params,bound).setParameters(sql);
+            try(var result=sql.executeQuery()) { assertTrue(result.next());assertNotEquals("ALL",result.getString("type"));assertEquals("ix_admin_job_status",result.getString("key")); }
+        }
+        String job=page.items().getFirst().jobId();
+        jdbc.update("UPDATE tc_job_lease SET status='RUNNING',owner='private-worker',fencing_token=1,attempts=1,lease_until=UTC_TIMESTAMP(3)-INTERVAL 1 SECOND,next_run_at=UTC_TIMESTAMP(3)-INTERVAL 1 SECOND WHERE tenant_id=? AND id=?",tenant,Long.parseLong(job));
+        var expired=service.page(tenant,new com.lrj.trade.core.query.AdminQuery(0,20,null,null,Map.of("leaseExpired",true)));
+        assertEquals(1,expired.items().size());assertTrue(expired.items().getFirst().leaseExpired());assertEquals("RUNNING",expired.items().getFirst().status());
+        assertNull(service.detail(tenant,job).businessReference());
+        assertEquals(1,count("SELECT COUNT(*) FROM tc_job_lease WHERE tenant_id=? AND status='RUNNING'",tenant));
+        var indexes=jdbc.queryForList("SELECT DISTINCT index_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name LIKE 'ix_admin_%'",String.class);
+        assertEquals(20,indexes.size());
+    }
+
     private void jwt(String token,String scope,long tenant) {
         when(decoder.decode(token)).thenReturn(Jwt.withTokenValue(token).header("alg","RS256").issuer("https://identity.test")
             .subject(token).claim("tenant_id",Long.toString(tenant)).claim("scope",scope).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(120)).build());

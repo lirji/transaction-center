@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.order.mapper.AdminReturnMapper">
+  <resultMap id="View" type="com.lrj.trade.order.model.AdminReturnView"><constructor>
+      <arg column="cursor" javaType="java.lang.String"/>
+      <arg column="returnId" javaType="java.lang.String"/>
+      <arg column="returnNo" javaType="java.lang.String"/>
+      <arg column="orderNo" javaType="java.lang.String"/>
+      <arg column="memberId" javaType="java.lang.String"/>
+      <arg column="orderItemId" javaType="java.lang.String"/>
+      <arg column="warehouseId" javaType="java.lang.String"/>
+      <arg column="quantity" javaType="_long"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="receiptNo" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="updatedAt" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <sql id="columns">r.id AS `cursor`, r.id AS returnId, r.return_no AS returnNo, o.order_no AS orderNo, o.member_id AS memberId, r.order_item_id AS orderItemId, r.warehouse_id AS warehouseId, r.quantity AS quantity, r.status AS status, r.receipt_no AS receiptNo, r.version AS version, r.created_at AS createdAt, r.updated_at AS updatedAt</sql>
+  <sql id="source">FROM tc_return_request r JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id</sql>
+  <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.returnNo != null">AND r.return_no=#{q.filters.returnNo}</if>
+    <if test="q.filters.orderNo != null">AND o.order_no=#{q.filters.orderNo}</if>
+    <if test="q.filters.memberId != null">AND o.member_id=#{q.filters.memberId}</if>
+    <if test="q.filters.orderItemId != null">AND r.order_item_id=#{q.filters.orderItemId}</if>
+    <if test="q.filters.warehouseId != null">AND r.warehouse_id=#{q.filters.warehouseId}</if>
+    <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="find" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.return_no=#{number}
+  </select>
+  <resultMap id="AdminInspectionView" type="com.lrj.trade.order.model.AdminInspectionView"><constructor>
+    <arg column="receiptNo" javaType="java.lang.String"/>
+    <arg column="receivedQuantity" javaType="_long"/>
+    <arg column="restockQuantity" javaType="_long"/>
+    <arg column="recordedAt" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <select id="inspection" resultMap="AdminInspectionView" useCache="false" timeout="3">
+    SELECT r.return_no AS receiptNo, r.received_quantity AS receivedQuantity, r.restock_quantity AS restockQuantity, r.created_at AS recordedAt FROM tc_return_receipt r WHERE r.tenant_id=#{tenant} AND r.return_no=#{number}
+  </select>
+</mapper>

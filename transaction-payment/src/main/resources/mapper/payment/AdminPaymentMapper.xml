@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.AdminPaymentMapper">
+  <resultMap id="View" type="com.lrj.trade.payment.model.AdminPaymentView"><constructor>
+      <arg column="cursor" javaType="java.lang.String"/>
+      <arg column="paymentNo" javaType="java.lang.String"/>
+      <arg column="orderId" javaType="java.lang.String"/>
+      <arg column="orderNo" javaType="java.lang.String"/>
+      <arg column="memberId" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="expectedAmount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="activeAttemptNo" javaType="java.lang.String"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="updatedAt" javaType="java.time.Instant"/>
+      <arg column="version" javaType="_long"/>
+      <arg column="succeededReceiptNo" javaType="java.lang.String"/>
+      <arg column="closeFenceAt" javaType="java.time.Instant"/>
+  </constructor></resultMap>
+  <sql id="columns">r.id AS `cursor`, r.payment_no AS paymentNo, r.order_id AS orderId, o.order_no AS orderNo, r.member_id AS memberId, r.status AS status, r.expected_amount AS expectedAmount, r.currency AS currency, r.active_attempt_no AS activeAttemptNo, r.created_at AS createdAt, r.updated_at AS updatedAt, r.version AS version, s.receipt_no AS succeededReceiptNo, r.close_fence_at AS closeFenceAt</sql>
+  <sql id="source">FROM tc_payment_intent r JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id LEFT JOIN tc_payment_receipt s ON s.tenant_id=r.tenant_id AND s.id=r.succeeded_receipt_id AND s.intent_id=r.id</sql>
+  <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.paymentNo != null">AND r.payment_no=#{q.filters.paymentNo}</if>
+    <if test="q.filters.orderNo != null">AND o.order_no=#{q.filters.orderNo}</if>
+    <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
+    <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="find" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.payment_no=#{number}
+  </select>
+</mapper>

@@ -1,0 +1,336 @@
+{
+  "date": "2026-09-08",
+  "branch": "feat/admin-query-apis",
+  "command": "TESTCONTAINERS_RYUK_DISABLED=true mvn -q -Dtrade.test.mysql-image=mysql:8.4.11 verify",
+  "exitCode": 0,
+  "totals": {
+    "tests": 450,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "reports": [
+    {
+      "suite": "com.lrj.trade.client.RetryDecisionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.AddressProtectionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.AdminQueryTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.AdminVersionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.AuthoritativeReferralMappingAdapterTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.AutomaticAdmissionTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.CallbackProtectionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.CatalogQueryTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.EvidenceAccessTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.FinancialObservationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.FoundationTest",
+      "tests": 316,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.FulfillmentAccessTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.InventoryEventContractTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.JwtValidationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.KafkaEventPublisherTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.LifecycleRefundEventContractTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.MapperContractTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.MemberEventContractTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.OpenApiTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.OrderAttributionVerifierTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.OrderPaidEventContractTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.OutboxEventCatalogTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.OutboxMaintenanceRuntimeTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.PaymentChannelBindingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.PaymentChannelContractTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.PaymentRiskProviderContractTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.QualityGateTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.ReconciliationAccessTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.ReconciliationQueryExecutorTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.RedisCatalogCacheTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.RefundApprovalIngressTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.RefundApprovalRejectionAuditTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.RefundApprovalVerifierTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.RefundChannelContractTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.TraceContextTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.WorkerRuntimeTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "notes": [
+    "OpenAPI operationId兼容名称在全量验证后做文档修订；81项路由及唯一性另行静态核查。",
+    "未部署、未推送、未在演示库应用迁移。",
+    "现有未提交用户改动被保留；文件级SHA包含这些文件中的既有改动。"
+  ],
+  "sha256": {
+    "docs/ADMIN_QUERY_API.md": "8d76bb9b90b1a6bd2eaf7df275558c9086d32f97e21a7d45f874895790b544b7",
+    "docs/ADMIN_QUERY_API_PROPOSAL.md": "ee2b94196921afe9f48d331f2f3b67cb85f6659fa6a94c01ce3e59fa50677d70",
+    "docs/CURSOR_HANDOFF.md": "aa65dd3dd92c625cab68c5395c92f3cf1b51f8f6f23ed0daebb835343d8eeca2",
+    "docs/openapi.json": "ddf4ba8c594811ef1ceb5d7fce6752e2e9aa4a1ff30ccdf20f2a583e24db3083",
+    "scripts/generate-admin-query-openapi.py": "fcb231ace597044a9f860bb5ebe95f5e78e9106feb573ebd4f949ea1f2f1f551",
+    "transaction-catalog/src/main/java/com/lrj/trade/catalog/AdminQuoteQueryService.java": "740ddeab3ec1dd09826cab300eb35595bdc0ebbe1ebba5195c5ab17195a96749",
+    "transaction-catalog/src/main/java/com/lrj/trade/catalog/mapper/AdminQuoteMapper.java": "5bc63ec0f1dab7cf1497ffeb4d16a9ed759f1cba25edb8597f0ca96fefbe0591",
+    "transaction-catalog/src/main/java/com/lrj/trade/catalog/model/AdminQuoteView.java": "93f04848cb55a224f63b0f678de8d94ba33e73c26e4277d34a690f544bf3f279",
+    "transaction-catalog/src/main/resources/mapper/catalog/AdminQuoteMapper.xml": "e4f33673cb4281c9bfa62f680fc249a5bd7d87ff409fb20fdc8ddcd643d72123",
+    "transaction-core/src/main/java/com/lrj/trade/core/AdminProcessingReasonPort.java": "4936fadf3587321aab44bd6316b2dc74598e1e2b8fb56cae3b10eb13341a27ab",
+    "transaction-core/src/main/java/com/lrj/trade/core/query/AdminNumbers.java": "f90b6dd97dacb27f6b7bea0316acc4239c0dff9eb3e896a44aaedb38480b493f",
+    "transaction-core/src/main/java/com/lrj/trade/core/query/AdminPage.java": "5a598e7b19bd0a09b7734740bde8f5129e6ce828abbbbe692916c9e430a20036",
+    "transaction-core/src/main/java/com/lrj/trade/core/query/AdminQuery.java": "383e275fe830ac273589ce5dbd94ac1768fd604d44ec952ada1da9d0052142db",
+    "transaction-jobs/src/main/java/com/lrj/trade/jobs/AdminJobQueryService.java": "4f993369c610fa5a93b37dc0b8d6e75a5efc81a3b65f1adb3b2ea623af967504",
+    "transaction-jobs/src/main/java/com/lrj/trade/jobs/AdminProcessingReasonService.java": "5388bec2c671a7f477899de0f45e65f3719ca9bca76848ed7d86def4ca80ff1f",
+    "transaction-jobs/src/main/java/com/lrj/trade/jobs/mapper/AdminJobMapper.java": "c85dbb82866751a9a201a9cffae3ff0baaba6f97f353ba7d72027897d05b3f4b",
+    "transaction-jobs/src/main/java/com/lrj/trade/jobs/model/AdminBusinessReference.java": "16155ba937acb93d02578fce3b5853af3f14ff81d3cd258c9793f0e4d8d09394",
+    "transaction-jobs/src/main/java/com/lrj/trade/jobs/model/AdminJobView.java": "25c1e10ff6cfa97693e7b84a2c1204e16f7052c7f9975a57363cd1baf66d78f6",
+    "transaction-jobs/src/main/resources/mapper/jobs/AdminJobMapper.xml": "12839e3b5632d2c7cedb599e6b476f0b3e0d848936480d087db9ffdda2028554",
+    "transaction-order/src/main/java/com/lrj/trade/order/AdminOrderQueryService.java": "adf537a11987506678ae8471a9d1a90387c081ed9e0e6fffe1ac95e50dedd96f",
+    "transaction-order/src/main/java/com/lrj/trade/order/AdminReturnQueryService.java": "9ce96174f7835569631ad3c72f5968979b0a427416cecc21440f38448f9dd264",
+    "transaction-order/src/main/java/com/lrj/trade/order/mapper/AdminOrderMapper.java": "bd868cd260e7624f53d4715c315d1eb37f96c2836e69421ce73fe67826538dbe",
+    "transaction-order/src/main/java/com/lrj/trade/order/mapper/AdminReturnMapper.java": "88be9f50cb945d93369cf8c646cde198c655ff317455af6630047884285439da",
+    "transaction-order/src/main/java/com/lrj/trade/order/model/AdminFulfillmentView.java": "b539245a1aaa77f49856893951a7476d89dc4caefa3b5624d2d23ef262b5bf25",
+    "transaction-order/src/main/java/com/lrj/trade/order/model/AdminInspectionView.java": "b49db8014ea617e20dab92c30a868d2a6963f80b58e7c1369cd8deeab8c201ea",
+    "transaction-order/src/main/java/com/lrj/trade/order/model/AdminOrderItem.java": "5e14e336cb1763d8a245d7d99bc7a41ee0f6a407b2f084fc1718b1d958953ef9",
+    "transaction-order/src/main/java/com/lrj/trade/order/model/AdminOrderView.java": "8a64e9ff334eafe13ad71c17b25e1184b1469edeba5ab7620ca629a7ba6bc645",
+    "transaction-order/src/main/java/com/lrj/trade/order/model/AdminReturnView.java": "82146428ff8dfba069dd3b1945262f2c2b3a2e88cb2209ec31f380a67de4c610",
+    "transaction-order/src/main/resources/mapper/order/AdminOrderMapper.xml": "819de8492b46b57c321987d3fd2056fe7c19b0756531cc1455079ef6b370f0ab",
+    "transaction-order/src/main/resources/mapper/order/AdminReturnMapper.xml": "05fdbe497b7371115ea768e10fdf65134368c2878ad71a53ae7fe4e447e45622",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/AdminAttemptQueryService.java": "857f3e444ff2671822e5148c62c20fcd6f819bcf7d8f5b051d1766e611554c46",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/AdminPaymentQueryService.java": "73999ed56c447ede79aacd3cf06104f67da3a366414413b85672e63b29a6c99e",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/AdminReceiptQueryService.java": "7b52ca2b7a7fcd32c2d66498fa45ace772acaada500f7ca88e74dcb62b2345d2",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/mapper/AdminAttemptMapper.java": "a8bdc77c62fb530f0116cb4da19c1482f2cb9da01fca742bf1bbdecb5bbbdf87",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/mapper/AdminPaymentMapper.java": "78111d579800f4ff6233f3ad6fcab59b8b2b22f5b2172b6e8ad2bce20fdcace4",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/mapper/AdminReceiptMapper.java": "63d338788c0a71f5379d7a05afb8b49c9140ffc4a0807ad8e424d39755c64a13",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/model/AdminAttemptView.java": "91bffe9374320af2a993ac55460a3c0aa13b1b1a8c9841251b98ce6507cdc379",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/model/AdminPaymentView.java": "fa4a0d0d7c26ab35a4dc657838af26cee4d9477e0ba9fbb4f12bae0b3e7f4b88",
+    "transaction-payment/src/main/java/com/lrj/trade/payment/model/AdminReceiptView.java": "8714b34ae97dc4e726819803de372cca899f1418805d01110985362fdd4128b5",
+    "transaction-payment/src/main/resources/mapper/payment/AdminAttemptMapper.xml": "afd0bf6710abd141e2ecd282c023774c173cddcd6bf6cafa58f8addc9e2176a7",
+    "transaction-payment/src/main/resources/mapper/payment/AdminPaymentMapper.xml": "861e4552a0777c0062c5941392259a1e64fd3d80e4a3fbff1f4144b3426c54f1",
+    "transaction-payment/src/main/resources/mapper/payment/AdminReceiptMapper.xml": "43e131884e79bf8f47df44b34855760d7894c9582dc089cfee096c708d0b6345",
+    "transaction-refund/src/main/java/com/lrj/trade/refund/AdminRefundQueryService.java": "3db11f54611ecece90bac894d8153efc2b6d1db2c7a083d4f434de10c27f3de3",
+    "transaction-refund/src/main/java/com/lrj/trade/refund/mapper/AdminRefundMapper.java": "54aa7839faf0b2d5086aaad4085a20ace8b1a283a85f296821b51263fe8fb7d4",
+    "transaction-refund/src/main/java/com/lrj/trade/refund/model/AdminRefundItem.java": "38fbd201ce6012e49e4eea5b692f9decbf2a72dd16e19706838fa2b02102d07e",
+    "transaction-refund/src/main/java/com/lrj/trade/refund/model/AdminRefundView.java": "c72d392da32ff6b0c07b655dccac1d74e0f3406f99939277de5a70fc1f017608",
+    "transaction-refund/src/main/resources/mapper/refund/AdminRefundMapper.xml": "27ff4a7bceee7e2c01aae9cdff3ee0da1a4fc44ef08132106afefd3a50c58d97",
+    "transaction-server/src/main/java/com/lrj/trade/server/AdminEvidenceAccess.java": "9403a04573421c55eb2f47b8dc13c39554fd37ba7333fb79294923ccce28271a",
+    "transaction-server/src/main/java/com/lrj/trade/server/AdminQueryController.java": "fab8de66a4d301b0f576a2e6e2957614f71271d64259d426071bf7614d6bba85",
+    "transaction-server/src/main/java/com/lrj/trade/server/AdminQueryErrors.java": "aaa356693a1e11833eaf351aca6b9f241d2300adbe2942a09f2effa4a301e018",
+    "transaction-server/src/main/java/com/lrj/trade/server/AdminQueryParameters.java": "5dec2f6b54f6cdfda77068bb7d4816c96bd17139b98fae7149327135c984d961",
+    "transaction-server/src/main/java/com/lrj/trade/server/AdminRead.java": "738790cc9f89ff7e33e1790ebd803f601a32ac11f95b010f9ad7baef8dcdfa42",
+    "transaction-server/src/main/java/com/lrj/trade/server/AdminReadConfiguration.java": "197aad14303e19aeb1683064313de50b47b533db085ee21a0784ace6a0a68e88",
+    "transaction-server/src/main/java/com/lrj/trade/server/Errors.java": "8ad55ff8dd5271d4ad790396f656b6e0fd223450f794b1c687265ea983746d0b",
+    "transaction-server/src/main/java/com/lrj/trade/server/FulfillmentController.java": "2d1dcb7414e51efe12965e49a66b911e6baa61c3885d79903f4bc811f57707b3",
+    "transaction-server/src/main/java/com/lrj/trade/server/SecurityConfiguration.java": "384422fc3779bf005206a19665e2ddae54bef13b149b6725b4e8ee2da7728a6f",
+    "transaction-server/src/main/java/com/lrj/trade/server/TradeController.java": "28cadf7a7f28e3984a4a14b2fd6d649530d5b83781395a6cb0eb70a370543335",
+    "transaction-server/src/main/resources/application.yml": "88e27083ff381f4ffd71ac51c214ef4abf2ce5c1d5c8b7f28474d9fc0f625b3e",
+    "transaction-server/src/main/resources/db/migration/V033__admin_query_indexes.sql": "add6cc77a97de2966b0527bfd4b5659db8bece210404412ad3bf7d8af2cc7e68",
+    "transaction-server/src/test/java/com/lrj/trade/server/AdminQueryTest.java": "83561337b9dc04f43796a4e6e7863a7a88f7bd7a468f76e249bac21160141e12",
+    "transaction-server/src/test/java/com/lrj/trade/server/FoundationTest.java": "df8062ea38a92516427e969d4c08f061fc42f6ea2a16e8bf675b2697d79a6f8f",
+    "transaction-server/src/test/java/com/lrj/trade/server/MapperContractTest.java": "96719ad301cdaee86d856c590981d38be379fe54f8a180e8f07f844d79f7760b",
+    "transaction-server/src/test/java/com/lrj/trade/server/OpenApiTest.java": "c76e6d8ee7f5e07ee974f1881fe0d6f14998a6f7a2b4eb6617c70dc60fe029d7"
+  }
+}

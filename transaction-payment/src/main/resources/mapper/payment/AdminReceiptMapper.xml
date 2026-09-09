@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.payment.mapper.AdminReceiptMapper">
+  <resultMap id="View" type="com.lrj.trade.payment.model.AdminReceiptView"><constructor>
+      <arg column="cursor" javaType="java.lang.String"/>
+      <arg column="receiptNo" javaType="java.lang.String"/>
+      <arg column="paymentNo" javaType="java.lang.String"/>
+      <arg column="orderNo" javaType="java.lang.String"/>
+      <arg column="attemptNo" javaType="java.lang.String"/>
+      <arg column="channelCode" javaType="java.lang.String"/>
+      <arg column="amount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="disposition" javaType="java.lang.String"/>
+      <arg column="providerPaidAt" javaType="java.time.Instant"/>
+      <arg column="confirmedAt" javaType="java.time.Instant"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="refundedAmount" javaType="_long"/>
+      <arg column="refundReservedAmount" javaType="_long"/>
+      <arg column="unreservedAmount" javaType="_long"/>
+      <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <sql id="columns">r.id AS `cursor`, r.receipt_no AS receiptNo, p.payment_no AS paymentNo, o.order_no AS orderNo, a.merchant_request_no AS attemptNo, r.channel_code AS channelCode, r.amount AS amount, r.currency AS currency, r.disposition AS disposition, r.provider_paid_at AS providerPaidAt, r.confirmed_at AS confirmedAt, r.created_at AS createdAt, r.refunded_amount AS refundedAmount, r.refund_reserved_amount AS refundReservedAmount, (r.amount-r.refunded_amount-r.refund_reserved_amount) AS unreservedAmount, r.version AS version</sql>
+  <sql id="source">FROM tc_payment_receipt r JOIN tc_payment_intent p ON p.tenant_id=r.tenant_id AND p.id=r.intent_id JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id JOIN tc_payment_attempt a ON a.tenant_id=r.tenant_id AND a.id=r.attempt_id AND a.intent_id=r.intent_id</sql>
+  <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.receiptNo != null">AND r.receipt_no=#{q.filters.receiptNo}</if>
+    <if test="q.filters.paymentNo != null">AND p.payment_no=#{q.filters.paymentNo}</if>
+    <if test="q.filters.orderNo != null">AND o.order_no=#{q.filters.orderNo}</if>
+    <if test="q.filters.channelCode != null">AND r.channel_code=#{q.filters.channelCode}</if>
+    <if test="q.filters.disposition != null">AND r.disposition=#{q.filters.disposition}</if>
+    <if test="q.filters.abnormalOnly == true">AND r.disposition != 'NORMAL'</if>
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="find" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.receipt_no=#{number}
+  </select>
+</mapper>

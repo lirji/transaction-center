@@ -22,6 +22,11 @@ class RetryDecisionTest {
         assertEquals(RETRY_SAME_KEY,RetryDecision.from(429,failure(ErrorCodes.HOT_SKU_BUSY,true),true,"1").action());
         assertEquals(STOP,RetryDecision.from(503,failure(ErrorCodes.IDEMPOTENCY_CONFLICT,true),true,"1").action());
     }
+    @Test void adminQueryCodesRespectRetryPolicy() {
+        assertEquals(RETRY_SAME_KEY,RetryDecision.from(429,failure(ErrorCodes.ADMIN_QUERY_BUSY,true),true,"2").action());
+        assertEquals(STOP,RetryDecision.from(429,failure(ErrorCodes.ADMIN_QUERY_BUSY,true),false,"2").action());
+        assertEquals(STOP,RetryDecision.from(503,failure(ErrorCodes.ADMIN_QUERY_UNAVAILABLE,true),true,"2").action());
+    }
     @Test void unknownPaymentAndTimeoutNeverCreateANewAttempt() {
         assertEquals(QUERY_ORIGINAL,RetryDecision.from(409,failure(ErrorCodes.PAYMENT_UNRESOLVED,true),true,"1").action());
         assertEquals(QUERY_ORIGINAL,RetryDecision.transportUncertain().action());

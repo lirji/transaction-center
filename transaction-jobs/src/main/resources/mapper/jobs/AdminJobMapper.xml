@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.jobs.mapper.AdminJobMapper">
+  <resultMap id="View" type="com.lrj.trade.jobs.model.AdminJobView"><constructor>
+      <arg column="cursor" javaType="java.lang.String"/>
+      <arg column="jobId" javaType="java.lang.String"/>
+      <arg column="jobType" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="attempts" javaType="_long"/>
+      <arg column="nextRunAt" javaType="java.time.Instant"/>
+      <arg column="leaseUntil" javaType="java.time.Instant"/>
+      <arg column="leaseExpired" javaType="_boolean"/>
+      <arg column="lastError" javaType="java.lang.String"/>
+      <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="updatedAt" javaType="java.time.Instant"/>
+      <arg column="version" javaType="_long"/>
+  </constructor></resultMap>
+  <sql id="columns">r.id AS `cursor`, r.id AS jobId, r.job_type AS jobType, r.status AS status, r.attempts AS attempts, r.next_run_at AS nextRunAt, r.lease_until AS leaseUntil, (r.status='RUNNING' AND r.lease_until &lt;= #{at}) AS leaseExpired, r.last_error AS lastError, r.created_at AS createdAt, r.updated_at AS updatedAt, r.version AS version</sql>
+  <sql id="source">FROM tc_job_lease r </sql>
+  <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.jobType != null">AND r.job_type=#{q.filters.jobType}</if>
+    <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
+    <if test="q.filters.leaseExpired != null">AND (r.status='RUNNING' AND r.lease_until &lt;= #{at})=#{q.filters.leaseExpired}</if>
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="find" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    WHERE r.tenant_id=#{tenant} AND r.id=#{number}
+  </select>
+  <select id="now" resultType="java.time.Instant" useCache="false" timeout="3">SELECT UTC_TIMESTAMP(3)</select>
+  <select id="refundReason" resultType="java.lang.String" useCache="false" timeout="3">
+    SELECT last_error FROM tc_job_lease WHERE tenant_id=#{tenant} AND job_type='REFUND_RECOVER'
+    AND business_key=#{number} AND status IN ('READY','RUNNING','REVIEW')
+  </select>
+  <resultMap id="Reference" type="com.lrj.trade.jobs.model.AdminBusinessReference"><constructor>
+    <arg column="resourceType" javaType="java.lang.String"/><arg column="resourceNo" javaType="java.lang.String"/>
+  </constructor></resultMap>
+  <!-- 每个分支显式核对业务表租户与持久键，未知类型/坏键不会被原样回显。 -->
+  <select id="reference" resultMap="Reference" useCache="false" timeout="3">
+    SELECT 'ORDER' AS resourceType,o.order_no AS resourceNo FROM tc_job_lease j
+    JOIN tc_order o ON o.tenant_id=j.tenant_id AND o.order_no=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='ORDER_RESOLVE'
+    UNION ALL
+    SELECT 'PAYMENT',p.payment_no FROM tc_job_lease j
+    JOIN tc_payment_attempt a ON a.tenant_id=j.tenant_id AND a.merchant_request_no=j.business_key
+    JOIN tc_payment_intent p ON p.tenant_id=a.tenant_id AND p.id=a.intent_id
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='PAYMENT_RECOVER'
+    UNION ALL
+    SELECT 'REFUND',r.refund_no FROM tc_job_lease j
+    JOIN tc_refund r ON r.tenant_id=j.tenant_id AND r.refund_no=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='REFUND_RECOVER'
+    UNION ALL
+    SELECT 'PAYMENT_RECEIPT',r.receipt_no FROM tc_job_lease j
+    JOIN tc_payment_receipt r ON r.tenant_id=j.tenant_id AND r.receipt_no=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='REFUND_COMPENSATE'
+    UNION ALL
+    SELECT 'OUTBOX_EVENT',o.event_id FROM tc_job_lease j
+    JOIN tc_outbox o ON o.tenant_id=j.tenant_id AND o.event_id=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='OUTBOX_PUBLISH'
+    UNION ALL
+    SELECT 'RECONCILIATION_OPERATION',o.operation_no FROM tc_job_lease j
+    JOIN tc_reconciliation_operation o ON o.tenant_id=j.tenant_id AND o.operation_no=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='RECON_QUERY'
+  </select>
+</mapper>

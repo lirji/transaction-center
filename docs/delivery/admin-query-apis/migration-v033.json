@@ -1,0 +1,115 @@
+{
+  "database": "transaction_center_dev",
+  "mode": "migrate",
+  "beforeVersion": "032",
+  "indexesBefore": 0,
+  "afterVersion": "033",
+  "migrationsExecuted": 1,
+  "indexesVerified": {
+    "tc_order.ix_admin_order_status": {
+      "comment": "本租户订单状态游标",
+      "columns": "tenant_id,status,id"
+    },
+    "tc_order.ix_admin_order_financial": {
+      "comment": "本租户订单财务状态游标",
+      "columns": "tenant_id,financial_status,id"
+    },
+    "tc_order.ix_admin_order_created": {
+      "comment": "本租户订单创建时间窗口",
+      "columns": "tenant_id,created_at,id"
+    },
+    "tc_payment_intent.ix_admin_payment_status": {
+      "comment": "本租户支付状态游标",
+      "columns": "tenant_id,status,id"
+    },
+    "tc_payment_intent.ix_admin_payment_member": {
+      "comment": "本租户会员支付查询",
+      "columns": "tenant_id,member_id,id"
+    },
+    "tc_payment_intent.ix_admin_payment_created": {
+      "comment": "本租户支付创建时间窗口",
+      "columns": "tenant_id,created_at,id"
+    },
+    "tc_payment_attempt.ix_admin_attempt_page": {
+      "comment": "支付意图内尝试主键游标",
+      "columns": "tenant_id,intent_id,id"
+    },
+    "tc_payment_receipt.ix_admin_receipt_disposition": {
+      "comment": "本租户收款分类游标",
+      "columns": "tenant_id,disposition,id"
+    },
+    "tc_payment_receipt.ix_admin_receipt_order": {
+      "comment": "本租户订单所有实收记录",
+      "columns": "tenant_id,order_id,id"
+    },
+    "tc_payment_receipt.ix_admin_receipt_created": {
+      "comment": "本租户收款登记时间窗口",
+      "columns": "tenant_id,created_at,id"
+    },
+    "tc_return_request.ix_admin_return_page": {
+      "comment": "退货申请列表包括未验收记录",
+      "columns": "tenant_id,id"
+    },
+    "tc_return_request.ix_admin_return_status": {
+      "comment": "本租户退货申请状态游标",
+      "columns": "tenant_id,status,id"
+    },
+    "tc_return_request.ix_admin_return_order": {
+      "comment": "本租户订单退货申请",
+      "columns": "tenant_id,order_id,id"
+    },
+    "tc_return_request.ix_admin_return_created": {
+      "comment": "本租户退货申请创建时间窗口",
+      "columns": "tenant_id,created_at,id"
+    },
+    "tc_quote.ix_admin_quote_created": {
+      "comment": "本租户报价创建时间窗口",
+      "columns": "tenant_id,created_at,id"
+    },
+    "tc_refund.ix_admin_refund_page": {
+      "comment": "退款ALL查询主键游标",
+      "columns": "tenant_id,id"
+    },
+    "tc_refund.ix_admin_refund_created": {
+      "comment": "本租户退款申请时间窗口",
+      "columns": "tenant_id,created_at,id"
+    },
+    "tc_job_lease.ix_admin_job_page": {
+      "comment": "本租户所有任务主键游标",
+      "columns": "tenant_id,id"
+    },
+    "tc_job_lease.ix_admin_job_status": {
+      "comment": "本租户任务状态游标",
+      "columns": "tenant_id,status,id"
+    },
+    "tc_job_lease.ix_admin_job_created": {
+      "comment": "本租户任务创建时间窗口",
+      "columns": "tenant_id,created_at,id"
+    }
+  },
+  "tableRowsBefore": {
+    "tc_job_lease": 2,
+    "tc_order": 0,
+    "tc_payment_attempt": 0,
+    "tc_payment_intent": 0,
+    "tc_payment_receipt": 0,
+    "tc_quote": 0,
+    "tc_refund": 0,
+    "tc_return_request": 0
+  },
+  "tableRowsAfter": {
+    "tc_job_lease": 2,
+    "tc_order": 0,
+    "tc_payment_attempt": 0,
+    "tc_payment_intent": 0,
+    "tc_payment_receipt": 0,
+    "tc_quote": 0,
+    "tc_refund": 0,
+    "tc_return_request": 0
+  },
+  "flywayValidation": "passed",
+  "verifiedAt": "2026-09-08T14:49:31.884953Z",
+  "migrationSha256": "add6cc77a97de2966b0527bfd4b5659db8bece210404412ad3bf7d8af2cc7e68",
+  "applicationState": "existing API container stopped; no application deployment or restart performed",
+  "authorization": "用户明确授权：V033 索引迁移可以执行"
+}

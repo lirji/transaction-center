@@ -70,6 +70,19 @@ public class SecurityConfiguration {
                     .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.return.write")))
+                // 精确只读权限规则必须先于admin通配规则，管理身份不能隐式取得证据或租约权限。
+                .requestMatchers("/api/v1/trade/admin/orders/*/referral-evidence")
+                    .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.evidence.read")))
+                .requestMatchers(org.springframework.http.HttpMethod.POST,"/api/v1/trade/admin/members/*/eligibility:query")
+                    .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.evidence.read")))
+                .requestMatchers("/api/v1/trade/admin/jobs","/api/v1/trade/admin/jobs/*")
+                    .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.jobs.read")))
                 .requestMatchers("/api/v1/trade/admin/**").hasAuthority("SCOPE_trade.admin")
                 .requestMatchers("/api/v1/trade/**").authenticated()
                 .anyRequest().denyAll())

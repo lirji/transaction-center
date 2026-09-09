@@ -32,6 +32,12 @@ server:
   address: ${TRADE_BIND:127.0.0.1}
   shutdown: graceful
 trade:
+  admin-evidence:
+    enabled: ${TRADE_ADMIN_EVIDENCE_ENABLED:false}
+  admin-query:
+    concurrency: ${TRADE_ADMIN_QUERY_CONCURRENCY:4}
+    tenant-concurrency: ${TRADE_ADMIN_QUERY_TENANT_CONCURRENCY:2}
+    tenant-rate: ${TRADE_ADMIN_QUERY_TENANT_RATE:20}
   order-attribution:
     enabled: false
     issuer: ${TRADE_ORDER_ATTRIBUTION_ISSUER:}
