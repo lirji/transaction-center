@@ -39,7 +39,7 @@ trade:
     tenant-concurrency: ${TRADE_ADMIN_QUERY_TENANT_CONCURRENCY:2}
     tenant-rate: ${TRADE_ADMIN_QUERY_TENANT_RATE:20}
   order-attribution:
-    enabled: false
+    enabled: ${TRADE_ORDER_ATTRIBUTION_ENABLED:false}
     issuer: ${TRADE_ORDER_ATTRIBUTION_ISSUER:}
     jwks: ${TRADE_ORDER_ATTRIBUTION_JWKS:}
   automatic-admission:

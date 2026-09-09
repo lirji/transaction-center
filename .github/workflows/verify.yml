@@ -31,6 +31,8 @@ jobs:
           cache-dependency-path: scripts/contracts/requirements.txt
       - name: Install locked contract dependencies
         run: python -m pip install --require-hashes -r scripts/contracts/requirements.txt
+      - name: Verify Compose configuration without secrets
+        run: python3 scripts/verify-compose-config.py
       - name: Verify with isolated MySQL
         # Testcontainers启动隔离数据库；不读取共享基础设施或生产凭据。
         run: bash scripts/verify.sh > build-ci.log 2>&1
@@ -44,3 +46,4 @@ jobs:
             build-ci.log
             **/target/surefire-reports/*.xml
             **/target/failsafe-reports/*.xml
+
