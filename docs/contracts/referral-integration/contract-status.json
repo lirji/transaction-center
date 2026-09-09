@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "date": "2026-09-09",
+  "status": "BASELINE_RECONCILED_EXTERNAL_DECISIONS_PENDING",
+  "runtime_enablement": false,
+  "sources": [
+    {
+      "id": "trade-mapping",
+      "repositoryRelativePath": "transaction-core/src/main/java/com/lrj/trade/core/AuthoritativeSubjectMappingPort.java",
+      "sha256": "d17686f09378f16779cf32bcacfbea26186ebe5d8e92ffca778679f41dd375da"
+    },
+    {
+      "id": "trade-default-mapping",
+      "repositoryRelativePath": "transaction-server/src/main/java/com/lrj/trade/server/UnavailableSubjectMapping.java",
+      "sha256": "67c863d1295f146c862b1e060bae477cbda180324d89701f408aae76f4080b2d"
+    },
+    {
+      "id": "trade-evidence-http",
+      "repositoryRelativePath": "transaction-server/src/main/java/com/lrj/trade/server/EvidenceController.java",
+      "sha256": "f0a1f8d8a5b8738a0d0b0ddc085189670c07592a28a362f895c69094c8efe642"
+    },
+    {
+      "id": "trade-order-evidence",
+      "repositoryRelativePath": "transaction-server/src/main/java/com/lrj/trade/server/OrderReferralEvidenceService.java",
+      "sha256": "df04ebfd891b4f5ee3b3df75e4642507b7dd9a4efa0882cc90a0215505cc9e5d"
+    },
+    {
+      "id": "trade-customer-evidence",
+      "repositoryRelativePath": "transaction-server/src/main/java/com/lrj/trade/server/CustomerEligibilityService.java",
+      "sha256": "4f3ac63551d748086b99db567268f62776f4b85b72936daed7679b3266b7c3f3"
+    },
+    {
+      "id": "marketing-subject",
+      "repositoryRelativePath": "../marketing-lowcode-platform/services/referral-service/src/main/java/com/acme/marketing/referral/application/TrustedReferralSubjectPort.java",
+      "sha256": "51198273894ee2cedbb3e775ba78c102f38648961e9fffb7b1414ebfa5ea422d"
+    },
+    {
+      "id": "marketing-permit",
+      "repositoryRelativePath": "../marketing-lowcode-platform/services/referral-service/src/main/java/com/acme/marketing/referral/application/ReferralParticipationPermitPort.java",
+      "sha256": "7a3cc10de74bcfd86a161f6905d072829259b76b8d35910afb67f5321662c9f9"
+    },
+    {
+      "id": "marketing-defaults",
+      "repositoryRelativePath": "../marketing-lowcode-platform/services/referral-service/src/main/java/com/acme/marketing/referral/infrastructure/ReferralConfiguration.java",
+      "sha256": "13abc9066aa7cbea727123ec5ee581445d54b4986a6334acbcd2f5b2ea962954"
+    },
+    {
+      "id": "marketing-release",
+      "repositoryRelativePath": "../marketing-lowcode-platform/services/marketing-control-service/src/main/java/com/acme/marketing/control/application/ReleaseApplicationService.java",
+      "sha256": "10e594904ddd01d60f4df450ef13ea01b7e85819f724429e6e9008068cb30373"
+    },
+    {
+      "id": "manifest",
+      "repositoryRelativePath": "../marketing-lowcode-platform/marketing-contracts/src/main/java/com/acme/marketing/contracts/release/ReleaseManifest.java",
+      "sha256": "3c7786f4de769befab63eee8f051aa44c0f0ad174feb34a9f7bf93023e550df4"
+    },
+    {
+      "id": "ack",
+      "repositoryRelativePath": "../marketing-lowcode-platform/marketing-contracts/src/main/java/com/acme/marketing/contracts/release/RuntimeAck.java",
+      "sha256": "096bbd9447b2a2b05e4d10e8aa406be5ed7170057c10183fc209718fd90c892d"
+    }
+  ],
+  "contracts": [
+    {
+      "id": "C01",
+      "owner": "BFF + authoritative member/scope provider (provider pending)",
+      "consumer": "TrustedReferralSubjectPort",
+      "assertionAudience": "marketing-referral",
+      "maxLifetimeSeconds": 60,
+      "machineAndUserIdentityRequired": true,
+      "pending": [
+        "canonicalSubject authority",
+        "organization/shop authority",
+        "BFF service identity",
+        "signature algorithm/JWKS/KMS",
+        "canonical JSON digest version",
+        "maxBindAge origin"
+      ]
+    },
+    {
+      "id": "C02",
+      "owner": "transaction native eligibility + authoritative mapping provider",
+      "consumer": "marketing evidence adapter (not implemented)",
+      "existingPath": "POST /internal/v1/customer-eligibility:query",
+      "existingRequestFields": [
+        "memberId",
+        "policyVersion",
+        "campaignStartAt",
+        "evaluatedAt"
+      ],
+      "prohibitedConversions": [
+        "memberId to canonicalSubject",
+        "missing mapping to new customer",
+        "mapping revision to customer fact revision"
+      ]
+    },
+    {
+      "id": "C03",
+      "owner": "transaction native evidence + authoritative mapping provider",
+      "consumer": "marketing evidence adapter (not implemented)",
+      "batchPath": "POST /internal/v1/order-referral-evidence:query",
+      "batchRequestFields": [
+        "orderIds"
+      ],
+      "firstOrderPath": "POST /internal/v1/first-order-referral-evidence:query",
+      "firstOrderRequestFields": [
+        "memberId",
+        "from",
+        "to",
+        "firstOrderPolicyVersion"
+      ],
+      "prohibitedConversions": [
+        "paidAt to settledAt",
+        "isFirstConfirmedPaidOrder to arbitrary first eligible order",
+        "omit pendingRefundAmount",
+        "native evidenceVersion plus mapping revision to fake single revision"
+      ]
+    },
+    {
+      "id": "RELEASE",
+      "owner": "marketing-control + referral runtime",
+      "consumer": "ReferralParticipationPermitPort",
+      "currentRejection": "REFERRAL_RELEASE_NOT_AVAILABLE",
+      "maxPermitLifetimeSeconds": 10,
+      "required": [
+        "approval",
+        "frozen SKU closure",
+        "signed manifest",
+        "supported ABI",
+        "authenticated fresh signed runtime ACK",
+        "activation epoch",
+        "fresh kill switch"
+      ],
+      "enabled": false
+    }
+  ],
+  "checksExecuted": [
+    "source existence and hashes",
+    "native paths/DTO fields compared",
+    "default rejection and release guard inspected"
+  ],
+  "notExecuted": [
+    "external approval/signoff",
+    "live identity mapping",
+    "BFF signed assertion acceptance",
+    "real release activation",
+    "cross-platform evidence adapter integration"
+  ]
+}

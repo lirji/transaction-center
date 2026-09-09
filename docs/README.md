@@ -1,6 +1,6 @@
 # 交易中心文档导航
 
-[当前交付状态](PROJECT_STATUS.md) · [管理查询接口](ADMIN_QUERY_API.md) · [控制台交接](CURSOR_HANDOFF.md)
+[当前交付状态](PROJECT_STATUS.md) · [待办清单](TRADE_REMAINING_INTERNAL_WORK.md) · [管理查询接口](ADMIN_QUERY_API.md) · [控制台交接](CURSOR_HANDOFF.md)
 
 本目录面向产品、后端开发、测试和运维，描述当前仓库中的交易能力。更新日期：2026-09-09；代码基线：已推送main的 `3187c57`。先阅读 [当前交付状态](PROJECT_STATUS.md)，区分已实现、已在本机部署与待生产验收的范围。
 
@@ -12,6 +12,11 @@
 | [业务说明](BUSINESS_GUIDE.md) | 交易主流程、状态机、业务规则和外部边界 | 产品、开发、测试 |
 | [高并发与一致性设计](HIGH_CONCURRENCY_DESIGN.md) | 如何防重复、防超卖、恢复未知结果及控制负载 | 开发、架构、测试 |
 | [数据架构](DATA_ARCHITECTURE.md) | 数据归属、核心关系、约束、索引及迁移 | 开发、数据库维护人员 |
+| [多实例正确性验证](MULTI_INSTANCE_VERIFICATION.md) | T12复现命令、故障边界和证据 | 后端、测试、运维 |
+| [裂变接入合同基线](contracts/referral-integration/CONTRACT_BASELINE.md) | 身份/证据/发布真实字段与待签收项 | 跨平台开发 |
+| [交易与裂变执行顺序](EXECUTION_ORDER_AND_REFERRAL_GAPS.md) | 按依赖排序的执行稿及裂变实际缺口 | 产品、开发、测试 |
+| [可浏览测试数据](DEMO_DATA.md) | 当前演示库业务样例、重复执行及真实查询核对 | 开发、测试、产品 |
+| [控制台配置与隔离联调](CONSOLE_INTEGRATION.md) | 配置透传、完整业务种子、真实HTTP浏览器测试及前端CI | 开发、测试 |
 | [部署运维与容量验证](OPERATIONS_AND_CAPACITY.md) | 如何运行、观测、恢复以及验证容量 | 运维、测试、开发 |
 
 先读架构和业务，再结合并发、数据与运维文档阅读代码。接口字段、路径与响应以 [OpenAPI](openapi.json) 和对应 Controller 为依据；事件以 [AsyncAPI](asyncapi.json)、[事件合同](ASYNCAPI_CONTRACT.md) 和 [contracts](contracts/) 为依据。当前 OpenAPI 文件包含 **69 个路径、81 个 HTTP 操作**，这是合同文件统计，不是生产可用接口数量；部分接口需要开关和来源授权。

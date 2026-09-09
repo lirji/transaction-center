@@ -54,7 +54,7 @@ curl -fsS http://127.0.0.1:8400/actuator/health
 | TRADE_FULFILLMENT_ENABLED | false | 履约写入与会员确认，另需来源权限 |
 | TRADE_AUTOMATIC_ADMISSION_ENABLED | false | 积压与实际数据库磁盘自动保护 |
 
-值来自 [application.yml](../transaction-server/src/main/resources/application.yml)、[Compose](../deploy/compose.yaml)、各配置类。Spring 支持的配置不一定已经由 Compose environment 透传：当前 Compose 没有显式透传自动准入系列、订单归因 enabled、TRADE_ADMIN_EVIDENCE_ENABLED及TRADE_ADMIN_QUERY_*管理查询限额，不能只在 `.env` 加一个名字就假定容器已启用；部署时需检查最终有效配置并按授权补齐部署配置。此文档任务不改 Compose。
+值来自 [application.yml](../transaction-server/src/main/resources/application.yml)、[Compose](../deploy/compose.yaml)、各配置类。Compose已补齐自动准入系列、订单归因开关与信任配置、管理证据及管理查询限额透传；默认值、Worker入口隔离和校验方式见[配置与隔离联调](CONSOLE_INTEGRATION.md)。自动准入仍须核对真实数据库存储映射后才可启用。
 
 连接预算需要累加：若 API 数量为 A、Worker 数量为 W，各池仍为 10，则应用连接上限约为 `10 × (A + W)`，另留迁移、观测、运维及其他服务连接余量。此式不是吞吐公式。Worker 线程数也不等于数据库连接数，但增加线程会提高竞争，必须联动观察。
 
