@@ -22,8 +22,21 @@ public class SecurityConfiguration {
             ? OAuth2TokenValidatorResult.success()
             : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token","接收方不匹配或缺少过期时间",null));
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-            JwtValidators.createDefaultWithIssuer(issuer),audienceValidator));
+            JwtValidators.createDefaultWithIssuer(issuer),audienceValidator,SecurityConfiguration::validateIdentity));
         return decoder;
+    }
+    /** 统一在认证边界拒绝缺失、数值型、非规范文本或超出数据库范围的租户，避免各控制器宽松转换。 */
+    private static OAuth2TokenValidatorResult validateIdentity(Jwt jwt) {
+        Object tenant=jwt.getClaims().get("tenant_id");
+        boolean valid=tenant instanceof String text && text.matches("[1-9][0-9]{0,18}");
+        if(valid) {
+            try { Long.parseLong((String)tenant); }
+            catch(NumberFormatException overflow) { valid=false; }
+        }
+        String subject=jwt.getSubject();
+        if(valid && subject!=null && !subject.isBlank() && subject.length()<=255)
+            return OAuth2TokenValidatorResult.success();
+        return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token","令牌缺少有效租户或主体声明",null));
     }
     /** 仅健康探针匿名开放，管理操作需要显式作用域；无Cookie认证因此禁用CSRF。 */
     @Bean

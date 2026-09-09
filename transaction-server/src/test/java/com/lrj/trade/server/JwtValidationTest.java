@@ -34,13 +34,23 @@ class JwtValidationTest {
             assertThrows(JwtException.class,()->decoder.decode(token(key,"https://issuer.test","other-app",future)));
             assertThrows(JwtException.class,()->decoder.decode(token(key,"https://issuer.test","transaction-center",Instant.now().minusSeconds(600))));
             assertThrows(JwtException.class,()->decoder.decode(token(key,"https://issuer.test","transaction-center",null)));
+            for(Object tenant : new Object[]{null, 900001, "0", "-1", "+1", "01", " 1", "1 ", "1.0", "9223372036854775808", ""}) {
+                assertThrows(JwtException.class,()->decoder.decode(token(key,"https://issuer.test","transaction-center",future,tenant,"member")));
+            }
+            for(String subject : new String[]{null,""," "}) {
+                assertThrows(JwtException.class,()->decoder.decode(token(key,"https://issuer.test","transaction-center",future,"900001",subject)));
+            }
+            assertEquals("900001", decoder.decode(token(key,"https://issuer.test","transaction-center",future,"900001","member")).getClaim("tenant_id"));
             RSAKey attacker=new RSAKeyGenerator(2048).keyID("test-key").generate();
             assertThrows(JwtException.class,()->decoder.decode(token(attacker,"https://issuer.test","transaction-center",future)));
         } finally { server.stop(0); }
     }
     private String token(RSAKey key,String issuer,String audience,Instant expiry) throws Exception {
-        var claims=new JWTClaimsSet.Builder().issuer(issuer).audience(audience).subject("member")
-            .claim("tenant_id","123").expirationTime(expiry==null?null:Date.from(expiry)).build();
+        return token(key,issuer,audience,expiry,"123","member");
+    }
+    private String token(RSAKey key,String issuer,String audience,Instant expiry,Object tenant,String subject) throws Exception {
+        var claims=new JWTClaimsSet.Builder().issuer(issuer).audience(audience).subject(subject)
+            .claim("tenant_id",tenant).expirationTime(expiry==null?null:Date.from(expiry)).build();
         SignedJWT jwt=new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(),claims);
         jwt.sign(new RSASSASigner(key));
         return jwt.serialize();
