@@ -1,5 +1,7 @@
 归因阶段428项/34套组合全量通过（含SDK及自动准入），随后3项断言修订专项通过；共享V032已完成，48表678字段中文注释完整。后续映射与原平台新切片不在此全量范围，完整裂变及生产验收仍在推进。
 
+项目全景文档：[文档导航](docs/README.md) · [项目架构](docs/PROJECT_ARCHITECTURE.md) · [业务说明](docs/BUSINESS_GUIDE.md) · [高并发设计](docs/HIGH_CONCURRENCY_DESIGN.md) · [数据架构](docs/DATA_ARCHITECTURE.md) · [部署运维与容量验证](docs/OPERATIONS_AND_CAPACITY.md)。
+
 # 交易中心 transaction-center
 
 仓库交付边界见 [会话交接](SESSION_HANDOFF.md)；本机恢复状态另见未入库的 CODEX_PROGRESS.md。已有能力与后续缺口见 [剩余内部工作](docs/TRADE_REMAINING_INTERNAL_WORK.md)。
@@ -38,6 +40,10 @@ mvn verify
 
 需要 Java 21、Maven、Docker。测试使用 `mysql:8.4` 临时隔离容器，与 dev_infra 镜像标签一致；自动回收测试资源，不连接共享数据库、不执行共享实例故障注入。测试容器创建与首次初始化需要时间；没有 Docker 时测试应失败，不静默跳过数据库验收。`mvn -DskipTests package` 仅用于快速打包，不表示验收通过。
 
+## 管理台前端
+
+运营 SPA 在 `frontend/apps/console`（Vite，`http://127.0.0.1:4180`，`/api` 代理到 `8400`）。登录走 Casdoor，令牌须 `aud=transaction-center`、`scope` 含 `trade.admin`、`tenant_id` 为正整数文本。详见 [frontend/apps/console/README.md](frontend/apps/console/README.md)。
+
 ## 开发运行与 dev_infra
 
 默认复用现有 `dev-infra-mysql84-1`；宿主机 `localhost:43306`，Docker external 网络 `dev-infra` 内使用 `infra-mysql84:3306`。交易项目的 Compose 不创建数据库、Redis、Kafka或观测组件。
@@ -56,7 +62,29 @@ mvn verify
 | TRADE_JWT_AUDIENCE | 默认transaction-center；签发方令牌须匹配 |
 | TRADE_PORT / TRADE_BIND | 默认8400／127.0.0.1；容器配置为0.0.0.0 |
 
-配置完成后运行打包的 `transaction-server/target/transaction-server-0.1.0-SNAPSHOT.jar`，或在 `deploy` 目录执行 `docker compose up --build -d`。Docker构建之前须先完成 Maven package。生产必须使用HTTPS网关及受控内部网络；当前Compose只作为本机应用接入模板。
+配置完成后可运行打包的 `transaction-server/target/transaction-server-0.1.0-SNAPSHOT.jar`。Docker部署使用以下入口（需Docker Compose、Bash、Python 3）：
+
+```bash
+# 首次配置；已有.env时直接编辑，保留原有凭据。
+cp -n deploy/.env.example deploy/.env
+chmod 600 deploy/.env
+# 填写deploy/.env中的数据库账号及JWT配置后：
+./scripts/docker-start.sh
+```
+
+脚本校验必填配置与外部网络，从源码构建Java 21后端和前端静态页面镜像，启动后等待健康检查通过；不再要求宿主机预先执行Maven打包。首次构建需要下载镜像和Maven依赖。构建跳过测试，完整验收仍使用 `./scripts/verify.sh`。健康检查覆盖应用及数据库可用性，不代表JWT登录、真实渠道或业务闭环已验收。
+
+宿主机已有Java 21、Maven、Node.js和pnpm时，可使用 `./scripts/docker-start.sh --local-build`：脚本先在本机打包后端并安装锁定的前端依赖、构建页面，再构建运行镜像，复用本机依赖缓存；适合首次Maven基础镜像下载缓慢的场景。可与 `--worker` 组合。
+
+镜像健康探针为首次冷启动保留300秒宽限，启动脚本最多等待600秒；服务提前就绪会立即通过，不会固定等待宽限结束。
+
+`TRADE_ENV_FILE=/绝对路径/交易配置.env ./scripts/docker-start.sh` 可指定现有配置；也可直接导出所需环境变量。默认复用 `dev-infra` 网络及 `infra-mysql84`、`infra-redis7`、`infra-kafka38`，可用 `DEV_INFRA_NETWORK` 指定共享网络名。先由dev_infra启动所需服务，脚本不会新建中间件。`TRADE_DB_URL` 可指定共享MySQL中的交易专用逻辑库。JWT公钥地址必须从容器可达，不能用指向宿主机服务的 `localhost`。
+
+默认前端地址为 `http://127.0.0.1:4180`，可用 `TRADE_CONSOLE_HOST_PORT` 调整端口。Nginx提供静态页面、登录回调路由和 `/api/` 同源后端代理；运行时公开配置位于前端 `public/config.js`。演示环境使用 `TRADE_ENV_FILE="$PWD/deploy/.env.demo" ./scripts/docker-start.sh --local-build` 启动前后端。
+
+默认API地址为 `http://127.0.0.1:8400`，健康检查为 `/actuator/health`；可用 `TRADE_HOST_PORT` 调整宿主端口。运行 `docker compose -f deploy/compose.yaml logs --tail 100 trade-api` 查看日志，运行 `docker compose -f deploy/compose.yaml stop trade-api` 停止API。使用自定义配置文件时，这些命令也需加 `--env-file /绝对路径/交易配置.env`。
+
+需要后台任务时显式运行 `./scripts/docker-start.sh --worker`；省略该参数不会停止此前已运行的worker，需要时执行 `docker compose -f deploy/compose.yaml --profile worker stop trade-worker`。生产必须使用HTTPS网关及受控内部网络；当前Compose用于本机开发部署。
 
 后台处理默认关闭，Compose的`trade-api`固定禁用。`trade-worker`仅在显式`worker` profile启用时启动，复用dev_infra，不发布宿主端口。先确认迁移、凭据和真实渠道准入；配置、停机语义及未完成的监控／容量门禁见[常驻Worker合同](docs/WORKER_RUNTIME_PLAN.md)。本轮未部署或启用共享后台，不得据此开展真实收款。
 
@@ -94,3 +122,7 @@ Redis 缓存与 Kafka V1 事件已有开发环境专项证据；生产配置、�
 ## 持续集成
 
 [GitHub Actions](.github/workflows/verify.yml)复用scripts/verify.sh，Java21、隔离MySQL及锁定的Python合同依赖，失败也保存测试报告。配置已本地解析，底层Maven/合同命令分别验证；远程执行、安全扫描及生产发布签收仍待完成，无部署步骤。
+
+### 本地统一登录与演示数据
+
+Casdoor交易应用已按 `aud=transaction-center`、`scope` 含 `trade.admin`、顶层字符串 `tenant_id=900001` 对齐。开通/数据库准备/真实PKCE与API验收脚本及账号位置见 [本地Casdoor接入说明](docs/CASDOOR_LOCAL_SETUP.md)。演示API使用独立 `transaction_center_dev` 库及 `deploy/.env.demo`，不会向原业务库写演示种子。
