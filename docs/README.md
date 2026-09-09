@@ -46,6 +46,10 @@
 | 安全与接入 | [Casdoor](CASDOOR_LOCAL_SETUP.md)、[证据 HTTP](EVIDENCE_HTTP.md)、[管理版本合同](ADMIN_VERSION_CONTRACT.md)、[错误 SDK](ERROR_SDK_DESIGN.md) |
 | 测试与交付 | [验证记录](VERIFICATION.md)、[覆盖账本](ACCEPTANCE_COVERAGE.md)、[Git 交付](GIT_DELIVERY.md)、[Cursor 交接](CURSOR_HANDOFF.md) |
 
+## 分布式演进设计（未实施）
+
+[服务边界与表归属](DISTRIBUTED_SERVICE_DESIGN.md) · [跨服务事务与交互协议](DISTRIBUTED_PROTOCOLS.md) · [迁移和验收计划](plans/distributed-trade/MIGRATION_AND_ACCEPTANCE.md)。这些是下一阶段草案，当前仍为模块化单体。
+
 ## 文档维护规则
 
 早期专题中的迁移版本、接口数量、测试数量及“后续待实现”通常对应当时切片。已在易混淆文档顶部补充时效提示，历史正文用于追溯；阅读当前能力时先看本导航和总览，再追到对应实现。`DESIGN` 文件也可能包含后续实际实现记录，文件名本身不能证明完成状态。

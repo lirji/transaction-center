@@ -43,6 +43,10 @@
 
 更细的内部与跨平台剩余工作见[剩余工作](TRADE_REMAINING_INTERNAL_WORK.md)。营销等其他仓库的最新提交与部署未在本次核对，不能用交易仓库结果代替它们的验收。
 
+## 后续设计（未实施）
+
+已形成 [分布式服务边界草案](DISTRIBUTED_SERVICE_DESIGN.md)、[跨服务协议](DISTRIBUTED_PROTOCOLS.md) 及 [迁移验收计划](plans/distributed-trade/MIGRATION_AND_ACCEPTANCE.md)，待审查中间状态、首单确认、证据合同等关键决策。本次没有启动拆库、多实例或故障测试。
+
 ## 文档阅读与维护
 
 当前状态以本页、实际源码合同及对应带日期证据为准。专题设计中的迁移号是该切片迁移号，历史测试数不改写；涉及当前全局状态的入口只引用本页。后续实现变更应同步本页、API合同和新增验证证据，不能只更新本机CODEX_PROGRESS.md。
