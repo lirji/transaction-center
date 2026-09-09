@@ -1,0 +1,610 @@
+{
+  "date": "2026-09-09",
+  "command": "TESTCONTAINERS_RYUK_DISABLED=true bash scripts/verify-multi-instance.sh",
+  "result": "PASS",
+  "tests": [
+    {
+      "suite": "com.lrj.trade.server.multiprocess.MultiInstanceIT",
+      "count": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "com.lrj.trade.server.WorkerRuntimeTest",
+      "count": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "runtime": {
+    "p99Millis": 268.09975,
+    "cases": [
+      {
+        "queue": {
+          "unfinished": 30,
+          "oldestAgeSeconds": 14
+        },
+        "details": {
+          "orders": 4
+        },
+        "at": "2026-09-09T02:35:40.923742Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 394MB",
+          "CPUPerc": "0.43%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "1.99%",
+          "MemUsage": "477.5MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.06MB / 1.25MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7332"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "50"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          }
+        ],
+        "id": "D-01",
+        "description": "跨API订单同键同内容唯一、异内容409"
+      },
+      {
+        "queue": {
+          "unfinished": 31,
+          "oldestAgeSeconds": 16
+        },
+        "details": {
+          "unauthenticated": 401,
+          "crossTenant": 404
+        },
+        "at": "2026-09-09T02:35:43.021450Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 394MB",
+          "CPUPerc": "0.32%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "1.99%",
+          "MemUsage": "477.5MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.07MB / 1.26MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7338"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "19"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "50"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          }
+        ],
+        "id": "D-17",
+        "description": "跨进程鉴权与租户隔离"
+      },
+      {
+        "queue": {
+          "unfinished": 32,
+          "oldestAgeSeconds": 18
+        },
+        "details": {
+          "winners": 1
+        },
+        "at": "2026-09-09T02:35:45.039370Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 400MB",
+          "CPUPerc": "0.54%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "1.99%",
+          "MemUsage": "478.1MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.09MB / 1.27MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7373"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "19"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "50"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          }
+        ],
+        "id": "D-13-exclusive",
+        "description": "两个Worker进程只一个取得租约"
+      },
+      {
+        "queue": {
+          "unfinished": 33,
+          "oldestAgeSeconds": 21
+        },
+        "details": {
+          "oldToken": 1,
+          "newToken": 2,
+          "stock": 107
+        },
+        "at": "2026-09-09T02:35:48.224444Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 401MB",
+          "CPUPerc": "0.67%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "1.99%",
+          "MemUsage": "478.4MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.13MB / 1.29MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7604"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "19"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "50"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          }
+        ],
+        "id": "D-13-stale",
+        "description": "暂停/自然到期/接管/恢复后旧库存写入整体回滚"
+      },
+      {
+        "queue": {
+          "unfinished": 34,
+          "oldestAgeSeconds": 28
+        },
+        "details": {
+          "killedPid": 44428,
+          "replacementPid": 44465,
+          "stock": 108
+        },
+        "at": "2026-09-09T02:35:54.881147Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 403MB",
+          "CPUPerc": "0.46%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "2.00%",
+          "MemUsage": "479.1MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.21MB / 1.37MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7721"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "19"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "42"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": false,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44465
+          }
+        ],
+        "id": "D-13-crash",
+        "description": "强制退出后原任务接管、重启不重复完成"
+      },
+      {
+        "queue": {
+          "unfinished": 33,
+          "oldestAgeSeconds": 30
+        },
+        "details": {
+          "results": [
+            {
+              "outcomes": [
+                "RETRY"
+              ],
+              "status": "OK"
+            },
+            {
+              "outcomes": [
+                "DONE"
+              ],
+              "status": "OK"
+            }
+          ],
+          "receipts": 2
+        },
+        "at": "2026-09-09T02:35:56.874622Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 404MB",
+          "CPUPerc": "0.53%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "2.00%",
+          "MemUsage": "480.1MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.24MB / 1.43MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7761"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "19"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "50"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": false,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44465
+          }
+        ],
+        "id": "worker-recovery",
+        "description": "生产PaymentRecoveryWorker处理持久任务；无新增资金事实"
+      },
+      {
+        "queue": {
+          "unfinished": 33,
+          "oldestAgeSeconds": 34
+        },
+        "details": {
+          "orders": 4,
+          "stock": 108
+        },
+        "at": "2026-09-09T02:36:01.040637Z",
+        "databaseContainer": {
+          "BlockIO": "66.6MB / 406MB",
+          "CPUPerc": "1.45%",
+          "Container": "dc8f8e3cf15c8923a8b9f294a77e34af8e759c12d6502437299b21ab7309b066",
+          "ID": "dc8f8e3cf15c",
+          "MemPerc": "2.00%",
+          "MemUsage": "480.8MiB / 23.43GiB",
+          "Name": "pedantic_jemison",
+          "NetIO": "1.28MB / 1.49MB",
+          "PIDs": "85"
+        },
+        "databaseMetrics": [
+          {
+            "Variable_name": "Innodb_data_reads",
+            "Value": "1073"
+          },
+          {
+            "Variable_name": "Innodb_data_writes",
+            "Value": "7800"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_current_waits",
+            "Value": "0"
+          },
+          {
+            "Variable_name": "Innodb_row_lock_time",
+            "Value": "19"
+          },
+          {
+            "Variable_name": "Threads_connected",
+            "Value": "45"
+          },
+          {
+            "Variable_name": "Threads_running",
+            "Value": "2"
+          }
+        ],
+        "processCpu": [
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44411
+          },
+          {
+            "cpuMillis": -1,
+            "alive": false,
+            "pid": 44416
+          },
+          {
+            "cpuMillis": -1,
+            "alive": false,
+            "pid": 44428
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44432
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44465
+          },
+          {
+            "cpuMillis": -1,
+            "alive": true,
+            "pid": 44473
+          }
+        ],
+        "id": "D-01-restart",
+        "description": "API退出后重试原业务号，订单及库存不重复"
+      }
+    ],
+    "instances": [
+      {
+        "role": "API-A",
+        "port": 60014,
+        "pid": 44411
+      },
+      {
+        "role": "API-B",
+        "port": 60029,
+        "pid": 44416
+      },
+      {
+        "role": "Worker-A",
+        "port": 60042,
+        "pid": 44428
+      },
+      {
+        "role": "Worker-B",
+        "port": 60053,
+        "pid": 44432
+      },
+      {
+        "role": "Worker-A-restarted",
+        "port": 60076,
+        "pid": 44465
+      },
+      {
+        "role": "API-B-restarted",
+        "port": 60103,
+        "pid": 44473
+      }
+    ],
+    "p50Millis": 166.516875,
+    "scope": "correctness only; controlled worker batches, not production capacity or channel acceptance",
+    "status": "PASS",
+    "database": "transaction_center_multi_it",
+    "httpSamples": 7,
+    "p95Millis": 268.09975
+  },
+  "report": "transaction-server/target/multi-instance/6de383be-b982-473c-9fc5-5989829ca8cf/result.json",
+  "logSha256": "ec1624cb27e782c63fb2021da379b22dfbf6e33c01694571d66c7ac4d12a6c9b",
+  "sourceSha256": {
+    "transaction-server/src/test/java/com/lrj/trade/server/multiprocess/MultiInstanceIT.java": "fd9ae7c1e369f9290b824caf80eac7318ac7b2fb0b97318b94f40cd311a59075",
+    "transaction-server/src/test/java/com/lrj/trade/server/multiprocess/IsolatedTradeProcess.java": "53b366e90e3fb2354e1ab46a7eed9c1782e2f59fdb470843c4a4acaa0e40937b"
+  },
+  "productionJarExcludesDrivers": true,
+  "remoteCi": "not triggered",
+  "externalContracts": "baseline reconciled; authority/business decisions pending"
+}

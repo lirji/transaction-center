@@ -89,3 +89,25 @@ jobs:
             transaction-server/target/console-integration/
             transaction-server/target/surefire-reports/
             build-console-integration.log
+
+  multi-instance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Isolated API and worker process fault verification
+        run: bash scripts/verify-multi-instance.sh > build-multi-instance.log 2>&1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: multi-instance-evidence
+          retention-days: 7
+          path: |
+            build-multi-instance.log
+            transaction-server/target/multi-instance/
+            transaction-server/target/surefire-reports/
