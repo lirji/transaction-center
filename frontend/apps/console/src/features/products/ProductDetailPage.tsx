@@ -1,0 +1,282 @@
+import { useState, type FormEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams } from 'react-router-dom'
+import { Badge, Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { api, type Sku } from '../../shared/api/client'
+import { MutationBanner } from '../../shared/ui/QueryGate'
+import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
+import { formatMinor, parseInteger } from '../../shared/api/money'
+import { describeProblem } from '../../shared/api/client'
+import { parseCurrencyCode } from '../../shared/api/validate'
+
+export function ProductDetailPage() {
+  const { id = '' } = useParams()
+  const queryClient = useQueryClient()
+  const product = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) })
+  const skus = useQuery({ queryKey: ['product-skus', id], queryFn: () => api.productSkus(id), enabled: Boolean(id) })
+  const [name, setName] = useState('')
+  const [unitPrice, setUnitPrice] = useState('')
+  const [currency, setCurrency] = useState('CNY')
+  const [skuNo, setSkuNo] = useState('')
+  const [skuPrice, setSkuPrice] = useState('')
+  const [skuCurrency, setSkuCurrency] = useState('CNY')
+  const [stockType, setStockType] = useState<'PHYSICAL' | 'SERVICE'>('PHYSICAL')
+  const [specKey, setSpecKey] = useState('color')
+  const [specValue, setSpecValue] = useState('')
+  const [formError, setFormError] = useState('')
+  const [confirm, setConfirm] = useState<'publish' | 'unpublish'>()
+  const [editing, setEditing] = useState<Sku>()
+  const [editPrice, setEditPrice] = useState('')
+  const [editCurrency, setEditCurrency] = useState('CNY')
+  const [editStockType, setEditStockType] = useState<'PHYSICAL' | 'SERVICE'>('PHYSICAL')
+  const [editSpecKey, setEditSpecKey] = useState('')
+  const [editSpecValue, setEditSpecValue] = useState('')
+
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['product', id] })
+    await queryClient.invalidateQueries({ queryKey: ['product-skus', id] })
+    await queryClient.invalidateQueries({ queryKey: ['products'] })
+  }
+  const onConflict = (error: unknown) => void invalidateIfVersionConflict(queryClient, error, ['product', id])
+  const edit = useMutation({
+    mutationFn: (body: { expectedVersion: number; name: string; unitPrice: number; currency: string }) => api.editProduct(id, body),
+    onSuccess: invalidate,
+    onError: onConflict,
+  })
+  const publish = useMutation({
+    mutationFn: ({ expectedVersion }: { expectedVersion: number }) => api.publishProduct(id, expectedVersion),
+    onSuccess: async () => { setConfirm(undefined); await invalidate() },
+    onError: onConflict,
+  })
+  const unpublish = useMutation({
+    mutationFn: ({ expectedVersion }: { expectedVersion: number }) => api.unpublishProduct(id, expectedVersion),
+    onSuccess: async () => { setConfirm(undefined); await invalidate() },
+    onError: onConflict,
+  })
+  const addSku = useMutation({
+    mutationFn: (body: { expectedVersion: number; skuNo: string; unitPrice: number; currency: string; stockType: 'PHYSICAL' | 'SERVICE'; specification: Record<string, string> }) => api.addSku(id, body),
+    onSuccess: invalidate,
+    onError: onConflict,
+  })
+  const saveSku = useMutation({
+    mutationFn: (payload: { skuId: string; expectedVersion: number; unitPrice: number; currency: string; stockType: 'PHYSICAL' | 'SERVICE'; specification: Record<string, string> }) =>
+      api.editSku(id, payload.skuId, {
+        expectedVersion: payload.expectedVersion,
+        unitPrice: payload.unitPrice,
+        currency: payload.currency,
+        stockType: payload.stockType,
+        specification: payload.specification,
+      }),
+    onSuccess: async () => { setEditing(undefined); await invalidate() },
+    onError: onConflict,
+  })
+
+  if (product.isLoading) return <div className="workspace"><StateBanner tone="loading" title="正在读取商品" detail={`GET /admin/products/${id}`} /></div>
+  if (product.isError || !product.data) {
+    const problem = describeProblem(product.error)
+    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to="/products">返回列表</Link></div>
+  }
+  const current = product.data
+  const draft = current.status === 'DRAFT'
+  const draftName = name || current.name
+  const draftPrice = unitPrice || String(current.unitPrice)
+  const draftCurrency = currency || current.currency
+
+  function submitEdit(event: FormEvent) {
+    event.preventDefault()
+    setFormError('')
+    try {
+      edit.mutate({
+        expectedVersion: current.version,
+        name: draftName.trim(),
+        unitPrice: parseInteger(draftPrice, '单价', { min: 0 }),
+        currency: parseCurrencyCode(draftCurrency),
+      })
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : '输入无效')
+    }
+  }
+
+  function submitSku(event: FormEvent) {
+    event.preventDefault()
+    setFormError('')
+    try {
+      const specification: Record<string, string> = {}
+      if (specKey.trim() && specValue.trim()) specification[specKey.trim()] = specValue.trim()
+      addSku.mutate({
+        expectedVersion: current.version,
+        skuNo: skuNo.trim(),
+        unitPrice: parseInteger(skuPrice, 'SKU 单价', { min: 0 }),
+        currency: parseCurrencyCode(skuCurrency),
+        stockType,
+        specification,
+      })
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : '输入无效')
+    }
+  }
+
+  function submitSkuEdit(event: FormEvent) {
+    event.preventDefault()
+    if (!editing) return
+    setFormError('')
+    try {
+      const specification = { ...editing.specification }
+      if (editSpecKey.trim() && editSpecValue.trim()) specification[editSpecKey.trim()] = editSpecValue.trim()
+      saveSku.mutate({
+        skuId: editing.skuId,
+        expectedVersion: current.version,
+        unitPrice: parseInteger(editPrice, 'SKU 单价', { min: 0 }),
+        currency: parseCurrencyCode(editCurrency),
+        stockType: editStockType,
+        specification,
+      })
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : '输入无效')
+    }
+  }
+
+  return (
+    <div className="workspace">
+      <PageHeader
+        eyebrow="Catalog"
+        title={current.name}
+        description={`状态 ${current.status} · 版本 ${current.version}。目录价不是下单应付额。`}
+        actions={<Link className="button secondary" to="/products">返回列表</Link>}
+      />
+      <MutationBanner
+        error={edit.error ?? publish.error ?? unpublish.error ?? addSku.error ?? saveSku.error}
+        success={edit.data || publish.data || unpublish.data || addSku.data || saveSku.data ? `resourceId=${(edit.data ?? publish.data ?? unpublish.data ?? addSku.data ?? saveSku.data)?.resourceId}` : undefined}
+      />
+      <div className="page-grid">
+        <div className="section-gap">
+          <Panel>
+            <dl className="kv">
+              <dt>商品 ID</dt><dd className="mono">{current.productId}</dd>
+              <dt>主 SKU</dt><dd className="mono">{current.skuId}</dd>
+              <dt>状态</dt><dd><Badge tone={current.status === 'PUBLISHED' ? 'good' : 'warn'}>{current.status}</Badge></dd>
+              <dt>发布修订</dt><dd className="mono">{current.publishedRevision ?? '无'}</dd>
+              <dt>目录价</dt><dd>{formatMinor(current.unitPrice, current.currency)}<small className="mono">{current.currency} {current.unitPrice}</small></dd>
+            </dl>
+            {draft ? (
+              <div className="heading-actions">
+                <Button tone="primary" disabled={publish.isPending} onClick={() => setConfirm('publish')}>发布</Button>
+              </div>
+            ) : current.status === 'PUBLISHED' ? (
+              <Button disabled={unpublish.isPending} onClick={() => setConfirm('unpublish')}>下架</Button>
+            ) : null}
+          </Panel>
+          <Panel className="table-panel">
+            <h2 style={{ padding: '16px 18px 0' }}>SKU</h2>
+            {skus.isLoading ? <StateBanner tone="loading" title="正在读取 SKU" detail="GET /admin/products/{id}/skus" /> : null}
+            {skus.isError ? <StateBanner tone="error" title={describeProblem(skus.error).title} detail={describeProblem(skus.error).detail} /> : null}
+            {skus.data && skus.data.length > 0 ? (
+              <table className="data-table">
+                <thead><tr><th>SKU</th><th>库存类型</th><th>单价</th><th>修订</th>{draft ? <th /> : null}</tr></thead>
+                <tbody>
+                  {skus.data.map((row) => (
+                    <tr key={row.skuId}>
+                      <td><strong>{row.title}</strong><small className="mono">{row.skuNo} / {row.skuId}</small></td>
+                      <td>{row.stockType}</td>
+                      <td>{formatMinor(row.unitPrice, row.currency)}<small className="mono">{row.currency} {row.unitPrice}</small></td>
+                      <td className="mono">{row.revision}</td>
+                      {draft ? (
+                        <td>
+                          <Button tone="ghost" onClick={() => {
+                            const entry = Object.entries(row.specification)[0]
+                            setEditing(row)
+                            setEditPrice(String(row.unitPrice))
+                            setEditCurrency(row.currency)
+                            setEditStockType(row.stockType)
+                            setEditSpecKey(entry?.[0] ?? '')
+                            setEditSpecValue(entry?.[1] ?? '')
+                            setFormError('')
+                          }}>编辑</Button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : skus.data ? <div style={{ padding: '16px 18px' }}><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
+          </Panel>
+        </div>
+        <div className="section-gap">
+          {draft ? (
+            <Panel>
+              <h2>编辑草稿</h2>
+              <StackForm onSubmit={submitEdit} actions={<Button tone="primary" type="submit" disabled={edit.isPending}>保存</Button>}>
+                <Field label="名称"><input value={name} placeholder={current.name} onChange={(event) => setName(event.target.value)} /></Field>
+                <Field label="单价（最小单位）" error={formError}>
+                  <input value={unitPrice} placeholder={String(current.unitPrice)} onChange={(event) => setUnitPrice(event.target.value)} />
+                </Field>
+                <Field label="币种"><input value={currency} placeholder={current.currency} onChange={(event) => setCurrency(event.target.value)} /></Field>
+              </StackForm>
+            </Panel>
+          ) : <StateBanner tone="info" title="已发布快照不可改商品正文" detail="下架不会清理库存或历史快照。" />}
+          {draft ? (
+            <Panel>
+              <h2>追加 SKU</h2>
+              <StackForm onSubmit={submitSku} actions={<Button tone="primary" type="submit" disabled={addSku.isPending}>追加</Button>}>
+                <Field label="skuNo"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} required /></Field>
+                <Field label="单价"><input value={skuPrice} onChange={(event) => setSkuPrice(event.target.value)} required /></Field>
+                <Field label="币种"><input value={skuCurrency} onChange={(event) => setSkuCurrency(event.target.value)} /></Field>
+                <Field label="stockType">
+                  <select value={stockType} onChange={(event) => setStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
+                    <option value="PHYSICAL">PHYSICAL</option>
+                    <option value="SERVICE">SERVICE</option>
+                  </select>
+                </Field>
+                <Field label="规格键"><input value={specKey} onChange={(event) => setSpecKey(event.target.value)} /></Field>
+                <Field label="规格值"><input value={specValue} onChange={(event) => setSpecValue(event.target.value)} /></Field>
+              </StackForm>
+            </Panel>
+          ) : null}
+          {draft && editing ? (
+            <Panel>
+              <h2>编辑 SKU {editing.skuNo}</h2>
+              <StackForm onSubmit={submitSkuEdit} actions={
+                <>
+                  <Button onClick={() => setEditing(undefined)}>取消</Button>
+                  <Button tone="primary" type="submit" disabled={saveSku.isPending}>保存 SKU</Button>
+                </>
+              }>
+                <Field label="单价" error={formError}><input value={editPrice} onChange={(event) => setEditPrice(event.target.value)} required /></Field>
+                <Field label="币种"><input value={editCurrency} onChange={(event) => setEditCurrency(event.target.value)} /></Field>
+                <Field label="stockType">
+                  <select value={editStockType} onChange={(event) => setEditStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
+                    <option value="PHYSICAL">PHYSICAL</option>
+                    <option value="SERVICE">SERVICE</option>
+                  </select>
+                </Field>
+                <Field label="规格键"><input value={editSpecKey} onChange={(event) => setEditSpecKey(event.target.value)} /></Field>
+                <Field label="规格值"><input value={editSpecValue} onChange={(event) => setEditSpecValue(event.target.value)} /></Field>
+              </StackForm>
+            </Panel>
+          ) : null}
+        </div>
+      </div>
+      {confirm === 'publish' ? (
+        <ConfirmDialog
+          title="发布商品"
+          description="发布后快照不可改商品正文。目录价仍不是可付金额。"
+          confirmLabel="确认发布"
+          tone="primary"
+          pending={publish.isPending}
+          onClose={() => setConfirm(undefined)}
+          onConfirm={() => publish.mutate({ expectedVersion: current.version })}
+        />
+      ) : null}
+      {confirm === 'unpublish' ? (
+        <ConfirmDialog
+          title="下架商品"
+          description="下架不会清理库存或历史快照。"
+          confirmLabel="确认下架"
+          pending={unpublish.isPending}
+          onClose={() => setConfirm(undefined)}
+          onConfirm={() => unpublish.mutate({ expectedVersion: current.version })}
+        />
+      ) : null}
+    </div>
+  )
+}

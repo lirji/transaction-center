@@ -1,0 +1,95 @@
+import { useState, type FormEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button, CursorPager, Field, PageHeader, Panel, StackForm } from '../../components/ui'
+import { api } from '../../shared/api/client'
+import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
+
+export function ConsentsPage() {
+  const [after, setAfter] = useState(0)
+  const [purpose, setPurpose] = useState('')
+  const [documentVersion, setDocumentVersion] = useState('')
+  const [title, setTitle] = useState('')
+  const [contentUrl, setContentUrl] = useState('')
+  const [contentHash, setContentHash] = useState('')
+  const [formError, setFormError] = useState('')
+  const queryClient = useQueryClient()
+  const query = useQuery({ queryKey: ['consent-documents', after], queryFn: () => api.consentDocuments(after) })
+  const publish = useMutation({
+    mutationFn: api.publishConsentDocument,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['consent-documents'] })
+    },
+  })
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    setFormError('')
+    if (!purpose.trim() || !documentVersion.trim() || !title.trim()) {
+      setFormError('用途、版本和标题不能为空')
+      return
+    }
+    if (!contentUrl.startsWith('https://')) {
+      setFormError('发布 URL 必须是 HTTPS')
+      return
+    }
+    if (!/^[0-9a-f]{64}$/.test(contentHash.trim())) {
+      setFormError('contentHash 必须是 64 位小写十六进制 SHA-256')
+      return
+    }
+    publish.mutate({
+      purpose: purpose.trim(),
+      documentVersion: documentVersion.trim(),
+      title: title.trim(),
+      contentUrl: contentUrl.trim(),
+      contentHash: contentHash.trim(),
+    })
+  }
+
+  return (
+    <div className="workspace">
+      <PageHeader
+        eyebrow="Consent"
+        title="条款文档"
+        description="后台发布不可变版本后再给会员展示。服务端不抓取远端正文，也不把列表中的任一版本暗中当成已同意。注册不会自动勾选营销条款。"
+      />
+      <div className="page-grid">
+        <Panel className="table-panel">
+          <QueryGate query={query} emptyTitle="尚未发布条款" emptyDetail="发布后会出现在本租户列表。不要按 documentVersion 字符串排序当最新。">
+            {(rows) => (
+              <>
+                <table className="data-table">
+                  <thead><tr><th>用途 / 版本</th><th>标题</th><th>摘要</th></tr></thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.id}>
+                        <td><strong>{row.purpose}</strong><small className="mono">{row.documentVersion}</small></td>
+                        <td>{row.title}<small><a href={row.contentUrl} target="_blank" rel="noreferrer">{row.contentUrl}</a></small></td>
+                        <td className="mono">{row.contentHash.slice(0, 12)}…</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
+              </>
+            )}
+          </QueryGate>
+        </Panel>
+        <Panel>
+          <h2>发布新版本</h2>
+          <MutationBanner error={publish.error} success={publish.data ? `已发布 resourceId=${publish.data.resourceId}` : undefined} />
+          <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={publish.isPending}>发布</Button>}>
+            <Field label="purpose"><input value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={64} /></Field>
+            <Field label="documentVersion"><input value={documentVersion} onChange={(event) => setDocumentVersion(event.target.value)} maxLength={64} /></Field>
+            <Field label="标题"><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} /></Field>
+            <Field label="contentUrl" hint="必须 HTTPS，页面应展示与 contentHash 对应的内容。">
+              <input value={contentUrl} onChange={(event) => setContentUrl(event.target.value)} maxLength={1000} />
+            </Field>
+            <Field label="contentHash" error={formError}>
+              <input value={contentHash} onChange={(event) => setContentHash(event.target.value)} className="mono" />
+            </Field>
+          </StackForm>
+        </Panel>
+      </div>
+    </div>
+  )
+}

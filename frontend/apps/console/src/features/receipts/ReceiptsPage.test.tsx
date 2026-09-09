@@ -1,0 +1,28 @@
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ReceiptsPage } from './ReceiptsPage'
+import { renderWithApp } from '../../test/render'
+import { adminPage, json } from '../../test/admin-fixtures'
+
+describe('ReceiptsPage', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not request when abnormalOnly conflicts with NORMAL', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValue(json(adminPage([])))
+    renderWithApp(<ReceiptsPage />, { route: '/receipts' })
+    await userEvent.selectOptions(screen.getByLabelText('disposition'), 'NORMAL')
+    await userEvent.selectOptions(screen.getByLabelText('abnormalOnly'), 'true')
+    await userEvent.click(screen.getByRole('button', { name: '查询' }))
+    expect(await screen.findByText(/互斥/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.every((call) => !String(call[0]).includes('disposition=NORMAL') || !String(call[0]).includes('abnormalOnly=true'))).toBe(true)
+    })
+  })
+})
