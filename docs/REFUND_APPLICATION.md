@@ -1,5 +1,7 @@
 # 正常退款申请与内部执行合同
 
+> 时效说明（2026-09-08）：本文保留 V014 申请层切片，正文“尚未交付”及后台尚未运行的描述属于当时状态。当前已有 [审批 HTTP](REFUND_APPROVAL_HTTP.md)、[耐久回调](REFUND_CALLBACK_INBOX.md)、[恢复 Worker](REFUND_RECOVERY_WORKER.md)、异常补偿及履约退货入口。后台是否实际处理由部署开关决定，真实渠道仍需接入；总流程见 [业务说明](BUSINESS_GUIDE.md)。
+
 状态：V014内部实现通过183项全量回归并已共享迁移；35表/469字段中文注释完整。沿用已批准交易中心完整计划及REFUND_IMPLEMENTATION_PLAN.md，不缩减TC20～25/27/29。实际验证结果以VERIFICATION.md为准；内部验证不替代下列外部交付边界。
 
 ## 交付边界

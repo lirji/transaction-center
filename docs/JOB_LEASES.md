@@ -1,5 +1,7 @@
 # 可恢复任务租约设计
 
+> 时效说明（2026-09-08）：本文保留 V008 租约基础及历史验收；正文“尚无常驻/公平调度”等属于当时状态。当前已有八类常驻通道、租户轮转和有界线程，见 [Worker 合同](WORKER_RUNTIME_PLAN.md) 与 [高并发设计](HIGH_CONCURRENCY_DESIGN.md)。默认开关关闭不等于代码未实现。
+
 ## 范围与依据
 
 沿用已批准FINAL_PLAN第6／8节、DATABASE_DESIGN的tc_job_lease及TC-31／32。新增transaction-jobs，不添加调度中间件；支付只依赖core中的JobSchedulerPort，jobs实现该端口并独占自身Mapper。前端无变化，HTTP合同不增加。

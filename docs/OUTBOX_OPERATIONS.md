@@ -1,5 +1,7 @@
 # 后台发布队列与永久受控重放
 
+> 时效说明（2026-09-08）：本文保留 V023 受控重放合同；后续 [V024 维护](OUTBOX_MAINTENANCE_OPERATIONS.md) 已实现可选的周期历史补漏，正文末尾“历史全租户补漏尚未完成”为当时范围。默认关闭，是否运行取决于部署配置。
+
 代码已接入，验证状态以任务检查点为准。发布事件队列、异常任务队列和重放分别为：
 
 - GET `/api/v1/trade/admin/outbox-publications?state=REVIEW&after=0&limit=50`：要求trade.admin，最多100条本租户元数据，状态PENDING/SENT/REVIEW；无payload。

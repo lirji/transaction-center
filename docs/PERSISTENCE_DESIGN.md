@@ -1,5 +1,7 @@
 # 交易中心持久化分层设计
 
+> 时效说明（2026-09-08）：本文保留早期 Mapper 分层切片记录；正文的 HTTP 数量和当时待实现范围不是当前总量。当前 OpenAPI 为 55 路径/66 操作（2026-09-08 文件统计），整体分层与数据现状见 [项目架构](PROJECT_ARCHITECTURE.md) 和 [数据架构](DATA_ARCHITECTURE.md)。
+
 ## 决策
 
 采用MyBatis Mapper接口＋XML，SQL不写在生产Java、SQL注解或Provider中。Starter固定4.0.1，复用Spring Boot 4.0.2、现有Hikari数据源及Spring事务，不增加数据库或其他中间件。
