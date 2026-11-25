@@ -90,7 +90,9 @@
   </update>
   <select id="pendingCheckoutOrder" useCache="false" resultType="java.lang.Long">
     SELECT native_order_id FROM tc_checkout_pilot_quote_ref
-    WHERE tenant_id=#{tenant} AND native_order_id=#{order} FOR SHARE
+    WHERE tenant_id=#{tenant} AND native_order_id=#{order}
+      AND (funding_receipt_hash IS NULL OR funding_valid_until &lt;= UTC_TIMESTAMP(3))
+    FOR SHARE
   </select>
   <update id="cancel">
     UPDATE tc_order SET status=#{status},cancel_reason=#{reason},cancelled_at=#{cancelled},updated_at=#{now},version=version+1

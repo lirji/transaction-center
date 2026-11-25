@@ -35,4 +35,10 @@ V036 在一个本地事务内保留原生报价、逐行原价与折扣、原生
 
 新入口使用 `TRADE_CHECKOUT_PILOT_ORDER_ENABLED`，默认关闭。启用时同时配置同一前缀的 `NATIVE_MERCHANT_NO`、`MEMBER_LINKS`（交易会员主键到商城会员标识的 JSON 对象）和 `SKU_LINKS`（商城 SKU 到 `commerceRevision`、`tradeSkuId`、`tradeRevision` 的 JSON 对象）。买家及规格一对一，分别至多 1000 位与 50 个。两侧规格版本均须匹配，同价重发也需要更新配对。映射由实际责任方确认后通过受控部署配置注入。
 
-预算回执接通前，试点原生订单进入待支付，尝试支付返回 409 和 `CHECKOUT_PILOT_FUNDING_PENDING`，不会生成意图或渠道请求。仅关闭新下单开关时，已有试点订单依旧受付款拦截，获授权机器仍可查询证据。部署启用前须确认每个支付实例已支持门禁。若要回退到缺少该门禁的应用版本，先停止新下单并取消待支付试点订单，再核对库存释放和付款状态。
+## 预算回执与支付门禁
+
+资金服务读取原生订单证据中的 `financialStatus` 和 `paidAt`，只按可信已付事实核销预算，或在交易订单可靠取消后释放预算。`PENDING_PAYMENT` 和 `CLOSING` 期间均保留预留。
+
+结算机器使用 `trade.checkout-pilot.funding` 调用 `POST /internal/v1/checkout-pilot/quote-references/{reference}:funding`，请求仅含 `fundingReceipt`。V037 验证独立资金 Ed25519 签名及用途 `marketing.checkout-funding/v1`，比对两侧租户、门店、范围版本、原生订单、原签价摘要、币种、优惠分值、应付分值和订单有效期。首次回执与支付和取消共用订单行锁。重复提交同一份回执返回原确认，其他回执返回 409。预算回执未安装时，正常支付入口返回 409 和 `CHECKOUT_PILOT_FUNDING_PENDING`，不会生成支付意图。
+
+`TRADE_CHECKOUT_PILOT_FUNDING_ENABLED` 默认关闭。启用时配置 `TRADE_CHECKOUT_PILOT_FUNDING_KEY_ID` 和标准 Base64 X.509 公钥 `TRADE_CHECKOUT_PILOT_FUNDING_PUBLIC_KEY`，两者均与签价密钥独立。暂停时先关闭新下单，保留证据查询和对账。变更用于收款的服务版本前，先确认全部活跃实例已支持回执门禁。回退至缺少门禁的版本前，应先清理待付款及在途试点订单并核对预算。

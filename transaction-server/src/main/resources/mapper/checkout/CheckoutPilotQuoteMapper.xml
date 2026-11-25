@@ -42,10 +42,17 @@
             q.order_request_hash AS requestHash, q.scope_version AS scopeVersion, q.store_id AS storeId,
             q.price_proof_hash AS proofHash, o.currency AS currency, CAST(o.gross_amount AS CHAR) AS grossMinor,
             CAST(o.discount_amount AS CHAR) AS discountMinor, CAST(o.payable_amount AS CHAR) AS payableMinor,
-            o.status AS orderStatus, o.expires_at AS orderExpiresAt
+            o.status AS orderStatus, o.expires_at AS orderExpiresAt, o.financial_status AS financialStatus,
+            o.paid_at AS paidAt, q.funding_receipt_hash AS fundingReceiptHash
         FROM tc_checkout_pilot_quote_ref q JOIN tc_order o ON o.tenant_id=q.tenant_id AND o.id=q.native_order_id
         WHERE q.tenant_id=#{tenant} AND q.quote_ref=#{reference}
     </select>
+    <update id="acceptFunding">
+        UPDATE tc_checkout_pilot_quote_ref SET funding_application_id=#{funding.applicationId},
+            funding_receipt_hash=#{funding.receiptHash}, funding_valid_until=#{funding.validUntil}
+        WHERE tenant_id=#{tenant} AND quote_ref=#{funding.reference} AND native_order_id=#{funding.orderId}
+          AND funding_receipt_hash IS NULL AND #{funding.validUntil} &gt; UTC_TIMESTAMP(3)
+    </update>
     <update id="freeze">
         UPDATE tc_checkout_pilot_quote_ref
         SET price_proof_hash = #{price.proofHash}, price_proof = #{price.proof}, gross_minor = #{price.grossMinor},

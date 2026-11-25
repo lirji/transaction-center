@@ -28,6 +28,8 @@ public interface CheckoutPilotQuoteMapper {
 
     /** 从交易自己的订单复核当前可支付状态及关联证据，不外传原始签名和买家字段。 */
     Optional<BoundOrder> findBoundOrder(@Param("tenant") long tenant, @Param("reference") String reference);
+    /** 仅首份有效预算回执可以开放试点订单支付。 */
+    int acceptFunding(@Param("tenant") long tenant, @Param("funding") FundingBinding funding);
 
     /** 一次写入且验证原报价未过期；竞争失败后读取首份有效回执。 */
     int freeze(@Param("tenant") long tenant, @Param("price") FrozenPrice price);
@@ -49,5 +51,9 @@ public interface CheckoutPilotQuoteMapper {
     /** 受控查询所需的报价与原生订单事实。 */
     record BoundOrder(String orderId, String orderNo, String nativeQuoteId, String requestHash, String scopeVersion,
                       String storeId, String proofHash, String currency, String grossMinor, String discountMinor,
-                      String payableMinor, String orderStatus, Instant orderExpiresAt) { }
+                      String payableMinor, String orderStatus, Instant orderExpiresAt, String financialStatus,
+                      Instant paidAt, String fundingReceiptHash) { }
+
+    /** 已核验预算回执只写入与原生订单同一行的交易证据。 */
+    record FundingBinding(String reference, long orderId, String applicationId, String receiptHash, Instant validUntil) { }
 }

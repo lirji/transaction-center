@@ -60,7 +60,8 @@ import tools.jackson.databind.ObjectMapper;
     "trade.checkout-pilot.marketing-tenant=lc02-pilot", "trade.checkout-pilot.marketing-organization=lc02-retail",
     "trade.checkout-pilot.marketing-shop=lc02-store-a", "trade.checkout-pilot.marketing-campaign=lc02-threshold",
     "trade.checkout-pilot.marketing-funder=lc02-mug-r1", "trade.checkout-pilot.order-enabled=true",
-    "trade.checkout-pilot.native-merchant-no=lc02-trade-merchant"
+    "trade.checkout-pilot.native-merchant-no=lc02-trade-merchant", "trade.checkout-pilot.funding-enabled=true",
+    "trade.checkout-pilot.funding-key-id=funding-test"
 })
 class CheckoutPilotQuoteTest {
     private static final String ISSUER = "https://checkout.test";
@@ -74,6 +75,7 @@ class CheckoutPilotQuoteTest {
     private static final String UNAVAILABLE_QUOTE = UUID.randomUUID().toString();
     private static final Instant SOURCE_EXPIRY = Instant.now().plusSeconds(240).truncatedTo(ChronoUnit.MILLIS);
     private static final KeyPair MARKETING_KEY = signingKey();
+    private static final KeyPair FUNDING_KEY = signingKey();
     private static final byte[] ADDRESS_KEY = new java.security.SecureRandom().generateSeed(32);
     private static final AtomicInteger CALLED = new AtomicInteger();
     private static final AtomicInteger STORE_VERSION = new AtomicInteger();
@@ -95,6 +97,8 @@ class CheckoutPilotQuoteTest {
         registry.add("trade.checkout-pilot.caller-key", () -> Checks.hash(ISSUER, SUBJECT));
         registry.add("trade.checkout-pilot.marketing-public-key", () ->
             Base64.getEncoder().encodeToString(MARKETING_KEY.getPublic().getEncoded()));
+        registry.add("trade.checkout-pilot.funding-public-key", () ->
+            Base64.getEncoder().encodeToString(FUNDING_KEY.getPublic().getEncoded()));
         registry.add("trade.checkout-pilot.member-links", () -> "{\"1\":\"commerce-buyer\",\"2\":\"another-commerce-buyer\"}");
         registry.add("trade.checkout-pilot.sku-links", () ->
             "{\"lc02-mug-a\":{\"commerceRevision\":1,\"tradeSkuId\":1,\"tradeRevision\":4}}");
@@ -286,10 +290,41 @@ class CheckoutPilotQuoteTest {
         assertEquals(409, forbidden.statusCode(), forbidden.body());
         assertEquals(OrderService.CHECKOUT_FUNDING_PENDING, json.readTree(forbidden.body()).path("code").asString());
         assertEquals(0, total("tc_payment_intent", tenant));
+        assertFundingReceipt(reference, facts);
         var cancel = post("buyer", "/api/v1/trade/orders/" + no + ":cancel", "abort", Map.of("reason", "未预留预算"));
         assertEquals("CANCELLED", json.readTree(http.send(cancel, HttpResponse.BodyHandlers.ofString()).body()).path("status").asString());
         assertEquals(0, inventory.balances(tenant, 0, 5).getFirst().reserved());
         assertEquals(5, inventory.balances(tenant, 0, 5).getFirst().available());
+    }
+
+    private void assertFundingReceipt(String reference, tools.jackson.databind.JsonNode facts) throws Exception {
+        when(decoder.decode("funding")).thenReturn(jwt("funding", SUBJECT, TENANT, "trade.checkout-pilot.funding"));
+        when(decoder.decode("funding-other")).thenReturn(jwt("funding-other", "different-machine", TENANT, "trade.checkout-pilot.funding"));
+        var claims = new TreeMap<String, String>();
+        for (String key : java.util.List.of("tradeTenantId", "orderId", "scopeVersion", "storeId", "priceProofHash", "currency",
+                "discountMinor", "payableMinor")) claims.put(key, facts.path(key).asString());
+        claims.put("tradeQuoteRef", reference);
+        claims.put("purpose", "marketing.checkout-funding/v1");
+        claims.put("marketingTenantId", "lc02-pilot");
+        claims.put("expiresAt", facts.path("orderExpiresAt").asString());
+        claims.put("applicationId", UUID.randomUUID().toString());
+        String path = CheckoutFundingReceiptController.PATH.replace("{reference}", reference);
+        String token = sign(claims, "funding-test", FUNDING_KEY);
+        assertEquals(403, http.send(post("funding-other", path, "wrong-actor", Map.of("fundingReceipt", token)),
+            HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(409, http.send(post("funding", path, "wrong-signer", Map.of("fundingReceipt", sign(claims))),
+            HttpResponse.BodyHandlers.ofString()).statusCode());
+        var request = post("funding", path, "attach", Map.of("fundingReceipt", token));
+        var first = http.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        var second = http.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        var attached = first.get(15, TimeUnit.SECONDS);
+        var replay = second.get(15, TimeUnit.SECONDS);
+        assertEquals(200, attached.statusCode(), attached.body());
+        assertEquals(200, replay.statusCode(), replay.body());
+        assertEquals(json.readTree(attached.body()), json.readTree(replay.body()));
+        claims.put("applicationId", UUID.randomUUID().toString());
+        assertEquals(409, http.send(post("funding", path, "new-application",
+            Map.of("fundingReceipt", sign(claims, "funding-test", FUNDING_KEY))), HttpResponse.BodyHandlers.ofString()).statusCode());
     }
 
     private int total(String table, long tenant) {
@@ -347,14 +382,18 @@ class CheckoutPilotQuoteTest {
     }
 
     private static String sign(Map<String, String> claims) throws GeneralSecurityException {
+        return sign(claims, "checkout-test", MARKETING_KEY);
+    }
+
+    private static String sign(Map<String, String> claims, String keyId, KeyPair key) throws GeneralSecurityException {
         var base64 = Base64.getUrlEncoder().withoutPadding();
         var canonical = new StringBuilder();
         new TreeMap<>(claims).forEach((name, value) -> canonical.append(name.length()).append(':').append(name)
             .append(value.length()).append(':').append(value));
-        String signingInput = base64.encodeToString("checkout-test".getBytes(StandardCharsets.US_ASCII)) + "."
+        String signingInput = base64.encodeToString(keyId.getBytes(StandardCharsets.US_ASCII)) + "."
             + base64.encodeToString(canonical.toString().getBytes(StandardCharsets.US_ASCII));
         var signer = Signature.getInstance("Ed25519");
-        signer.initSign(MARKETING_KEY.getPrivate());
+        signer.initSign(key.getPrivate());
         signer.update(signingInput.getBytes(StandardCharsets.US_ASCII));
         return signingInput + "." + base64.encodeToString(signer.sign());
     }

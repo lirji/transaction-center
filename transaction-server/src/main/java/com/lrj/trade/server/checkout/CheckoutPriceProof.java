@@ -37,6 +37,11 @@ final class CheckoutPriceProof {
 
     /** 验签后才解析负载，结算协议只接收已定义的 ASCII 字段和有序长度编码。 */
     static Map<String, String> verify(String token, String keyId, PublicKey key) {
+        return verify(token, keyId, key, PURPOSE, FIELDS);
+    }
+
+    /** 同一编码可承载不同用途，验签方必须明确使用对应字段集合和信任密钥。 */
+    static Map<String, String> verify(String token, String keyId, PublicKey key, String purpose, Set<String> allowedFields) {
         try {
             if (token.length() > MAX_PROOF_SIZE) throw invalid();
             String[] parts = token.split("\\.", -1);
@@ -45,8 +50,8 @@ final class CheckoutPriceProof {
             verifier.initVerify(key);
             verifier.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
             if (!verifier.verify(decodeSegment(parts[2]))) throw invalid();
-            var fields = decode(ascii(decodeSegment(parts[1])));
-            if (!fields.keySet().equals(FIELDS) || !PURPOSE.equals(fields.get("purpose"))) throw invalid();
+            var fields = decode(ascii(decodeSegment(parts[1])), allowedFields);
+            if (!fields.keySet().equals(allowedFields) || !purpose.equals(fields.get("purpose"))) throw invalid();
             return fields;
         } catch (GeneralSecurityException failure) {
             throw invalid();
@@ -59,7 +64,7 @@ final class CheckoutPriceProof {
         return bytes;
     }
 
-    private static Map<String, String> decode(String serialized) {
+    private static Map<String, String> decode(String serialized, Set<String> allowedFields) {
         Map<String, String> result = new LinkedHashMap<>();
         int cursor = 0;
         String previous = "";
@@ -69,7 +74,7 @@ final class CheckoutPriceProof {
             String key = serialized.substring(separator + 1, keyEnd);
             int valueSeparator = serialized.indexOf(':', keyEnd);
             int valueEnd = end(serialized, keyEnd, valueSeparator);
-            if (key.compareTo(previous) <= 0 || !FIELDS.contains(key)) throw invalid();
+            if (key.compareTo(previous) <= 0 || !allowedFields.contains(key)) throw invalid();
             result.put(key, serialized.substring(valueSeparator + 1, valueEnd));
             previous = key;
             cursor = valueEnd;

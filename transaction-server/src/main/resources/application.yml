@@ -36,6 +36,9 @@ trade:
     enabled: ${TRADE_CHECKOUT_PILOT_ENABLED:false}
     freeze-enabled: ${TRADE_CHECKOUT_PILOT_FREEZE_ENABLED:false}
     order-enabled: ${TRADE_CHECKOUT_PILOT_ORDER_ENABLED:false}
+    funding-enabled: ${TRADE_CHECKOUT_PILOT_FUNDING_ENABLED:false}
+    funding-key-id: ${TRADE_CHECKOUT_PILOT_FUNDING_KEY_ID:}
+    funding-public-key: ${TRADE_CHECKOUT_PILOT_FUNDING_PUBLIC_KEY:}
     tenant-id: ${TRADE_CHECKOUT_PILOT_TENANT_ID:0}
     caller-key: ${TRADE_CHECKOUT_PILOT_CALLER_KEY:}
     scope-version: ${TRADE_CHECKOUT_PILOT_SCOPE_VERSION:}
