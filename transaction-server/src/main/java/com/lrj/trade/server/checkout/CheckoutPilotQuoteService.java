@@ -32,7 +32,7 @@ public class CheckoutPilotQuoteService {
     public static final String UNAVAILABLE = "CHECKOUT_PILOT_SOURCE_UNAVAILABLE";
     static final String QUOTE_ID_PATTERN = "[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}";
     static final String DIGEST_PATTERN = "[0-9a-f]{64}";
-    private static final String ID_PATTERN = "[A-Za-z0-9_.:-]{1,64}";
+    static final String ID_PATTERN = "[A-Za-z0-9_.:-]{1,64}";
     private static final String SOURCE_PATH = "/internal/v1/checkout-pilot/quotes/{quoteId}";
     private static final int MAX_DISTINCT_ITEMS = 50;
     private final CheckoutPilotQuoteMapper mapper;
@@ -150,6 +150,13 @@ public class CheckoutPilotQuoteService {
     void requireCaller(Actor caller) {
         if (caller.tenantId() != scope.tenantId() || !scope.callerKey().equals(caller.key())) {
             throw new TradeException(UNTRUSTED, "当前机器未获试点报价授权");
+        }
+    }
+
+    /** 买家使用原生交易身份，只在配对租户内获取试点引用。 */
+    void requireBuyerTenant(Actor caller) {
+        if (caller.tenantId() != scope.tenantId()) {
+            throw new TradeException(UNTRUSTED, "当前交易租户未获试点授权");
         }
     }
 

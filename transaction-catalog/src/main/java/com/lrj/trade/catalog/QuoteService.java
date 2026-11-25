@@ -59,7 +59,7 @@ public class QuoteService implements QuotePort {
             long quote=mapper.lastInsertedQuoteId(actor.tenantId());
             for(QuoteItem line:priced) mapper.insertItem(actor.tenantId(),quote,Long.parseLong(line.skuId()),line.skuRevision(),
                 line.title(),Specifications.encode(line.specification()),line.stockType(),line.quantity(),line.unitPrice(),
-                line.payableAmount(),created);
+                0,line.payableAmount(),created);
             audit.append(actor,"quote.create","QUOTE",Long.toString(quote),"创建不可变服务端报价",0,0);
             return Long.toString(quote);
         });
@@ -77,10 +77,43 @@ public class QuoteService implements QuotePort {
         Checks.positive(quoteId);
         long member=members.requireActive(actor);
         Quote quote=load(actor.tenantId(),member,quoteId);
+        if (CheckoutPrice.POLICY.equals(quote.pricingPolicy()))
+            throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "试点报价只能通过原结算入口创建订单");
         for(QuoteItem item:quote.items()) skus.published(actor.tenantId(),Long.parseLong(item.skuId()));
         if(!clock.instant().isBefore(quote.expiresAt()))
             throw new TradeException("QUOTE_EXPIRED","报价已过期，请重新获取报价");
         return quote;
+    }
+
+    /** 复用原生规格锁与快照写入，商品价格已变化时整笔试点下单回滚。 */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Quote createCheckout(Actor actor, CheckoutPrice price) {
+        long tenant = actor.tenantId();
+        long member = members.requireActive(actor);
+        List<QuoteItem> items = new ArrayList<>();
+        long payable = 0;
+        for (var line : price.lines().stream().sorted(Comparator.comparingLong(CheckoutPrice.Line::skuId)).toList()) {
+            var sku = skus.published(tenant, line.skuId());
+            if (!price.currency().equals(sku.currency()) || line.unitPrice() != sku.unitPrice())
+                throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "原生商品价格已变化，请重新报价");
+            items.add(new QuoteItem(sku.skuId(), sku.revision(), sku.title(), sku.specification(), sku.stockType(),
+                line.quantity(), sku.unitPrice(), line.payableAmount()));
+            payable = Math.addExact(payable, line.payableAmount());
+        }
+        var created = clock.instant().truncatedTo(ChronoUnit.MILLIS);
+        if (items.isEmpty() || payable <= 0 || payable != price.payableAmount() || !created.isBefore(price.expiresAt()))
+            throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "试点报价已失效或应付校验失败");
+        mapper.insertQuote(tenant, member, payable, price.currency(), CheckoutPrice.POLICY, created, price.expiresAt());
+        long quote = mapper.lastInsertedQuoteId(tenant);
+        for (var item : items) {
+            mapper.insertItem(tenant, quote, Long.parseLong(item.skuId()), item.skuRevision(), item.title(),
+                Specifications.encode(item.specification()), item.stockType(), item.quantity(), item.unitPrice(),
+                Math.multiplyExact(item.unitPrice(), item.quantity()) - item.payableAmount(), item.payableAmount(), created);
+        }
+        audit.append(actor, "quote.create", "QUOTE", Long.toString(quote), "创建试点原生报价", 0, 0);
+        return new Quote(Long.toString(quote), payable, price.currency(), CheckoutPrice.POLICY, created, price.expiresAt(),
+            List.copyOf(items));
     }
     private Quote load(long tenant,long member,long quoteId) {
         QuoteHeader header=mapper.findOwn(tenant,member,quoteId).stream().findFirst()

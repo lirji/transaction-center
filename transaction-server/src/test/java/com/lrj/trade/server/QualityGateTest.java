@@ -69,6 +69,8 @@ class QualityGateTest {
                             .replace("import com.lrj.trade.payment.PaymentChannelPort;","")
                             .replace("import com.lrj.trade.payment.PaymentRiskPort;","")
                             .replace("import com.lrj.trade.catalog.QuotePort;","")
+                            .replace("import com.lrj.trade.catalog.model.Quote;","")
+                            .replace("import com.lrj.trade.catalog.model.CheckoutPrice;","")
                             .replace("import com.lrj.trade.inventory.InventoryReturnPort;","")
                             .replace("import com.lrj.trade.inventory.InventoryTradingPort;","");
                         assertFalse(checked.contains("com.lrj.trade."+other+"."),file.toString());

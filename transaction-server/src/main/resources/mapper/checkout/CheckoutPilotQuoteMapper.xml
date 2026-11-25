@@ -27,6 +27,25 @@
         SELECT <include refid="quoteReferenceColumns"/> FROM tc_checkout_pilot_quote_ref
         WHERE tenant_id = #{tenant} AND quote_ref = #{reference}
     </select>
+    <select id="lockByReference" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$QuoteReference">
+        SELECT <include refid="quoteReferenceColumns"/> FROM tc_checkout_pilot_quote_ref
+        WHERE tenant_id = #{tenant} AND quote_ref = #{reference} FOR UPDATE
+    </select>
+    <update id="bindOrder">
+        UPDATE tc_checkout_pilot_quote_ref SET native_order_id=#{binding.orderId}, order_request_hash=#{binding.requestHash},
+            order_bound_at=#{binding.boundAt}
+        WHERE tenant_id=#{tenant} AND quote_ref=#{binding.quoteRef} AND native_order_id IS NULL
+          AND price_proof_hash=#{binding.proofHash} AND price_expires_at &gt; UTC_TIMESTAMP(3)
+    </update>
+    <select id="findBoundOrder" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$BoundOrder">
+        SELECT CAST(o.id AS CHAR) AS orderId, o.order_no AS orderNo, CAST(o.quote_id AS CHAR) AS nativeQuoteId,
+            q.order_request_hash AS requestHash, q.scope_version AS scopeVersion, q.store_id AS storeId,
+            q.price_proof_hash AS proofHash, o.currency AS currency, CAST(o.gross_amount AS CHAR) AS grossMinor,
+            CAST(o.discount_amount AS CHAR) AS discountMinor, CAST(o.payable_amount AS CHAR) AS payableMinor,
+            o.status AS orderStatus, o.expires_at AS orderExpiresAt
+        FROM tc_checkout_pilot_quote_ref q JOIN tc_order o ON o.tenant_id=q.tenant_id AND o.id=q.native_order_id
+        WHERE q.tenant_id=#{tenant} AND q.quote_ref=#{reference}
+    </select>
     <update id="freeze">
         UPDATE tc_checkout_pilot_quote_ref
         SET price_proof_hash = #{price.proofHash}, price_proof = #{price.proof}, gross_minor = #{price.grossMinor},

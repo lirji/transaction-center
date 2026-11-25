@@ -36,6 +36,7 @@ public class Errors {
             case "ORDER_ATTRIBUTION_UNTRUSTED" -> 403;
             case com.lrj.trade.server.checkout.CheckoutPilotQuoteService.UNTRUSTED -> 403;
             case com.lrj.trade.server.checkout.CheckoutPilotQuoteService.CONFLICT -> 409;
+            case com.lrj.trade.order.OrderService.CHECKOUT_FUNDING_PENDING -> 409;
             case com.lrj.trade.server.checkout.CheckoutPilotQuoteService.UNAVAILABLE -> 503;
             case "ORDER_ATTRIBUTION_TRANSACTION","ORDER_ATTRIBUTION_CONSUMED" -> 409;
             case "NOT_FOUND" -> 404;

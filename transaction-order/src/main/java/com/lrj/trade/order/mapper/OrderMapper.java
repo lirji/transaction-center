@@ -23,7 +23,8 @@ public interface OrderMapper {
     int insertOrder(@Param("tenant") long tenant,@Param("number") String number,@Param("member") long member,
         @Param("quote") long quote,@Param("merchantId") long merchantId,@Param("merchantNo") String merchantNo,
         @Param("warehouse") Long warehouse,@Param("status") String status,@Param("financial") String financial,
-        @Param("amount") long amount,@Param("currency") String currency,@Param("created") Instant created,@Param("expires") Instant expires);
+        @Param("gross") long gross,@Param("discount") long discount,@Param("amount") long amount,
+        @Param("currency") String currency,@Param("created") Instant created,@Param("expires") Instant expires);
     /** 读取当前会员订单，不能以知道订单编号绕过归属。 */
     List<OrderHeader> findOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("number") String number);
     /** 在支付许可或取消前锁定同一订单行，阻止跨终态并发更新。 */
@@ -34,7 +35,8 @@ public interface OrderMapper {
     int insertItem(@Param("tenant") long tenant,@Param("order") long order,@Param("sku") long sku,
         @Param("revision") long revision,@Param("title") String title,@Param("specification") String specification,
         @Param("type") String type,@Param("quantity") long quantity,@Param("price") long price,
-        @Param("amount") long amount,@Param("reservation") String reservation,@Param("created") Instant created);
+        @Param("gross") long gross,@Param("discount") long discount,@Param("amount") long amount,
+        @Param("reservation") String reservation,@Param("created") Instant created);
     /** 读取明细按SKU排序，与创建预占及取消释放使用相同锁序。 */
     List<OrderItemRow> items(@Param("tenant") long tenant,@Param("order") long order);
     /** 仅写入密文，字段用途与订单已通过加密关联数据绑定。 */
@@ -42,6 +44,8 @@ public interface OrderMapper {
         @Param("phone") byte[] phone,@Param("address") byte[] address,@Param("keyVersion") String keyVersion,@Param("created") Instant created);
     /** 首次许可支付写入屏障；后续渠道模块不得在未获得许可时调用渠道。 */
     int markPaymentStarted(@Param("tenant") long tenant,@Param("order") long order,@Param("version") long version,@Param("now") Instant now);
+    /** 原生试点订单须等待独立确认的资金预留，常规订单没有此门禁。 */
+    Long pendingCheckoutOrder(@Param("tenant") long tenant, @Param("order") long order);
     /** 无支付许可时直接取消，有支付许可时只能进入CLOSING等待可靠终态。 */
     int cancel(@Param("tenant") long tenant,@Param("order") long order,@Param("version") long version,
         @Param("status") String status,@Param("reason") String reason,@Param("cancelled") Instant cancelled,@Param("now") Instant now);

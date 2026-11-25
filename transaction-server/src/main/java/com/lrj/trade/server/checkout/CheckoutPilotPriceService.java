@@ -11,6 +11,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +71,7 @@ public class CheckoutPilotPriceService {
 
         // 独立读商城后再写本地，条件更新决定并发胜出者，避免外部请求占用数据库锁。
         var source = quotes.revalidate(row);
-        var frozen = price(row, source, claims, proofHash, token);
+        var frozen = price(row, source, claims, proofHash, token).frozen();
         if (mapper.freeze(tenant, frozen) == 1) return receipt(frozen, proofHash);
         return receipt(mapper.findFrozen(tenant, reference).orElseThrow(CheckoutPilotPriceService::conflict), proofHash);
     }
@@ -96,7 +97,16 @@ public class CheckoutPilotPriceService {
         }
     }
 
-    private FrozenPrice price(QuoteReference row, SourceEvidence source, Map<String, String> claims,
+    /** 创建原生报价前按真实商城与当前信任配置重验已冻结的逐行分值。 */
+    List<PricedLine> checkoutLines(long tenant, QuoteReference row, SourceEvidence source, FrozenPrice frozen) {
+        if (!CheckoutPriceProof.sha256(frozen.proof()).equals(frozen.proofHash())) throw conflict();
+        var claimed = verify(frozen.proof(), tenant, row, clock.instant());
+        var checked = price(row, source, claimed, frozen.proofHash(), frozen.proof());
+        if (!frozen.equals(checked.frozen())) throw conflict();
+        return checked.lines();
+    }
+
+    private CheckedPrice price(QuoteReference row, SourceEvidence source, Map<String, String> claims,
             String proofHash, String token) {
         var lines = source.items().stream().sorted(Comparator.comparing(SourceLine::skuId)).toList();
         if (!quotes.digest(source).equals(claims.get("sourceDigest"))
@@ -108,6 +118,7 @@ public class CheckoutPilotPriceService {
         if (pricedLines.length != lines.size()) throw conflict();
         long gross = 0;
         long payable = 0;
+        List<PricedLine> result = new ArrayList<>(lines.size());
         try {
             for (int index = 0; index < lines.size(); index++) {
                 var line = lines.get(index);
@@ -116,11 +127,13 @@ public class CheckoutPilotPriceService {
                         || !Integer.toString(line.quantity()).equals(priced[2]) || !line.unitPriceMinor().equals(priced[3])) {
                     throw conflict();
                 }
-                long original = Math.multiplyExact(line.quantity(), minor(line.unitPriceMinor()));
+                long unitPrice = minor(line.unitPriceMinor());
+                long original = Math.multiplyExact(line.quantity(), unitPrice);
                 long net = minor(priced[4]);
                 if (net > original || (!source.eligibleSkuId().equals(line.skuId()) && net != original)) throw conflict();
                 gross = Math.addExact(gross, original);
                 payable = Math.addExact(payable, net);
+                result.add(new PricedLine(line.skuId(), line.quantity(), unitPrice, net));
             }
             long discount = gross - payable;
             // 原生交易金额需能无损传输，本试点仅验收需要支付的订单。
@@ -129,7 +142,8 @@ public class CheckoutPilotPriceService {
                 throw conflict();
             }
             var expiresAt = Instant.parse(claims.get("expiresAt")).truncatedTo(ChronoUnit.MILLIS);
-            return new FrozenPrice(row.quoteRef(), proofHash, token, gross, discount, payable, expiresAt);
+            return new CheckedPrice(new FrozenPrice(row.quoteRef(), proofHash, token, gross, discount, payable, expiresAt),
+                List.copyOf(result));
         } catch (ArithmeticException | IllegalArgumentException invalid) {
             throw conflict();
         }
@@ -159,6 +173,12 @@ public class CheckoutPilotPriceService {
     private static TradeException conflict() {
         return new TradeException(CheckoutPilotQuoteService.CONFLICT, PRICE_ERROR);
     }
+
+    /** 已和原始报价逐字段核对的商品行，可按明确配对生成原生规格报价。 */
+    record PricedLine(String commerceSkuId, int quantity, long unitPrice, long payable) { }
+
+    /** 同一轮验签同时得到冻结金额和原生结算需要的逐行分值。 */
+    private record CheckedPrice(FrozenPrice frozen, List<PricedLine> lines) { }
 
     /** 冻结回执只提供结算金额及原引用，敏感归属和原始签名留在服务端。 */
     public record Receipt(String tradeQuoteRef, String currency, String grossMinor, String discountMinor,

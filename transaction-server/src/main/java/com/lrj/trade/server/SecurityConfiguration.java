@@ -49,6 +49,8 @@ public class SecurityConfiguration {
                     com.lrj.trade.server.checkout.CheckoutPilotQuoteController.PATH).hasAuthority("SCOPE_trade.checkout-pilot.prepare")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,
                     com.lrj.trade.server.checkout.CheckoutPilotPriceController.PATH).hasAuthority("SCOPE_trade.checkout-pilot.freeze")
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                    com.lrj.trade.server.checkout.CheckoutPilotOrderController.EVIDENCE_PATH).hasAuthority("SCOPE_trade.checkout-pilot.order-evidence")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/internal/v1/reconciliation/reports").hasAuthority("SCOPE_trade.reconciliation.report")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/internal/v1/reconciliation/money-facts","/internal/v1/reconciliation/cases/*").hasAuthority("SCOPE_trade.reconciliation.read")
                 .requestMatchers("/internal/v1/first-order-referral-evidence:query","/internal/v1/customer-eligibility:query","/internal/v1/order-referral-evidence:query","/internal/v1/orders/*/referral-evidence").hasAuthority("SCOPE_trade.evidence.read")

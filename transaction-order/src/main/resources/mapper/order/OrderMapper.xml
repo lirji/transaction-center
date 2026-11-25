@@ -56,9 +56,9 @@
   </update>
   <insert id="insertOrder">
     INSERT INTO tc_order(tenant_id,order_no,member_id,quote_id,merchant_id,merchant_no,warehouse_id,status,financial_status,
-      gross_amount,payable_amount,currency,created_at,updated_at,expires_at)
+      gross_amount,discount_amount,payable_amount,currency,created_at,updated_at,expires_at)
     VALUES (#{tenant},#{number},#{member},#{quote},#{merchantId},#{merchantNo},#{warehouse},#{status},#{financial},
-      #{amount},#{amount},#{currency},#{created},#{created},#{expires})
+      #{gross},#{discount},#{amount},#{currency},#{created},#{created},#{expires})
   </insert>
   <select id="findOwn" resultMap="header" useCache="false">
     SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND order_no=#{number}
@@ -72,9 +72,9 @@
   </select>
   <insert id="insertItem">
     INSERT INTO tc_order_item(tenant_id,order_id,sku_id,sku_revision,title,specification,stock_type,quantity,
-      unit_price,gross_amount,payable_amount,reservation_key,created_at,updated_at)
+      unit_price,gross_amount,discount_amount,payable_amount,reservation_key,created_at,updated_at)
     VALUES (#{tenant},#{order},#{sku},#{revision},#{title},#{specification},#{type},#{quantity},
-      #{price},#{amount},#{amount},#{reservation},#{created},#{created})
+      #{price},#{gross},#{discount},#{amount},#{reservation},#{created},#{created})
   </insert>
   <select id="items" resultMap="item" useCache="false">
     SELECT id,sku_id,sku_revision,title,specification,stock_type,quantity,unit_price,payable_amount,reservation_key FROM tc_order_item
@@ -88,6 +88,10 @@
     UPDATE tc_order SET payment_started_at=#{now},updated_at=#{now},version=version+1
     WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='PENDING_PAYMENT' AND payment_started_at IS NULL
   </update>
+  <select id="pendingCheckoutOrder" useCache="false" resultType="java.lang.Long">
+    SELECT native_order_id FROM tc_checkout_pilot_quote_ref
+    WHERE tenant_id=#{tenant} AND native_order_id=#{order} FOR SHARE
+  </select>
   <update id="cancel">
     UPDATE tc_order SET status=#{status},cancel_reason=#{reason},cancelled_at=#{cancelled},updated_at=#{now},version=version+1
     WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='PENDING_PAYMENT'

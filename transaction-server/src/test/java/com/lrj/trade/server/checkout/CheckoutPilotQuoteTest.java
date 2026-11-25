@@ -5,7 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
+import com.lrj.trade.catalog.CatalogService;
+import com.lrj.trade.core.Actor;
 import com.lrj.trade.core.Checks;
+import com.lrj.trade.inventory.InventoryService;
+import com.lrj.trade.member.MemberService;
+import com.lrj.trade.order.MerchantService;
+import com.lrj.trade.order.OrderService;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -53,19 +59,22 @@ import tools.jackson.databind.ObjectMapper;
     "trade.checkout-pilot.freeze-enabled=true", "trade.checkout-pilot.marketing-key-id=checkout-test",
     "trade.checkout-pilot.marketing-tenant=lc02-pilot", "trade.checkout-pilot.marketing-organization=lc02-retail",
     "trade.checkout-pilot.marketing-shop=lc02-store-a", "trade.checkout-pilot.marketing-campaign=lc02-threshold",
-    "trade.checkout-pilot.marketing-funder=lc02-mug-r1"
+    "trade.checkout-pilot.marketing-funder=lc02-mug-r1", "trade.checkout-pilot.order-enabled=true",
+    "trade.checkout-pilot.native-merchant-no=lc02-trade-merchant"
 })
 class CheckoutPilotQuoteTest {
     private static final String ISSUER = "https://checkout.test";
     private static final String SUBJECT = "lc02-checkout-machine";
     private static final String TENANT = "906021";
-    private static final String OWNER = "b".repeat(64);
     private static final String OUTGOING_TOKEN = UUID.randomUUID() + "-" + UUID.randomUUID();
     private static final String ELIGIBLE_QUOTE = UUID.randomUUID().toString();
+    private static final String OWNER = CheckoutPriceProof.sha256(
+        "[\"commerce-checkout-owner-v1\",\"lc02-pilot\",\"commerce-buyer\",\"" + ELIGIBLE_QUOTE + "\"]");
     private static final String UNKNOWN_QUOTE = UUID.randomUUID().toString();
     private static final String UNAVAILABLE_QUOTE = UUID.randomUUID().toString();
     private static final Instant SOURCE_EXPIRY = Instant.now().plusSeconds(240).truncatedTo(ChronoUnit.MILLIS);
     private static final KeyPair MARKETING_KEY = signingKey();
+    private static final byte[] ADDRESS_KEY = new java.security.SecureRandom().generateSeed(32);
     private static final AtomicInteger CALLED = new AtomicInteger();
     private static final AtomicInteger STORE_VERSION = new AtomicInteger();
     private static final HttpServer COMMERCE = commerce();
@@ -86,6 +95,10 @@ class CheckoutPilotQuoteTest {
         registry.add("trade.checkout-pilot.caller-key", () -> Checks.hash(ISSUER, SUBJECT));
         registry.add("trade.checkout-pilot.marketing-public-key", () ->
             Base64.getEncoder().encodeToString(MARKETING_KEY.getPublic().getEncoded()));
+        registry.add("trade.checkout-pilot.member-links", () -> "{\"1\":\"commerce-buyer\",\"2\":\"another-commerce-buyer\"}");
+        registry.add("trade.checkout-pilot.sku-links", () -> "{\"lc02-mug-a\":1}");
+        registry.add("trade.address.key-base64", () -> Base64.getEncoder().encodeToString(ADDRESS_KEY));
+        registry.add("trade.address.key-version", () -> "checkout-test");
     }
 
     @AfterAll
@@ -97,6 +110,10 @@ class CheckoutPilotQuoteTest {
     @MockitoBean JwtDecoder decoder;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
+    @Autowired MemberService members;
+    @Autowired MerchantService merchants;
+    @Autowired CatalogService catalog;
+    @Autowired InventoryService inventory;
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Test
@@ -136,10 +153,12 @@ class CheckoutPilotQuoteTest {
         String stored = jdbc.queryForObject("SELECT JSON_UNQUOTE(JSON_EXTRACT(evidence_json, '$.items[0].unitPriceMinor'))"
             + " FROM tc_checkout_pilot_quote_ref WHERE tenant_id=?", String.class, Long.parseLong(TENANT));
         assertEquals("5900", stored);
-        assertFrozenPrice(prepared.path("tradeQuoteRef").asString(), prepared.path("sourceDigest").asString());
+        String reference = prepared.path("tradeQuoteRef").asString();
+        var proofHash = assertFrozenPrice(reference, prepared.path("sourceDigest").asString());
+        assertNativeOrder(reference, proofHash);
     }
 
-    private void assertFrozenPrice(String reference, String sourceDigest) throws Exception {
+    private String assertFrozenPrice(String reference, String sourceDigest) throws Exception {
         when(decoder.decode("freeze")).thenReturn(jwt("freeze", SUBJECT, TENANT, "trade.checkout-pilot.freeze"));
         when(decoder.decode("freeze-other")).thenReturn(jwt("freeze-other", "other-machine", TENANT, "trade.checkout-pilot.freeze"));
         when(decoder.decode("freeze-wrong-tenant")).thenReturn(jwt("freeze-wrong-tenant", SUBJECT, "906022", "trade.checkout-pilot.freeze"));
@@ -187,6 +206,112 @@ class CheckoutPilotQuoteTest {
         assertEquals(receipt, json.readTree(freeze("freeze", reference, proof).body()));
         assertEquals(409, freeze("freeze", reference, modified(claims, "marketingQuoteId", UUID.randomUUID().toString())).statusCode());
         assertEquals(before, CALLED.get());
+        return CheckoutPriceProof.sha256(proof);
+    }
+
+    private void assertNativeOrder(String reference, String proofHash) throws Exception {
+        long tenant = Long.parseLong(TENANT);
+        var buyer = new Actor(tenant, ISSUER, "buyer");
+        var other = new Actor(tenant, ISSUER, "other-buyer");
+        members.register(buyer, "参与会员");
+        members.register(other, "对照会员");
+        assertEquals("1", members.me(buyer).memberId());
+        assertEquals("2", members.me(other).memberId());
+        merchants.create(buyer, "merchant", "lc02-trade-merchant", "隔离试点商户");
+        long product = Long.parseLong(catalog.create(buyer, "product", "lc02-cup", "陶瓷杯", "native-mug", 6000, "CNY"));
+        catalog.publish(buyer, "publish", product, 0);
+        long sku = Long.parseLong(catalog.detail(tenant, product, false).skuId());
+        assertEquals(1, sku);
+        long warehouse = Long.parseLong(inventory.warehouse(buyer, "warehouse", "lc02", "可售仓"));
+        long empty = Long.parseLong(inventory.warehouse(buyer, "empty", "lc02-empty", "无库存仓"));
+        inventory.adjust(buyer, "stock", warehouse, sku, 5, "隔离验收");
+        when(decoder.decode("buyer")).thenReturn(jwt("buyer", buyer.subject(), TENANT, "trade.member"));
+        when(decoder.decode("other-buyer")).thenReturn(jwt("other-buyer", other.subject(), TENANT, "trade.member"));
+        when(decoder.decode("foreign-buyer")).thenReturn(jwt("foreign-buyer", buyer.subject(), "906022", "trade.member"));
+        when(decoder.decode("read-evidence")).thenReturn(jwt("read-evidence", SUBJECT, TENANT, "trade.checkout-pilot.order-evidence"));
+        when(decoder.decode("wrong-evidence")).thenReturn(jwt("wrong-evidence", other.subject(), TENANT, "trade.checkout-pilot.order-evidence"));
+        String evidence = CheckoutPilotOrderController.EVIDENCE_PATH.replace("{reference}", reference);
+        assertEquals(404, http.send(api("read-evidence", evidence).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403, sendOrder(reference, empty, "other-buyer", "untrusted").statusCode());
+        assertEquals(403, sendOrder(reference, empty, "foreign-buyer", "untrusted").statusCode());
+        assertEquals(409, sendOrder(reference, warehouse, "buyer", "different-native-price").statusCode());
+        catalog.unpublish(buyer, "unpublish", product, 1);
+        catalog.edit(buyer, "correct-price", product, 2, "陶瓷杯", 5900, "CNY");
+        catalog.publish(buyer, "republish", product, 3);
+        STORE_VERSION.incrementAndGet();
+        assertEquals(409, sendOrder(reference, warehouse, "buyer", "stale").statusCode());
+        STORE_VERSION.decrementAndGet();
+        var noStock = sendOrder(reference, empty, "buyer", "needs-stock");
+        assertEquals("INSUFFICIENT_STOCK", json.readTree(noStock.body()).path("code").asString(), noStock.body());
+        assertEquals(0, total("tc_quote", tenant));
+        assertEquals(0, total("tc_order", tenant));
+
+        var first = http.sendAsync(order(reference, warehouse, "buyer", "order-one"), HttpResponse.BodyHandlers.ofString());
+        var second = http.sendAsync(order(reference, warehouse, "buyer", "order-two"), HttpResponse.BodyHandlers.ofString());
+        var opened = first.get(15, TimeUnit.SECONDS);
+        var repeated = second.get(15, TimeUnit.SECONDS);
+        assertEquals(200, opened.statusCode(), opened.body());
+        assertEquals(200, repeated.statusCode(), repeated.body());
+        var nativeOrder = json.readTree(opened.body());
+        assertEquals(nativeOrder, json.readTree(repeated.body()));
+        assertEquals(10800L, nativeOrder.path("payableAmount").asLong());
+        assertEquals(10800L, nativeOrder.path("items").get(0).path("payableAmount").asLong());
+        assertEquals("PENDING_PAYMENT", nativeOrder.path("status").asString());
+        assertEquals(1, total("tc_quote", tenant));
+        assertEquals(1, total("tc_order", tenant));
+        assertEquals(2, inventory.balances(tenant, 0, 5).getFirst().reserved());
+        assertEquals(409, sendOrder(reference, empty, "buyer", "order-one").statusCode());
+        assertEquals(403, sendOrder(reference, warehouse, "other-buyer", "other-again").statusCode());
+
+        assertEquals(403, http.send(api("buyer", evidence).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(403, http.send(api("wrong-evidence", evidence).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+        var response = http.send(api("read-evidence", evidence).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, response.statusCode(), response.body());
+        assertEquals("no-store", response.headers().firstValue("Cache-Control").orElse(""));
+        var facts = json.readTree(response.body());
+        assertEquals(proofHash, facts.path("priceProofHash").asString());
+        assertEquals(nativeOrder.path("orderId"), facts.path("orderId"));
+        assertEquals("11800", facts.path("grossMinor").asString());
+        assertEquals("1000", facts.path("discountMinor").asString());
+        assertEquals("10800", facts.path("payableMinor").asString());
+        assertFalse(facts.has("ownerRef"));
+
+        String no = nativeOrder.path("orderNo").asString();
+        var duplicate = post("buyer", "/api/v1/trade/orders", "regular-order", Map.of("quoteId",
+            nativeOrder.path("quoteId").asString(), "warehouseId", Long.toString(warehouse)));
+        assertEquals(409, http.send(duplicate, HttpResponse.BodyHandlers.ofString()).statusCode());
+        var attempt = post("buyer", "/api/v1/trade/orders/" + no + "/payments", "payment", Map.of("channelCode", "TEST_A", "returnUrlId", "return"));
+        var forbidden = http.send(attempt, HttpResponse.BodyHandlers.ofString());
+        assertEquals(409, forbidden.statusCode(), forbidden.body());
+        assertEquals(OrderService.CHECKOUT_FUNDING_PENDING, json.readTree(forbidden.body()).path("code").asString());
+        assertEquals(0, total("tc_payment_intent", tenant));
+        var cancel = post("buyer", "/api/v1/trade/orders/" + no + ":cancel", "abort", Map.of("reason", "未预留预算"));
+        assertEquals("CANCELLED", json.readTree(http.send(cancel, HttpResponse.BodyHandlers.ofString()).body()).path("status").asString());
+        assertEquals(0, inventory.balances(tenant, 0, 5).getFirst().reserved());
+        assertEquals(5, inventory.balances(tenant, 0, 5).getFirst().available());
+    }
+
+    private int total(String table, long tenant) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE tenant_id=?", Integer.class, tenant);
+    }
+
+    private HttpResponse<String> sendOrder(String reference, long warehouse, String actor, String key) throws Exception {
+        return http.send(order(reference, warehouse, actor, key), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpRequest order(String reference, long warehouse, String actor, String key) {
+        return post(actor, CheckoutPilotOrderController.CREATE_PATH, key, Map.of("tradeQuoteRef", reference, "warehouseId", Long.toString(warehouse),
+            "address", Map.of("recipient", "验收人", "phone", "13900000001", "address", "隔离验收地址")));
+    }
+
+    private HttpRequest post(String actor, String path, String id, Map<String, ?> body) {
+        return api(actor, path).header("Idempotency-Key", id).header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
+    }
+
+    private HttpRequest.Builder api(String actor, String path) {
+        return HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+            .header("Authorization", "Bearer " + actor);
     }
 
     private HttpResponse<String> freeze(String caller, String reference, String proof) throws Exception {

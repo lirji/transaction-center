@@ -35,6 +35,7 @@ trade:
   checkout-pilot:
     enabled: ${TRADE_CHECKOUT_PILOT_ENABLED:false}
     freeze-enabled: ${TRADE_CHECKOUT_PILOT_FREEZE_ENABLED:false}
+    order-enabled: ${TRADE_CHECKOUT_PILOT_ORDER_ENABLED:false}
     tenant-id: ${TRADE_CHECKOUT_PILOT_TENANT_ID:0}
     caller-key: ${TRADE_CHECKOUT_PILOT_CALLER_KEY:}
     scope-version: ${TRADE_CHECKOUT_PILOT_SCOPE_VERSION:}
@@ -51,6 +52,9 @@ trade:
     marketing-shop: ${TRADE_CHECKOUT_PILOT_MARKETING_SHOP:}
     marketing-campaign: ${TRADE_CHECKOUT_PILOT_MARKETING_CAMPAIGN:}
     marketing-funder: ${TRADE_CHECKOUT_PILOT_MARKETING_FUNDER:}
+    native-merchant-no: ${TRADE_CHECKOUT_PILOT_NATIVE_MERCHANT_NO:}
+    member-links: ${TRADE_CHECKOUT_PILOT_MEMBER_LINKS:}
+    sku-links: ${TRADE_CHECKOUT_PILOT_SKU_LINKS:}
   admin-evidence:
     enabled: ${TRADE_ADMIN_EVIDENCE_ENABLED:false}
   admin-query:

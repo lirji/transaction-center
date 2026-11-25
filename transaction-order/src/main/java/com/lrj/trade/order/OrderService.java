@@ -2,6 +2,8 @@ package com.lrj.trade.order;
 
 import com.lrj.trade.core.*;
 import com.lrj.trade.catalog.QuotePort;
+import com.lrj.trade.catalog.model.CheckoutPrice;
+import com.lrj.trade.catalog.model.Quote;
 import com.lrj.trade.member.MemberTradingPort;
 import com.lrj.trade.member.MemberTradeFactPort;
 import com.lrj.trade.inventory.InventoryTradingPort;
@@ -20,6 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** 订单、明细、地址密文、库存及事件共用本地事务，不能留下部分成功订单。 */
 @Service
 public class OrderService implements OrderPaymentPort {
+    public static final String CHECKOUT_FUNDING_PENDING = "CHECKOUT_PILOT_FUNDING_PENDING";
     private static final JsonMapper JSON=JsonMapper.builder().build();
     private final OrderMapper mapper;
     private final com.lrj.trade.order.mapper.OrderAttributionMapper attributions;
@@ -88,48 +91,65 @@ public class OrderService implements OrderPaymentPort {
                 :attributions.replay(actor.tenantId(),actor.key(),"order.create",key),hash);
             if(replay!=null) return replay;
             admission.acquire(actor.tenantId()).requireOrder();
-            var quote=quotes.requireUsable(actor,quoteId);
-            long member=members.memberId(actor);
-            var merchant=merchants.requireActive(actor.tenantId());
-            boolean physical=quote.items().stream().anyMatch(item->item.stockType().equals("PHYSICAL"));
-            if(physical && (warehouse==null || address==null)) throw new TradeException("INVALID_ARGUMENT","实物订单必须指定仓库和收货地址");
-            if(!physical && (warehouse!=null || address!=null)) throw new TradeException("INVALID_ARGUMENT","纯服务订单不能附带仓库或收货个人信息");
-            String no="ORD-"+UUID.randomUUID();
-            EncryptedAddress encrypted=physical?addresses.encrypt(actor.tenantId(),no,address):null;
-            var now=clock.instant().truncatedTo(ChronoUnit.MILLIS);
-            // 商户锁等待或加密耗时之后再验证，避免用刚刚过期的报价创建订单。
-            if(!now.isBefore(quote.expiresAt())) throw new TradeException("QUOTE_EXPIRED","报价已过期");
-            boolean free=quote.payableAmount()==0;
-            if(verified!=null) verified.requireUsable(actor,member,quoteId,now);
-            mapper.insertOrder(actor.tenantId(),no,member,quoteId,Long.parseLong(merchant.merchantId()),merchant.merchantNo(),
-                warehouse,free?"PAID":"PENDING_PAYMENT",free?"NO_PAYMENT_REQUIRED":"UNPAID",
-                quote.payableAmount(),quote.currency(),now,now.plusSeconds(ttl));
-            long order=Long.parseLong(own(actor,member,no,false).orderId());
-            if(verified!=null) {
-                try { attributions.insert(actor.tenantId(),order,no,actor.key(),"order.create",key,hash,verified,now); }
-                catch(org.springframework.dao.DuplicateKeyException conflict) {
-                    throw new TradeException("ORDER_ATTRIBUTION_CONSUMED","订单归因令牌已消费");
-                }
-            }
-            for(var item:quote.items()) {
-                String reservation=item.stockType().equals("PHYSICAL")?no+":"+item.skuId():null;
-                mapper.insertItem(actor.tenantId(),order,Long.parseLong(item.skuId()),item.skuRevision(),item.title(),
-                    JSON.writeValueAsString(item.specification()),item.stockType(),item.quantity(),item.unitPrice(),
-                    item.payableAmount(),reservation,now);
-                if(reservation!=null) {
-                    inventory.reserve(actor,reservation,warehouse,Long.parseLong(item.skuId()),item.quantity());
-                    // 零元订单没有渠道收款，也不设置paidAt或消费首单；仅确认履约库存。
-                    if(free) inventory.confirm(actor,"zero:"+reservation,reservation);
-                }
-            }
-            if(encrypted!=null) mapper.insertAddress(actor.tenantId(),order,encrypted.recipient(),encrypted.phone(),
-                encrypted.address(),encrypted.keyVersion(),now);
-            audit.append(actor,"order.create","ORDER",no,"创建报价订单",0,0);
-            outbox.append(actor.tenantId(),"order.created.internal.v0",no);
-            if(!free) jobs.schedule(actor.tenantId(),JobType.ORDER_RESOLVE,no,now.plusSeconds(ttl));
-            return no;
+            return place(actor, key, quotes.requireUsable(actor,quoteId), warehouse, address, verified, hash, null);
         });
         return read(actor,number);
+    }
+
+    /** 调用方持有试点引用锁，创建原生报价、订单与库存预占后同时提交关系。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public OrderView createCheckout(Actor actor, CheckoutPrice price, Long warehouse, ShippingAddress address, String merchantNo) {
+        admission.acquire(actor.tenantId()).requireOrder();
+        var quote = quotes.createCheckout(actor, price);
+        return read(actor, place(actor, null, quote, warehouse, address, null, null, merchantNo));
+    }
+
+    private String place(Actor actor, String key, Quote quote, Long warehouse, ShippingAddress address,
+            VerifiedOrderAttribution verified, String hash, String checkoutMerchant) {
+        long quoteId=Long.parseLong(quote.quoteId());
+        long member=members.memberId(actor);
+        var merchant=merchants.requireActive(actor.tenantId());
+        if (checkoutMerchant != null && !checkoutMerchant.equals(merchant.merchantNo()))
+            throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "收款商户与试点配对不符");
+        boolean physical=quote.items().stream().anyMatch(item->item.stockType().equals("PHYSICAL"));
+        if(physical && (warehouse==null || address==null)) throw new TradeException("INVALID_ARGUMENT","实物订单必须指定仓库和收货地址");
+        if(!physical && (warehouse!=null || address!=null)) throw new TradeException("INVALID_ARGUMENT","纯服务订单不能附带仓库或收货个人信息");
+        String no="ORD-"+UUID.randomUUID();
+        EncryptedAddress encrypted=physical?addresses.encrypt(actor.tenantId(),no,address):null;
+        var now=clock.instant().truncatedTo(ChronoUnit.MILLIS);
+        // 商户锁等待或加密耗时之后再验证，避免用刚刚过期的报价创建订单。
+        if(!now.isBefore(quote.expiresAt())) throw new TradeException("QUOTE_EXPIRED","报价已过期");
+        boolean free=quote.payableAmount()==0;
+        long gross=quote.items().stream().mapToLong(item -> Math.multiplyExact(item.unitPrice(), item.quantity())).reduce(0, Math::addExact);
+        if(verified!=null) verified.requireUsable(actor,member,quoteId,now);
+        mapper.insertOrder(actor.tenantId(),no,member,quoteId,Long.parseLong(merchant.merchantId()),merchant.merchantNo(),
+            warehouse,free?"PAID":"PENDING_PAYMENT",free?"NO_PAYMENT_REQUIRED":"UNPAID",
+            gross,gross-quote.payableAmount(),quote.payableAmount(),quote.currency(),now,now.plusSeconds(ttl));
+        long order=Long.parseLong(own(actor,member,no,false).orderId());
+        if(verified!=null) {
+            try { attributions.insert(actor.tenantId(),order,no,actor.key(),"order.create",key,hash,verified,now); }
+            catch(org.springframework.dao.DuplicateKeyException conflict) {
+                throw new TradeException("ORDER_ATTRIBUTION_CONSUMED","订单归因令牌已消费");
+            }
+        }
+        for(var item:quote.items()) {
+            String reservation=item.stockType().equals("PHYSICAL")?no+":"+item.skuId():null;
+            long lineGross=Math.multiplyExact(item.unitPrice(),item.quantity());
+            mapper.insertItem(actor.tenantId(),order,Long.parseLong(item.skuId()),item.skuRevision(),item.title(),
+                JSON.writeValueAsString(item.specification()),item.stockType(),item.quantity(),item.unitPrice(),
+                lineGross,lineGross-item.payableAmount(),item.payableAmount(),reservation,now);
+            if(reservation!=null) {
+                inventory.reserve(actor,reservation,warehouse,Long.parseLong(item.skuId()),item.quantity());
+                // 零元订单没有渠道收款，也不设置paidAt或消费首单；仅确认履约库存。
+                if(free) inventory.confirm(actor,"zero:"+reservation,reservation);
+            }
+        }
+        if(encrypted!=null) mapper.insertAddress(actor.tenantId(),order,encrypted.recipient(),encrypted.phone(),
+            encrypted.address(),encrypted.keyVersion(),now);
+        audit.append(actor,"order.create","ORDER",no,"创建报价订单",0,0);
+        outbox.append(actor.tenantId(),"order.created.internal.v0",no);
+        if(!free) jobs.schedule(actor.tenantId(),JobType.ORDER_RESOLVE,no,now.plusSeconds(ttl));
+        return no;
     }
     private String attributionReplay(OrderAttributionReplay row,String hash) {
         if(row==null) return null;
@@ -176,6 +196,9 @@ public class OrderService implements OrderPaymentPort {
             throw new TradeException("STATE_CONFLICT","订单不允许发起支付");
         var now=clock.instant().truncatedTo(ChronoUnit.MILLIS);
         if(!now.isBefore(order.expiresAt())) throw new TradeException("ORDER_EXPIRED","订单已过支付期限");
+        // 支付写路径的门禁不依赖试点开关，关闭接入后存量订单仍须等待资金预留。
+        if (mapper.pendingCheckoutOrder(actor.tenantId(), Long.parseLong(order.orderId())) != null)
+            throw new TradeException(CHECKOUT_FUNDING_PENDING, "试点订单等待营销预算预留");
         if(order.paymentStartedAt()==null && mapper.markPaymentStarted(actor.tenantId(),Long.parseLong(order.orderId()),order.version(),now)!=1)
             throw new TradeException("VERSION_CONFLICT","订单已改变");
         return own(actor,member,number,true);

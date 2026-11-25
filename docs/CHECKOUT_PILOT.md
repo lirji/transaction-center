@@ -25,4 +25,14 @@
 - `COMMERCE_TENANT`、`MERCHANT_ID`、`STORE_ID` 和 `SKU_ID` 采用已签收配对。配置缺失或格式无效会在启用时启动失败。
 - `TRADE_CHECKOUT_PILOT_FREEZE_ENABLED` 默认关闭。启用时配置同一前缀的 `MARKETING_KEY_ID`、`MARKETING_PUBLIC_KEY`、`MARKETING_TENANT`、`MARKETING_ORGANIZATION`、`MARKETING_SHOP`、`MARKETING_CAMPAIGN` 和 `MARKETING_FUNDER`。公钥使用标准 Base64 编码的 X.509 Ed25519 公钥。私钥只由营销签价服务持有。
 
-停用后保留已有审计。原生订单与报价关联、资金预留和付款门禁由后续切片接入。
+## 原生下单
+
+买家以交易 JWT 调用 `POST /api/v1/trade/checkout-pilot/orders`，提交 `Idempotency-Key` 和 `tradeQuoteRef`。实物订单同时使用已有 `warehouseId` 字符串和 `address` 对象。原价、优惠和商品一律由服务端确定。交易以配置的商城会员映射重建报价主体摘要，并重新核对商城的门店与已发布商品。商城 SKU 按明确的一对一映射查找交易当前已发布规格，单价和币种须一致。本交易租户的有效收款商户也必须命中配对。
+
+V036 在一个本地事务内保留原生报价、逐行原价与折扣、原生订单、库存预占及唯一报价关联。同一买家、报价及履约参数可重试，返回同一订单。报价变更、过期、使用旧入口消费试点报价或请求参数冲突时拒绝。库存失败回滚全部写入。买家仍通过标准订单接口读单和取消。
+
+`GET /internal/v1/checkout-pilot/quote-references/{reference}/order-evidence` 要求 `trade.checkout-pilot.order-evidence` 作用域与已配对机器。返回交易租户、试点引用、订单及原生报价编号、范围和商城门店、签名摘要、币种与三个整数分值、订单状态及到期时间。未绑定订单返回 404，响应禁止缓存，会员和地址留在交易。
+
+新入口使用 `TRADE_CHECKOUT_PILOT_ORDER_ENABLED`，默认关闭。启用时同时配置同一前缀的 `NATIVE_MERCHANT_NO`、`MEMBER_LINKS`（交易会员主键到商城会员标识的 JSON 对象）和 `SKU_LINKS`（商城 SKU 到交易规格主键的 JSON 对象）。买家及规格一对一，分别至多 1000 位与 50 个。映射由实际责任方确认后通过受控部署配置注入。
+
+预算回执接通前，试点原生订单进入待支付，尝试支付返回 409 和 `CHECKOUT_PILOT_FUNDING_PENDING`，不会生成意图或渠道请求。停用新入口后，当前服务版本仍为已有试点订单保留付款拦截。部署启用前须确认每个支付实例已支持门禁。若要回退到缺少该门禁的应用版本，先停止新下单并取消待支付试点订单，再核对库存释放和付款状态。

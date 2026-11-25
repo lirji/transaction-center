@@ -34,9 +34,9 @@
   </select>
   <insert id="insertItem">
     INSERT INTO tc_quote_item(tenant_id,quote_id,sku_id,sku_revision,title,specification,stock_type,quantity,
-      unit_price,payable_amount,created_at,updated_at)
+      unit_price,discount_amount,payable_amount,created_at,updated_at)
     VALUES (#{tenant},#{quote},#{sku},#{revision},#{title},#{specification},#{stockType},#{quantity},
-      #{price},#{amount},#{created},#{created})
+      #{price},#{discount},#{amount},#{created},#{created})
   </insert>
   <select id="findOwn" resultMap="header" useCache="false">
     SELECT id,payable_amount,currency,pricing_policy,created_at,expires_at

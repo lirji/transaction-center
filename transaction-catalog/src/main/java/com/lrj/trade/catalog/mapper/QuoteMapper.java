@@ -20,7 +20,7 @@ public interface QuoteMapper {
     int insertItem(@Param("tenant") long tenant,@Param("quote") long quote,@Param("sku") long sku,
         @Param("revision") long revision,@Param("title") String title,@Param("specification") String specification,
         @Param("stockType") String stockType,@Param("quantity") long quantity,@Param("price") long price,
-        @Param("amount") long amount,@Param("created") Instant created);
+        @Param("discount") long discount,@Param("amount") long amount,@Param("created") Instant created);
     /** 同时核对租户与会员，越权与不存在均返回空列表。 */
     List<QuoteHeader> findOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("quote") long quote);
     /** 按规格主键排序，后续订单以相同顺序处理库存锁。 */
