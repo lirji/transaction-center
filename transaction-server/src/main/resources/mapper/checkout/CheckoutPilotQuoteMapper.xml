@@ -23,4 +23,22 @@
         SELECT <include refid="quoteReferenceColumns"/> FROM tc_checkout_pilot_quote_ref
         WHERE tenant_id = #{tenant} AND commerce_quote_id = #{commerceQuoteId} FOR UPDATE
     </select>
+    <select id="findByReference" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$QuoteReference">
+        SELECT <include refid="quoteReferenceColumns"/> FROM tc_checkout_pilot_quote_ref
+        WHERE tenant_id = #{tenant} AND quote_ref = #{reference}
+    </select>
+    <update id="freeze">
+        UPDATE tc_checkout_pilot_quote_ref
+        SET price_proof_hash = #{price.proofHash}, price_proof = #{price.proof}, gross_minor = #{price.grossMinor},
+            discount_minor = #{price.discountMinor}, payable_minor = #{price.payableMinor},
+            price_expires_at = #{price.expiresAt}
+        WHERE tenant_id = #{tenant} AND quote_ref = #{price.quoteRef} AND price_proof_hash IS NULL
+          AND expires_at &gt; UTC_TIMESTAMP(3) AND #{price.expiresAt} &gt; UTC_TIMESTAMP(3)
+    </update>
+    <select id="findFrozen" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$FrozenPrice">
+        SELECT quote_ref AS quoteRef, price_proof_hash AS proofHash, price_proof AS proof, gross_minor AS grossMinor,
+            discount_minor AS discountMinor, payable_minor AS payableMinor, price_expires_at AS expiresAt
+        FROM tc_checkout_pilot_quote_ref
+        WHERE tenant_id = #{tenant} AND quote_ref = #{reference} AND price_proof_hash IS NOT NULL
+    </select>
 </mapper>

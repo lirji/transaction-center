@@ -77,9 +77,7 @@ public class CheckoutPilotQuoteService {
 
     /** 先从主库恢复已有回执，首次外部核验在本地写事务之外执行。 */
     public Prepared prepare(Actor caller, String commerceQuoteId, String ownerRef) {
-        if (caller.tenantId() != scope.tenantId() || !scope.callerKey().equals(caller.key())) {
-            throw new TradeException(UNTRUSTED, "当前机器未获试点报价授权");
-        }
+        requireCaller(caller);
         var prior = mapper.find(scope.tenantId(), commerceQuoteId);
         if (prior.isPresent()) {
             return receipt(prior.get(), ownerRef);
@@ -132,11 +130,47 @@ public class CheckoutPilotQuoteService {
     }
 
     private Prepared receipt(QuoteReference row, String ownerRef) {
-        if (!scope.version().equals(row.scopeVersion()) || !scope.storeId().equals(row.storeId())
-                || !ownerRef.equals(row.ownerRef()) || !clock.instant().isBefore(row.expiresAt())) {
+        requireCurrentScope(row);
+        if (!ownerRef.equals(row.ownerRef())) {
             throw new TradeException(CONFLICT, "原报价引用已过期或不匹配当前结算");
         }
-        return new Prepared(row.quoteRef(), row.commerceQuoteId(), row.scopeVersion(), row.storeId(), row.expiresAt());
+        return new Prepared(row.quoteRef(), row.commerceQuoteId(), row.scopeVersion(), row.storeId(),
+                digest(storedEvidence(row)), row.expiresAt());
+    }
+
+    /** 范围版本或门店变更后，历史试点引用也不得用于恢复报价。 */
+    void requireCurrentScope(QuoteReference row) {
+        if (!scope.version().equals(row.scopeVersion()) || !scope.storeId().equals(row.storeId())
+                || !clock.instant().isBefore(row.expiresAt())) {
+            throw new TradeException(CONFLICT, "原报价引用已过期或不匹配当前结算");
+        }
+    }
+
+    /** 价格冻结沿用准备时的机器授权，重放不能借其他租户或主体访问引用。 */
+    void requireCaller(Actor caller) {
+        if (caller.tenantId() != scope.tenantId() || !scope.callerKey().equals(caller.key())) {
+            throw new TradeException(UNTRUSTED, "当前机器未获试点报价授权");
+        }
+    }
+
+    /** 冻结前重新查询商城活动范围和商品版本；远程请求留在交易写入前。 */
+    SourceEvidence revalidate(QuoteReference row) {
+        requireCurrentScope(row);
+        SourceEvidence evidence = source(row.commerceQuoteId());
+        if (!matches(evidence, row.commerceQuoteId(), row.ownerRef())
+                || !digest(storedEvidence(row)).equals(digest(evidence))) {
+            throw new TradeException(CONFLICT, "商城报价版本已变化，请重新报价");
+        }
+        return evidence;
+    }
+
+    /** 按固定记录字段顺序重建快照，MySQL JSON 的存储顺序不影响摘要。 */
+    String digest(SourceEvidence evidence) {
+        return CheckoutPriceProof.sha256(json.writeValueAsString(evidence));
+    }
+
+    private SourceEvidence storedEvidence(QuoteReference row) {
+        return json.readValue(row.evidenceJson(), SourceEvidence.class);
     }
 
     private static boolean validLine(SourceLine line) {
@@ -163,7 +197,8 @@ public class CheckoutPilotQuoteService {
                          String storeId, String skuId) { }
 
     /** 仅表示已准备的报价引用，冻结价格和支付许可由后续交易报价步骤产生。 */
-    public record Prepared(String tradeQuoteRef, String commerceQuoteId, String scopeVersion, String storeId, Instant expiresAt) { }
+    public record Prepared(String tradeQuoteRef, String commerceQuoteId, String scopeVersion, String storeId,
+                           String sourceDigest, Instant expiresAt) { }
 
     /** 与商城受限读取契约一致，保留报价形成时的金额及版本证据。 */
     record SourceEvidence(String scopeVersion, String tradeTenantId, String commerceTenantId, String merchantId,
