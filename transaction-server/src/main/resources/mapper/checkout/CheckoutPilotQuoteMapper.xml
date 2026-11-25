@@ -5,17 +5,22 @@
         INSERT INTO tc_checkout_pilot_quote_ref (
             quote_ref, tenant_id, commerce_quote_id, owner_ref, scope_version, store_id, evidence_json, expires_at, created_at
         ) VALUES (
-            #{quote.quoteRef}, #{quote.tenantId}, #{quote.commerceQuoteId}, #{quote.ownerRef}, #{quote.scopeVersion},
+            #{quote.quoteRef}, #{tenant}, #{quote.commerceQuoteId}, #{quote.ownerRef}, #{quote.scopeVersion},
             #{quote.storeId}, #{quote.evidenceJson}, #{quote.expiresAt}, #{quote.createdAt}
         )
         ON DUPLICATE KEY UPDATE quote_ref = quote_ref
     </insert>
-    <select id="find" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$QuoteReference">
-        SELECT quote_ref AS quoteRef, tenant_id AS tenantId, commerce_quote_id AS commerceQuoteId, owner_ref AS ownerRef,
+    <sql id="quoteReferenceColumns">
+        quote_ref AS quoteRef, commerce_quote_id AS commerceQuoteId, owner_ref AS ownerRef,
             scope_version AS scopeVersion, store_id AS storeId, CAST(evidence_json AS CHAR) AS evidenceJson,
             expires_at AS expiresAt, created_at AS createdAt
-        FROM tc_checkout_pilot_quote_ref
-        WHERE tenant_id = #{tenantId} AND commerce_quote_id = #{commerceQuoteId}
-        <if test="lock">FOR UPDATE</if>
+    </sql>
+    <select id="find" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$QuoteReference">
+        SELECT <include refid="quoteReferenceColumns"/> FROM tc_checkout_pilot_quote_ref
+        WHERE tenant_id = #{tenant} AND commerce_quote_id = #{commerceQuoteId}
+    </select>
+    <select id="lock" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper$QuoteReference">
+        SELECT <include refid="quoteReferenceColumns"/> FROM tc_checkout_pilot_quote_ref
+        WHERE tenant_id = #{tenant} AND commerce_quote_id = #{commerceQuoteId} FOR UPDATE
     </select>
 </mapper>

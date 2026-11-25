@@ -18,6 +18,7 @@ public class CheckoutPilotQuoteController {
     public static final String PATH = "/internal/v1/checkout-pilot/quote-references";
     private final CheckoutPilotQuoteService quotes;
 
+    /** 权限和持久化统一由试点用例处理，控制器只映射已认证请求。 */
     public CheckoutPilotQuoteController(CheckoutPilotQuoteService quotes) {
         this.quotes = quotes;
     }

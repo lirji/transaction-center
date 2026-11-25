@@ -9,13 +9,15 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface CheckoutPilotQuoteMapper {
     /** 并发重复调用保留首份证据与引用。 */
-    int insert(@Param("quote") QuoteReference quote);
+    int insert(@Param("tenant") long tenant, @Param("quote") QuoteReference quote);
 
     /** 只按已授权的原生租户和原始商城报价定位。 */
-    Optional<QuoteReference> find(@Param("tenantId") long tenantId, @Param("commerceQuoteId") String commerceQuoteId,
-                                 @Param("lock") boolean lock);
+    Optional<QuoteReference> find(@Param("tenant") long tenant, @Param("commerceQuoteId") String commerceQuoteId);
+
+    /** 并发插入后在当前事务内取得首份已持久化证据。 */
+    Optional<QuoteReference> lock(@Param("tenant") long tenant, @Param("commerceQuoteId") String commerceQuoteId);
 
     /** 证据为交易服务验收后的持久快照，对外只返回必要引用。 */
-    record QuoteReference(String quoteRef, long tenantId, String commerceQuoteId, String ownerRef,
+    record QuoteReference(String quoteRef, String commerceQuoteId, String ownerRef,
                           String scopeVersion, String storeId, String evidenceJson, Instant expiresAt, Instant createdAt) { }
 }

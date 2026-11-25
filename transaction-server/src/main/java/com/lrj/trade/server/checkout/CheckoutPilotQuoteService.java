@@ -42,6 +42,7 @@ public class CheckoutPilotQuoteService {
     private final RestClient commerce;
     private final Scope scope;
 
+    /** 装配单一试点范围及商城连接，缺少可信配置时在启动阶段拒绝启用。 */
     public CheckoutPilotQuoteService(CheckoutPilotQuoteMapper mapper, PlatformTransactionManager manager,
             ObjectMapper json, Clock clock,
             @Value("${trade.checkout-pilot.commerce-base-url}") URI url,
@@ -79,7 +80,7 @@ public class CheckoutPilotQuoteService {
         if (caller.tenantId() != scope.tenantId() || !scope.callerKey().equals(caller.key())) {
             throw new TradeException(UNTRUSTED, "当前机器未获试点报价授权");
         }
-        var prior = mapper.find(scope.tenantId(), commerceQuoteId, false);
+        var prior = mapper.find(scope.tenantId(), commerceQuoteId);
         if (prior.isPresent()) {
             return receipt(prior.get(), ownerRef);
         }
@@ -89,10 +90,10 @@ public class CheckoutPilotQuoteService {
         }
         return transaction.execute(status -> {
             Instant now = clock.instant().truncatedTo(ChronoUnit.MILLIS);
-            var quote = new QuoteReference(UUID.randomUUID().toString(), scope.tenantId(), commerceQuoteId, ownerRef,
+            var quote = new QuoteReference(UUID.randomUUID().toString(), commerceQuoteId, ownerRef,
                     scope.version(), scope.storeId(), json.writeValueAsString(evidence), evidence.expiresAt(), now);
-            mapper.insert(quote);
-            var persisted = mapper.find(scope.tenantId(), commerceQuoteId, true)
+            mapper.insert(scope.tenantId(), quote);
+            var persisted = mapper.lock(scope.tenantId(), commerceQuoteId)
                 .orElseThrow(() -> new TradeException(UNAVAILABLE, "无法读取试点报价引用"));
             return receipt(persisted, ownerRef);
         });
@@ -157,6 +158,7 @@ public class CheckoutPilotQuoteService {
         return value != null && value.matches(ID_PATTERN);
     }
 
+    /** 启用时固定的部署范围，用于校验商城实际返回的归属。 */
     private record Scope(long tenantId, String callerKey, String version, String commerceTenant, String merchantId,
                          String storeId, String skuId) { }
 
@@ -168,5 +170,6 @@ public class CheckoutPilotQuoteService {
                           String storeId, long storeVersion, String eligibleSkuId, String commerceQuoteId,
                           String ownerRef, String currency, Instant expiresAt, List<SourceLine> items) { }
 
+    /** 商品修订和渠道价格共同定位结算时采用的同一份价格快照。 */
     record SourceLine(String skuId, long skuRevision, long channelPriceVersion, int quantity, String unitPriceMinor) { }
 }
