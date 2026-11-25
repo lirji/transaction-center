@@ -95,8 +95,8 @@ public class QuoteService implements QuotePort {
         long payable = 0;
         for (var line : price.lines().stream().sorted(Comparator.comparingLong(CheckoutPrice.Line::skuId)).toList()) {
             var sku = skus.published(tenant, line.skuId());
-            if (!price.currency().equals(sku.currency()) || line.unitPrice() != sku.unitPrice())
-                throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "原生商品价格已变化，请重新报价");
+            if (line.skuRevision() != sku.revision() || !price.currency().equals(sku.currency()) || line.unitPrice() != sku.unitPrice())
+                throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "原生商品规格版本或价格已变化，请重新报价");
             items.add(new QuoteItem(sku.skuId(), sku.revision(), sku.title(), sku.specification(), sku.stockType(),
                 line.quantity(), sku.unitPrice(), line.payableAmount()));
             payable = Math.addExact(payable, line.payableAmount());

@@ -33,6 +33,6 @@ V036 在一个本地事务内保留原生报价、逐行原价与折扣、原生
 
 `GET /internal/v1/checkout-pilot/quote-references/{reference}/order-evidence` 要求 `trade.checkout-pilot.order-evidence` 作用域与已配对机器。返回交易租户、试点引用、订单及原生报价编号、范围和商城门店、签名摘要、币种与三个整数分值、订单状态及到期时间。未绑定订单返回 404，响应禁止缓存，会员和地址留在交易。
 
-新入口使用 `TRADE_CHECKOUT_PILOT_ORDER_ENABLED`，默认关闭。启用时同时配置同一前缀的 `NATIVE_MERCHANT_NO`、`MEMBER_LINKS`（交易会员主键到商城会员标识的 JSON 对象）和 `SKU_LINKS`（商城 SKU 到交易规格主键的 JSON 对象）。买家及规格一对一，分别至多 1000 位与 50 个。映射由实际责任方确认后通过受控部署配置注入。
+新入口使用 `TRADE_CHECKOUT_PILOT_ORDER_ENABLED`，默认关闭。启用时同时配置同一前缀的 `NATIVE_MERCHANT_NO`、`MEMBER_LINKS`（交易会员主键到商城会员标识的 JSON 对象）和 `SKU_LINKS`（商城 SKU 到 `commerceRevision`、`tradeSkuId`、`tradeRevision` 的 JSON 对象）。买家及规格一对一，分别至多 1000 位与 50 个。两侧规格版本均须匹配，同价重发也需要更新配对。映射由实际责任方确认后通过受控部署配置注入。
 
-预算回执接通前，试点原生订单进入待支付，尝试支付返回 409 和 `CHECKOUT_PILOT_FUNDING_PENDING`，不会生成意图或渠道请求。停用新入口后，当前服务版本仍为已有试点订单保留付款拦截。部署启用前须确认每个支付实例已支持门禁。若要回退到缺少该门禁的应用版本，先停止新下单并取消待支付试点订单，再核对库存释放和付款状态。
+预算回执接通前，试点原生订单进入待支付，尝试支付返回 409 和 `CHECKOUT_PILOT_FUNDING_PENDING`，不会生成意图或渠道请求。仅关闭新下单开关时，已有试点订单依旧受付款拦截，获授权机器仍可查询证据。部署启用前须确认每个支付实例已支持门禁。若要回退到缺少该门禁的应用版本，先停止新下单并取消待支付试点订单，再核对库存释放和付款状态。

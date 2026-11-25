@@ -7,6 +7,7 @@ import com.lrj.trade.order.model.ShippingAddress;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -21,16 +22,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 买家与营销机器分别使用原生下单和订单证据接口。 */
 @RestController
-@ConditionalOnProperty(name = {"trade.checkout-pilot.enabled", "trade.checkout-pilot.freeze-enabled",
-    "trade.checkout-pilot.order-enabled"}, havingValue = "true")
+@ConditionalOnProperty(name = "trade.checkout-pilot.enabled", havingValue = "true")
 public class CheckoutPilotOrderController {
     public static final String CREATE_PATH = "/api/v1/trade/checkout-pilot/orders";
     public static final String EVIDENCE_PATH = CheckoutPilotQuoteController.PATH + "/{reference}/order-evidence";
-    private final CheckoutPilotOrderService orders;
+    private final ObjectProvider<CheckoutPilotOrderService> orders;
+    private final CheckoutPilotQuoteService quotes;
 
     /** 订单金额和身份只从服务端证据及认证上下文读取。 */
-    public CheckoutPilotOrderController(CheckoutPilotOrderService orders) {
+    public CheckoutPilotOrderController(ObjectProvider<CheckoutPilotOrderService> orders, CheckoutPilotQuoteService quotes) {
         this.orders = orders;
+        this.quotes = quotes;
     }
 
     /** 客户端提交原交易报价引用与实物履约信息，返回标准原生订单。 */
@@ -45,17 +47,19 @@ public class CheckoutPilotOrderController {
                 throw new TradeException("INVALID_ARGUMENT", "仓库编号超出范围");
             }
         }
-        return orders.create(actor(jwt), key, body.tradeQuoteRef(), warehouse, body.address());
+        var service = orders.getIfAvailable();
+        if (service == null) throw new TradeException("NOT_FOUND", "试点原生下单未启用");
+        return service.create(actor(jwt), key, body.tradeQuoteRef(), warehouse, body.address());
     }
 
     /** 管理支付与预留的机器可核对订单来源，响应禁止缓存。 */
     @GetMapping(EVIDENCE_PATH)
-    public ResponseEntity<CheckoutPilotOrderService.Evidence> evidence(@AuthenticationPrincipal Jwt jwt,
+    public ResponseEntity<CheckoutPilotQuoteService.OrderEvidence> evidence(@AuthenticationPrincipal Jwt jwt,
             @PathVariable String reference) {
         if (!reference.matches(CheckoutPilotQuoteService.QUOTE_ID_PATTERN)) {
             throw new TradeException("INVALID_ARGUMENT", "试点交易报价引用格式无效");
         }
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(orders.evidence(actor(jwt), reference));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(quotes.orderEvidence(actor(jwt), reference));
     }
 
     private static Actor actor(Jwt jwt) {

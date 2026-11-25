@@ -8,5 +8,5 @@ public record CheckoutPrice(String currency, long payableAmount, Instant expires
     public static final String POLICY = "checkout-pilot/v1";
 
     /** 冻结行金额按已发布原生规格核对，不允许调用端覆盖商品原价。 */
-    public record Line(long skuId, int quantity, long unitPrice, long payableAmount) { }
+    public record Line(long skuId, long skuRevision, int quantity, long unitPrice, long payableAmount) { }
 }

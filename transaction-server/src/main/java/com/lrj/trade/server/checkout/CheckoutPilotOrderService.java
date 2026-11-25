@@ -11,7 +11,6 @@ import com.lrj.trade.order.model.OrderView;
 import com.lrj.trade.order.model.ShippingAddress;
 import com.lrj.trade.server.checkout.CheckoutPilotQuoteMapper.NativeBinding;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
@@ -41,7 +40,7 @@ public class CheckoutPilotOrderService {
     private final ObjectMapper json;
     private final Clock clock;
     private final Map<Long, String> buyerLinks;
-    private final Map<String, Long> skuLinks;
+    private final Map<String, SkuLink> skuLinks;
     private final String commerceTenant;
     private final String nativeMerchant;
 
@@ -65,15 +64,15 @@ public class CheckoutPilotOrderService {
         this.commerceTenant = commerceTenant;
         this.nativeMerchant = nativeMerchant;
         buyerLinks = json.readValue(buyers, new TypeReference<Map<Long, String>>() { });
-        skuLinks = json.readValue(skus, new TypeReference<Map<String, Long>>() { });
+        skuLinks = json.readValue(skus, new TypeReference<Map<String, SkuLink>>() { });
         if (!nativeMerchant.matches(IDENTIFIER) || buyerLinks.isEmpty() || buyerLinks.size() > MAX_BUYERS
                 || skuLinks.isEmpty() || skuLinks.size() > MAX_SKUS || !skuLinks.containsKey(eligibleSku)
                 || buyerLinks.entrySet().stream().anyMatch(e -> e.getKey() <= 0
                     || e.getValue() == null || !e.getValue().matches(IDENTIFIER))
                 || skuLinks.entrySet().stream().anyMatch(e -> !e.getKey().matches(CheckoutPilotQuoteService.ID_PATTERN)
-                    || e.getValue() == null || e.getValue() <= 0)
+                    || e.getValue() == null || !e.getValue().valid())
                 || new HashSet<>(buyerLinks.values()).size() != buyerLinks.size()
-                || new HashSet<>(skuLinks.values()).size() != skuLinks.size()) {
+                || skuLinks.values().stream().map(SkuLink::tradeSkuId).distinct().count() != skuLinks.size()) {
             throw new IllegalArgumentException("原生试点下单需要已确认的收款商户及一对一买家和规格配对");
         }
     }
@@ -101,9 +100,9 @@ public class CheckoutPilotOrderService {
         var frozen = mapper.findFrozen(tenant, reference).orElseThrow(CheckoutPilotOrderService::invalid);
         var source = quotes.revalidate(row);
         var lines = prices.checkoutLines(tenant, row, source, frozen).stream().map(line -> {
-            Long sku = skuLinks.get(line.commerceSkuId());
-            if (sku == null) throw invalid();
-            return new CheckoutPrice.Line(sku, line.quantity(), line.unitPrice(), line.payable());
+            var sku = skuLinks.get(line.commerceSkuId());
+            if (sku == null || sku.commerceRevision() != line.commerceRevision()) throw invalid();
+            return new CheckoutPrice.Line(sku.tradeSkuId(), sku.tradeRevision(), line.quantity(), line.unitPrice(), line.payable());
         }).toList();
         var price = new CheckoutPrice(source.currency(), frozen.payableMinor(), frozen.expiresAt(), lines);
 
@@ -121,16 +120,6 @@ public class CheckoutPilotOrderService {
         return orders.read(actor, number);
     }
 
-    /** 仅已授权机器根据报价引用核对本交易的当前订单状态与首份签名摘要。 */
-    public Evidence evidence(Actor caller, String reference) {
-        quotes.requireCaller(caller);
-        var sealed = mapper.findBoundOrder(caller.tenantId(), reference)
-            .orElseThrow(() -> new TradeException("NOT_FOUND", "试点报价尚未关联订单"));
-        return new Evidence(Long.toString(caller.tenantId()), reference, sealed.orderId(), sealed.orderNo(), sealed.nativeQuoteId(),
-            sealed.scopeVersion(), sealed.storeId(), sealed.proofHash(), sealed.currency(), sealed.grossMinor(), sealed.discountMinor(),
-            sealed.payableMinor(), sealed.orderStatus(), sealed.orderExpiresAt());
-    }
-
     private static String replay(CheckoutPilotQuoteMapper.BoundOrder bound, String hash) {
         if (!bound.requestHash().equals(hash)) throw invalid();
         return bound.orderNo();
@@ -140,8 +129,11 @@ public class CheckoutPilotOrderService {
         return new TradeException(CheckoutPilotQuoteService.CONFLICT, "试点报价未冻结、已关联其他下单请求或配对失效");
     }
 
-    /** 营销资金核对所需的原生订单事实和金额，响应中没有会员和收货信息。 */
-    public record Evidence(String tradeTenantId, String tradeQuoteRef, String orderId, String orderNo, String nativeQuoteId,
-                           String scopeVersion, String storeId, String priceProofHash, String currency, String grossMinor,
-                           String discountMinor, String payableMinor, String orderStatus, Instant orderExpiresAt) { }
+    /** 同价的重新发布也须按新版本重新确认配对，防止规格语义变更后沿用旧授权。 */
+    private record SkuLink(long commerceRevision, long tradeSkuId, long tradeRevision) {
+        boolean valid() {
+            return commerceRevision > 0 && tradeSkuId > 0 && tradeRevision > 0;
+        }
+    }
+
 }

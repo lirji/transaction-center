@@ -160,6 +160,16 @@ public class CheckoutPilotQuoteService {
         }
     }
 
+    /** 关闭新下单后仍允许原先授权的机器核对已绑定订单，便于取消、对账和回收预算。 */
+    public OrderEvidence orderEvidence(Actor caller, String reference) {
+        requireCaller(caller);
+        var sealed = mapper.findBoundOrder(caller.tenantId(), reference)
+            .orElseThrow(() -> new TradeException("NOT_FOUND", "试点报价尚未关联订单"));
+        return new OrderEvidence(Long.toString(caller.tenantId()), reference, sealed.orderId(), sealed.orderNo(), sealed.nativeQuoteId(),
+            sealed.scopeVersion(), sealed.storeId(), sealed.proofHash(), sealed.currency(), sealed.grossMinor(), sealed.discountMinor(),
+            sealed.payableMinor(), sealed.orderStatus(), sealed.orderExpiresAt());
+    }
+
     /** 冻结前重新查询商城活动范围和商品版本；远程请求留在交易写入前。 */
     SourceEvidence revalidate(QuoteReference row) {
         requireCurrentScope(row);
@@ -206,6 +216,11 @@ public class CheckoutPilotQuoteService {
     /** 仅表示已准备的报价引用，冻结价格和支付许可由后续交易报价步骤产生。 */
     public record Prepared(String tradeQuoteRef, String commerceQuoteId, String scopeVersion, String storeId,
                            String sourceDigest, Instant expiresAt) { }
+
+    /** 营销资金核对所需的原生订单事实和金额，响应中没有会员和收货信息。 */
+    public record OrderEvidence(String tradeTenantId, String tradeQuoteRef, String orderId, String orderNo, String nativeQuoteId,
+                                String scopeVersion, String storeId, String priceProofHash, String currency, String grossMinor,
+                                String discountMinor, String payableMinor, String orderStatus, Instant orderExpiresAt) { }
 
     /** 与商城受限读取契约一致，保留报价形成时的金额及版本证据。 */
     record SourceEvidence(String scopeVersion, String tradeTenantId, String commerceTenantId, String merchantId,

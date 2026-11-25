@@ -133,7 +133,7 @@ public class CheckoutPilotPriceService {
                 if (net > original || (!source.eligibleSkuId().equals(line.skuId()) && net != original)) throw conflict();
                 gross = Math.addExact(gross, original);
                 payable = Math.addExact(payable, net);
-                result.add(new PricedLine(line.skuId(), line.quantity(), unitPrice, net));
+                result.add(new PricedLine(line.skuId(), line.skuRevision(), line.quantity(), unitPrice, net));
             }
             long discount = gross - payable;
             // 原生交易金额需能无损传输，本试点仅验收需要支付的订单。
@@ -175,7 +175,7 @@ public class CheckoutPilotPriceService {
     }
 
     /** 已和原始报价逐字段核对的商品行，可按明确配对生成原生规格报价。 */
-    record PricedLine(String commerceSkuId, int quantity, long unitPrice, long payable) { }
+    record PricedLine(String commerceSkuId, long commerceRevision, int quantity, long unitPrice, long payable) { }
 
     /** 同一轮验签同时得到冻结金额和原生结算需要的逐行分值。 */
     private record CheckedPrice(FrozenPrice frozen, List<PricedLine> lines) { }

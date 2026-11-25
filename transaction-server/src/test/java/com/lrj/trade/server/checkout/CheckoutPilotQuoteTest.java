@@ -96,7 +96,8 @@ class CheckoutPilotQuoteTest {
         registry.add("trade.checkout-pilot.marketing-public-key", () ->
             Base64.getEncoder().encodeToString(MARKETING_KEY.getPublic().getEncoded()));
         registry.add("trade.checkout-pilot.member-links", () -> "{\"1\":\"commerce-buyer\",\"2\":\"another-commerce-buyer\"}");
-        registry.add("trade.checkout-pilot.sku-links", () -> "{\"lc02-mug-a\":1}");
+        registry.add("trade.checkout-pilot.sku-links", () ->
+            "{\"lc02-mug-a\":{\"commerceRevision\":1,\"tradeSkuId\":1,\"tradeRevision\":4}}");
         registry.add("trade.address.key-base64", () -> Base64.getEncoder().encodeToString(ADDRESS_KEY));
         registry.add("trade.address.key-version", () -> "checkout-test");
     }
@@ -218,7 +219,7 @@ class CheckoutPilotQuoteTest {
         assertEquals("1", members.me(buyer).memberId());
         assertEquals("2", members.me(other).memberId());
         merchants.create(buyer, "merchant", "lc02-trade-merchant", "隔离试点商户");
-        long product = Long.parseLong(catalog.create(buyer, "product", "lc02-cup", "陶瓷杯", "native-mug", 6000, "CNY"));
+        long product = Long.parseLong(catalog.create(buyer, "product", "lc02-cup", "陶瓷杯", "native-mug", 5900, "CNY"));
         catalog.publish(buyer, "publish", product, 0);
         long sku = Long.parseLong(catalog.detail(tenant, product, false).skuId());
         assertEquals(1, sku);
@@ -234,7 +235,7 @@ class CheckoutPilotQuoteTest {
         assertEquals(404, http.send(api("read-evidence", evidence).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
         assertEquals(403, sendOrder(reference, empty, "other-buyer", "untrusted").statusCode());
         assertEquals(403, sendOrder(reference, empty, "foreign-buyer", "untrusted").statusCode());
-        assertEquals(409, sendOrder(reference, warehouse, "buyer", "different-native-price").statusCode());
+        assertEquals(409, sendOrder(reference, warehouse, "buyer", "different-native-revision").statusCode());
         catalog.unpublish(buyer, "unpublish", product, 1);
         catalog.edit(buyer, "correct-price", product, 2, "陶瓷杯", 5900, "CNY");
         catalog.publish(buyer, "republish", product, 3);
