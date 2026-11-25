@@ -35,6 +35,14 @@ public final class ErrorCodes {
     public static final String CHANNEL_PROTOCOL_INVALID = "CHANNEL_PROTOCOL_INVALID";
     /** 服务端稳定错误标识，不依赖展示文案判断。 */
     public static final String CHANNEL_UNAVAILABLE = "CHANNEL_UNAVAILABLE";
+    /** 试点原生订单尚待营销预算回执，调用方应等待明确状态再发起支付。 */
+    public static final String CHECKOUT_PILOT_FUNDING_PENDING = "CHECKOUT_PILOT_FUNDING_PENDING";
+    /** 报价来源、版本或原生订单关联不符，需要重新核对。 */
+    public static final String CHECKOUT_PILOT_SOURCE_CONFLICT = "CHECKOUT_PILOT_SOURCE_CONFLICT";
+    /** 商城暂时不可用，可以使用原业务参数和原幂等键重试。 */
+    public static final String CHECKOUT_PILOT_SOURCE_UNAVAILABLE = "CHECKOUT_PILOT_SOURCE_UNAVAILABLE";
+    /** 认证主体不在试点买家或机器配对范围。 */
+    public static final String CHECKOUT_PILOT_UNTRUSTED = "CHECKOUT_PILOT_UNTRUSTED";
     /** 服务端稳定错误标识，不依赖展示文案判断。 */
     public static final String DUPLICATE_RESOURCE = "DUPLICATE_RESOURCE";
     /** 服务端稳定错误标识，不依赖展示文案判断。 */
@@ -167,5 +175,5 @@ public final class ErrorCodes {
     public static final String TRANSACTION_BOUNDARY = "TRANSACTION_BOUNDARY";
     /** 服务端稳定错误标识，不依赖展示文案判断。 */
     public static final String VERSION_CONFLICT = "VERSION_CONFLICT";
-    static final java.util.Set<String> RETRYABLE = java.util.Set.of(ADMIN_QUERY_BUSY,HOT_SKU_BUSY,CATALOG_QUERY_BUSY,ORDER_ADMISSION_PAUSED,PAYMENT_ADMISSION_PAUSED,REFUND_APPROVAL_AUDIT_UNAVAILABLE,EVIDENCE_UNAVAILABLE,RETRY_SAME_KEY);
+    static final java.util.Set<String> RETRYABLE = java.util.Set.of(ADMIN_QUERY_BUSY,HOT_SKU_BUSY,CATALOG_QUERY_BUSY,ORDER_ADMISSION_PAUSED,PAYMENT_ADMISSION_PAUSED,REFUND_APPROVAL_AUDIT_UNAVAILABLE,EVIDENCE_UNAVAILABLE,RETRY_SAME_KEY,CHECKOUT_PILOT_SOURCE_UNAVAILABLE);
 }
