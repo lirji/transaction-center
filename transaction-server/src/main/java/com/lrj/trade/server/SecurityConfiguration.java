@@ -45,6 +45,8 @@ public class SecurityConfiguration {
             .sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a->a.requestMatchers("/actuator/health","/actuator/health/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/actuator/prometheus").hasAuthority("SCOPE_trade.metrics.read")
+                .requestMatchers(org.springframework.http.HttpMethod.POST,
+                    com.lrj.trade.server.checkout.CheckoutPilotQuoteController.PATH).hasAuthority("SCOPE_trade.checkout-pilot.prepare")
                 .requestMatchers(org.springframework.http.HttpMethod.POST,"/internal/v1/reconciliation/reports").hasAuthority("SCOPE_trade.reconciliation.report")
                 .requestMatchers(org.springframework.http.HttpMethod.GET,"/internal/v1/reconciliation/money-facts","/internal/v1/reconciliation/cases/*").hasAuthority("SCOPE_trade.reconciliation.read")
                 .requestMatchers("/internal/v1/first-order-referral-evidence:query","/internal/v1/customer-eligibility:query","/internal/v1/order-referral-evidence:query","/internal/v1/orders/*/referral-evidence").hasAuthority("SCOPE_trade.evidence.read")

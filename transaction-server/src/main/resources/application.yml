@@ -32,6 +32,17 @@ server:
   address: ${TRADE_BIND:127.0.0.1}
   shutdown: graceful
 trade:
+  checkout-pilot:
+    enabled: ${TRADE_CHECKOUT_PILOT_ENABLED:false}
+    tenant-id: ${TRADE_CHECKOUT_PILOT_TENANT_ID:0}
+    caller-key: ${TRADE_CHECKOUT_PILOT_CALLER_KEY:}
+    scope-version: ${TRADE_CHECKOUT_PILOT_SCOPE_VERSION:}
+    commerce-base-url: ${TRADE_CHECKOUT_PILOT_COMMERCE_BASE_URL:}
+    commerce-token: ${TRADE_CHECKOUT_PILOT_COMMERCE_TOKEN:}
+    commerce-tenant: ${TRADE_CHECKOUT_PILOT_COMMERCE_TENANT:}
+    merchant-id: ${TRADE_CHECKOUT_PILOT_MERCHANT_ID:}
+    store-id: ${TRADE_CHECKOUT_PILOT_STORE_ID:}
+    sku-id: ${TRADE_CHECKOUT_PILOT_SKU_ID:}
   admin-evidence:
     enabled: ${TRADE_ADMIN_EVIDENCE_ENABLED:false}
   admin-query:
