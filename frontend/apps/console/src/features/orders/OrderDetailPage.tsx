@@ -79,7 +79,7 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
       <div className="section-gap">
         <Panel>
           <h2>订单摘要</h2>
-          <dl className="order-summary">
+          <dl className="summary-fields">
             <div><dt>订单状态</dt><dd><Badge tone={statusTone(order.status)}>{orderLabels[order.status]}</Badge></dd></div>
             <div><dt>资金状态</dt><dd><Badge tone={statusTone(order.financialStatus)}>{financialLabels[order.financialStatus]}</Badge></dd></div>
             <div><dt>应付金额</dt><dd>{formatMinor(order.payableAmount, order.currency)}</dd></div>

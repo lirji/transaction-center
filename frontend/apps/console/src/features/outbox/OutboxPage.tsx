@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner } from '../../components/ui'
 import { api, type OutboxPublication } from '../../shared/api/client'
@@ -7,10 +8,13 @@ import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersion
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_EVENTS_REPLAY } from '../../shared/auth/auth-context'
 
+const queueStates = ['REVIEW', 'PENDING', 'SENT'] as const
+
 export function OutboxPage() {
   const auth = useAuth()
   const canReplay = auth.hasScope(TRADE_EVENTS_REPLAY)
-  const [state, setState] = useState<'PENDING' | 'SENT' | 'REVIEW'>('REVIEW')
+  const [params, setParams] = useSearchParams()
+  const state = queueStates.find((value) => value === params.get('state')) ?? 'REVIEW'
   const [taskState, setTaskState] = useState<'READY' | 'RUNNING' | 'DONE' | 'REVIEW'>('REVIEW')
   const [after, setAfter] = useState(0)
   const [taskAfter, setTaskAfter] = useState(0)
@@ -42,7 +46,7 @@ export function OutboxPage() {
       <MutationBanner error={replay.error} success={replay.data ? `已受理重放 eventId=${replay.data.eventId} replayCount=${replay.data.replayCount}` : undefined} />
       <Panel>
         <Field label="发布状态">
-          <select value={state} onChange={(event) => { setState(event.target.value as typeof state); setAfter(0) }}>
+          <select value={state} onChange={(event) => { setParams({ state: event.target.value }, { replace: true }); setAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
             <option value="PENDING">PENDING</option>
             <option value="SENT">SENT</option>

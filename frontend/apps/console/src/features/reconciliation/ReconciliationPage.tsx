@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner } from '../../components/ui'
 import { api, type ReconciliationCase } from '../../shared/api/client'
@@ -7,10 +8,13 @@ import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersion
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_RECONCILIATION_QUERY } from '../../shared/auth/auth-context'
 
+const queueStates = ['OPEN', 'PROCESSING', 'CLOSED'] as const
+
 export function ReconciliationPage() {
   const auth = useAuth()
   const canQuery = auth.hasScope(TRADE_RECONCILIATION_QUERY)
-  const [state, setState] = useState<'OPEN' | 'PROCESSING' | 'CLOSED'>('OPEN')
+  const [params, setParams] = useSearchParams()
+  const state = queueStates.find((value) => value === params.get('state')) ?? 'OPEN'
   const [opState, setOpState] = useState<'QUEUED' | 'RUNNING' | 'RESULT_ACCEPTED' | 'REVIEW'>('REVIEW')
   const [after, setAfter] = useState(0)
   const [opAfter, setOpAfter] = useState(0)
@@ -43,7 +47,7 @@ export function ReconciliationPage() {
       <MutationBanner error={queryCase.error} success={queryCase.data ? `已排队 operationNo=${queryCase.data.operationNo}，状态 QUEUED` : undefined} />
       <Panel>
         <Field label="差异状态">
-          <select value={state} onChange={(event) => { setState(event.target.value as typeof state); setAfter(0) }}>
+          <select value={state} onChange={(event) => { setParams({ state: event.target.value }, { replace: true }); setAfter(0) }}>
             <option value="OPEN">OPEN</option>
             <option value="PROCESSING">PROCESSING</option>
             <option value="CLOSED">CLOSED</option>

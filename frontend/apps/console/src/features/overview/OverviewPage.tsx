@@ -1,112 +1,94 @@
-import { useQuery } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
+import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Badge, PageHeader, Panel, StateBanner } from '../../components/ui'
+import { Badge, PageHeader, Panel } from '../../components/ui'
 import { api, ApiProblem } from '../../shared/api/client'
+import { merchantSchema } from '../../shared/api/schemas'
 import { useAuth } from '../../shared/auth/useAuth'
-import {
-  TRADE_ADMIN,
-  TRADE_ADMISSION_WRITE,
-  TRADE_ADMIN_EVIDENCE_READ,
-  TRADE_ADMIN_JOBS_READ,
-  TRADE_EVENTS_REPLAY,
-  TRADE_FULFILLMENT_WRITE,
-  TRADE_RECONCILIATION_QUERY,
-  TRADE_RETURN_WRITE,
-} from '../../shared/auth/auth-context'
+import { formatBeijingTime } from '../../shared/ui/display'
 
-function countLabel(rows: unknown[] | undefined, error: boolean, loading: boolean) {
-  if (loading) return '读取中'
-  if (error) return '无法读取'
-  if (!rows) return '—'
-  return rows.length >= 20 ? `${rows.length}+` : String(rows.length)
+const SAMPLE_LIMIT = 1
+const PENDING_REFUND = { status: 'PENDING_APPROVAL', limit: SAMPLE_LIMIT } as const
+const ABNORMAL_RECEIPT = { abnormalOnly: true, limit: SAMPLE_LIMIT } as const
+const OPEN_CASE = 'OPEN'
+const PUBLICATION_REVIEW = 'REVIEW'
+
+function QueueRow<T>({ label, href, query, describe }: {
+  label: string
+  href: string
+  query: UseQueryResult<T[]>
+  describe: (item: T) => ReactNode
+}) {
+  const sample = query.data?.[0]
+  return (
+    <tr>
+      <th scope="row">{label}</th>
+      <td>{query.isPending ? '读取中' : query.isError ? '暂不可读' : sample ? describe(sample) : '当前无事项'}</td>
+      <td><Link to={href} aria-label={`查看${label}`}>查看队列</Link></td>
+    </tr>
+  )
 }
 
 export function OverviewPage() {
   const auth = useAuth()
   const merchant = useQuery({ queryKey: ['merchant'], queryFn: api.merchant, retry: false })
-  const pendingRefunds = useQuery({ queryKey: ['refunds', { status: 'PENDING_APPROVAL', after: 0 }], queryFn: () => api.refunds({ status: 'PENDING_APPROVAL', after: 0 }) })
-  const reviewOutbox = useQuery({ queryKey: ['outbox', 'REVIEW', 0], queryFn: () => api.outboxPublications('REVIEW', 0) })
   const admission = useQuery({ queryKey: ['admission'], queryFn: api.admissionPolicy, retry: false })
+  const receipts = useQuery({
+    queryKey: ['admin-receipts', 'overview', ABNORMAL_RECEIPT],
+    queryFn: () => api.paymentReceipts(ABNORMAL_RECEIPT),
+    select: (page) => page.items,
+    retry: false,
+  })
+  const refunds = useQuery({
+    queryKey: ['refunds', 'overview', PENDING_REFUND],
+    queryFn: () => api.refunds(PENDING_REFUND),
+    retry: false,
+  })
+  const reconciliation = useQuery({
+    queryKey: ['recon-cases', OPEN_CASE, 0, SAMPLE_LIMIT],
+    queryFn: () => api.reconciliationCases(OPEN_CASE, 0, SAMPLE_LIMIT),
+    retry: false,
+  })
+  const publications = useQuery({
+    queryKey: ['outbox', PUBLICATION_REVIEW, 0, SAMPLE_LIMIT],
+    queryFn: () => api.outboxPublications(PUBLICATION_REVIEW, 0, SAMPLE_LIMIT),
+    retry: false,
+  })
   const missingMerchant = merchant.error instanceof ApiProblem && merchant.error.status === 404
-  const extra = [
-    { scope: TRADE_EVENTS_REPLAY, label: 'Outbox 重放' },
-    { scope: TRADE_RECONCILIATION_QUERY, label: '对账只查单' },
-    { scope: TRADE_ADMISSION_WRITE, label: '改准入策略' },
-    { scope: TRADE_FULFILLMENT_WRITE, label: '声明履约' },
-    { scope: TRADE_RETURN_WRITE, label: '退货申请/验收' },
-    { scope: TRADE_ADMIN_EVIDENCE_READ, label: '交易证据 / 资格评估' },
-    { scope: TRADE_ADMIN_JOBS_READ, label: '任务租约观察' },
-  ]
+  const activeMerchant = merchant.data?.status === merchantSchema.shape.status.enum.ACTIVE
+  const merchantName = merchant.isPending ? '读取中' : merchant.data?.name ?? (missingMerchant ? '尚未配置' : '暂不可读')
 
   return (
     <div className="workspace">
-      <PageHeader
-        eyebrow="Overview"
-        title="交易运营工作台"
-        description="本台只调用 OpenAPI 已交付的管理接口。可按编号与状态查询本租户订单，没有真实付款跳转、不能在此批准退款。会员商城与 C 端下单不在此控制台。"
-      />
-      <div className="metric-grid">
-        <article className="metric-card">
-          <p>JWT 租户</p>
-          <strong className="mono">{auth.tenantId || '未声明'}</strong>
-          <span>{/^[1-9][0-9]*$/.test(auth.tenantId) ? '正整数文本 tenant_id' : '后端会拒绝非正整数租户声明'}</span>
-        </article>
-        <article className="metric-card">
-          <p>管理权限</p>
-          <strong>{auth.hasScope(TRADE_ADMIN) ? 'trade.admin' : '缺失'}</strong>
-          <span>演示数据需要身份匹配租户 900001</span>
-        </article>
-        <article className="metric-card">
-          <p>Audience</p>
-          <strong className="mono">{auth.audience.join(', ') || '令牌未带 aud'}</strong>
-          <span>必须匹配 transaction-center</span>
-        </article>
-      </div>
-      {merchant.isError && !missingMerchant ? <StateBanner tone="error" title="无法读取商户" detail={merchant.error instanceof Error ? merchant.error.message : '读取失败'} /> : null}
-      <div className="page-grid">
+      <PageHeader eyebrow="Overview" title="交易运营工作台" description="查看当前交易受理状态，进入需要跟进的业务队列。" />
+      <div className="section-gap">
         <Panel>
-          <h2>本租户商户</h2>
-          {merchant.isLoading ? <StateBanner tone="loading" title="正在读取" detail="GET /admin/merchant" /> : null}
-          {missingMerchant ? (
-            <p>尚未配置逻辑商户。下单前请先到 <Link to="/merchant">商户</Link> 创建，不要把商品标价当成可付金额。</p>
-          ) : merchant.data ? (
-            <dl className="kv">
-              <dt>商户号</dt><dd className="mono">{merchant.data.merchantNo}</dd>
-              <dt>名称</dt><dd>{merchant.data.name}</dd>
-              <dt>状态</dt><dd><Badge tone={merchant.data.status === 'ACTIVE' ? 'good' : 'danger'}>{merchant.data.status}</Badge></dd>
-              <dt>版本</dt><dd className="mono">{merchant.data.version}</dd>
-            </dl>
-          ) : null}
-        </Panel>
-        <Panel>
-          <h2>待处理</h2>
-          <dl className="kv">
-            <dt><Link to="/orders">订单查询</Link></dt>
-            <dd>按编号 / 状态 / 会员</dd>
-            <dt><Link to="/refunds">待审批退款</Link></dt>
-            <dd>{countLabel(pendingRefunds.data, pendingRefunds.isError, pendingRefunds.isLoading)}</dd>
-            <dt><Link to="/outbox">Outbox REVIEW</Link></dt>
-            <dd>{countLabel(reviewOutbox.data, reviewOutbox.isError, reviewOutbox.isLoading)}</dd>
-            <dt><Link to="/admission">准入策略</Link></dt>
-            <dd>
-              {admission.isLoading
-                ? '读取中'
-                : admission.data
-                  ? `下单 ${admission.data.orderEnabled ? '允许' : '关闭'} · 支付 ${admission.data.paymentEnabled ? '允许' : '关闭'}`
-                  : '无法读取'}
-            </dd>
+          <h2>交易受理</h2>
+          <dl className="summary-fields">
+            <div><dt>当前租户</dt><dd>{auth.tenantId || '未声明'}</dd></div>
+            <div><dt>逻辑商户</dt><dd><Link to="/merchant">{merchantName}</Link></dd></div>
+            <div><dt>商户状态</dt><dd>{merchant.data ? <Badge tone={activeMerchant ? 'good' : 'danger'}>{activeMerchant ? '正常' : '冻结'}</Badge> : '—'}</dd></div>
+            <div><dt>新订单</dt><dd>{admission.isPending ? '读取中' : admission.data ? admission.data.orderEnabled ? '接收' : '已暂停' : '暂不可读'}</dd></div>
+            <div><dt>新支付</dt><dd>{admission.isPending ? '读取中' : admission.data ? admission.data.paymentEnabled ? '接收' : '已暂停' : '暂不可读'}</dd></div>
           </dl>
         </Panel>
-        <Panel>
-          <h2>额外 scope</h2>
-          <p>下列操作除 trade.admin 外还需要独立 scope；证据与任务默认不出现在导航。</p>
-          <ul>
-            {extra.map((item) => (
-              <li key={item.scope}>
-                {item.label} · <code>{item.scope}</code> · {auth.hasScope(item.scope) ? '当前令牌具备' : '当前令牌不具备'}
-              </li>
-            ))}
-          </ul>
+        <Panel className="table-panel">
+          <h2 className="table-title">当前待处理</h2>
+          <table className="data-table queue-table">
+            <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
+            <tbody>
+              <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}
+                describe={(item) => `${item.receiptNo} · ${item.disposition}`} />
+              <QueueRow label="待审批退款" href={`/refunds?status=${PENDING_REFUND.status}`} query={refunds}
+                describe={(item) => item.approvalDeadline
+                  ? `${item.refundNo} · ${formatBeijingTime(item.approvalDeadline)}（北京时间）截止`
+                  : item.refundNo} />
+              <QueueRow label="未结对账差异" href={`/reconciliation?state=${OPEN_CASE}`} query={reconciliation}
+                describe={(item) => `${item.caseNo} · ${item.differenceType}`} />
+              <QueueRow label="发布异常" href={`/outbox?state=${PUBLICATION_REVIEW}`} query={publications}
+                describe={(item) => `${item.eventId} · ${item.eventType}`} />
+            </tbody>
+          </table>
         </Panel>
       </div>
     </div>
