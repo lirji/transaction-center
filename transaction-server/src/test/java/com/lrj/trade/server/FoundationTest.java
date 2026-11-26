@@ -5617,8 +5617,19 @@ class FoundationTest {
         assertEquals(1,expired.items().size());assertTrue(expired.items().getFirst().leaseExpired());assertEquals("RUNNING",expired.items().getFirst().status());
         assertNull(service.detail(tenant,job).businessReference());
         assertEquals(1,count("SELECT COUNT(*) FROM tc_job_lease WHERE tenant_id=? AND status='RUNNING'",tenant));
-        var indexes=jdbc.queryForList("SELECT DISTINCT index_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND index_name LIKE 'ix_admin_%'",String.class);
-        assertEquals(20,indexes.size());
+        var indexes=jdbc.queryForList("""
+            SELECT DISTINCT index_name FROM information_schema.statistics
+            WHERE table_schema=DATABASE() AND (index_name LIKE 'ix_admin_%' OR index_name='ix_operations_refund_confirmed')
+            """,String.class);
+        assertEquals(Set.of(
+            "ix_admin_order_status","ix_admin_order_financial","ix_admin_order_created",
+            "ix_admin_payment_status","ix_admin_payment_member","ix_admin_payment_created","ix_admin_attempt_page",
+            "ix_admin_receipt_disposition","ix_admin_receipt_order","ix_admin_receipt_created","ix_admin_receipt_confirmed",
+            "ix_admin_return_page","ix_admin_return_status","ix_admin_return_order","ix_admin_return_created",
+            "ix_admin_quote_created","ix_admin_refund_page","ix_admin_refund_created","ix_admin_refund_approval_deadline",
+            "ix_admin_job_page","ix_admin_job_status","ix_admin_job_created","ix_admin_product_name",
+            "ix_admin_member_state","ix_admin_member_registration","ix_admin_inventory_sku","ix_admin_inventory_available",
+            "ix_operations_refund_confirmed"),new HashSet<>(indexes));
     }
 
     private void jwt(String token,String scope,long tenant) {
