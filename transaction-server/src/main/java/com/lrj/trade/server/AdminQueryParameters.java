@@ -8,6 +8,7 @@ public final class AdminQueryParameters {
     private static final AdminQuery.WindowKeys APPROVAL_DEADLINE=new AdminQuery.WindowKeys("approvalDeadlineFrom","approvalDeadlineTo");
     private static final AdminQuery.WindowKeys RECEIPT_CONFIRMATION=new AdminQuery.WindowKeys("confirmedFrom","confirmedTo");
     private static final AdminQuery.WindowKeys MEMBER_REGISTRATION=new AdminQuery.WindowKeys("registeredFrom","registeredTo");
+    /** 创建时间可重复，用主键打破并列以保证游标顺序。 */
     private enum OrderSort { ID_ASC, CREATED_DESC }
     private AdminQueryParameters() {}
     /** 原队列默认值只在未传状态时补充，空值或重复值仍拒绝。 */
