@@ -55,7 +55,7 @@ public class PaymentService {
                         break;
                     } catch (org.springframework.dao.DuplicateKeyException duplicate) {
                         // 订单唯一或其它冲突继续交原边界处理，只有公开编号可重新发号。
-                        if (attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || mapper.lockBusinessNumber(number)==null) {
+                        if (attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || !BusinessNumber.isNumberCollision(duplicate,"uk_payment_business_no","uk_payment_no")) {
                             throw duplicate;
                         }
                     }

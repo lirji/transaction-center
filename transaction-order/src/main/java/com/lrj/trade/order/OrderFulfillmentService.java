@@ -38,9 +38,8 @@ public class OrderFulfillmentService {
                 number=BusinessNumber.next(BusinessNumber.Type.FULFILLMENT,now);
                 mapper.insertDelivery(source.tenantId(),id,number,source.key(),event,evidence,at,hash,now);
                 found=mapper.lockByOrder(source.tenantId(),id);
-                // 交付来源与订单仍是原业务幂等键，仅在候选号确实被占用时重试。
-                if (!found.isEmpty() || mapper.lockBusinessNumber(number)==null) break;
-            }
+                // 交付来源与订单仍是原业务幂等键，未找到归属才有界重试。
+                if(!found.isEmpty()) break;            }
             if(found.isEmpty() || !found.getFirst().deliveryHash().equals(hash))
                 throw new TradeException("FULFILLMENT_CONFLICT","订单或来源交付事件已经绑定其他内容");
             var row=found.getFirst(); if(!row.fulfillmentNo().equals(number)) return row.fulfillmentNo();

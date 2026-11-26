@@ -46,7 +46,7 @@ public class FulfillmentIngressService {
                     mapper.createReturn(actor.tenantId(),number,target.orderId(),item,warehouse,quantity,row.observedAt());
                     return new Result(number,"OPEN",0);
                 } catch (org.springframework.dao.DuplicateKeyException duplicate) {
-                    if (attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || mapper.lockReturnBusinessNumber(number)==null) throw duplicate;
+                    if (attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || !BusinessNumber.isNumberCollision(duplicate,"uk_return_request_business_no","uk_return_request")) throw duplicate;
                 }
             }
             throw new IllegalStateException("return number allocation exhausted");

@@ -9,8 +9,7 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface FulfillmentMapper {
     /** 唯一订单/来源事件先占位再当前读，不对不存在事件加范围锁。 */
-    /** 仅用于判断全局可读号冲突。 */
-    String lockBusinessNumber(@Param("number") String number);
+    /** 每个订单只能提交一次整单交付和来源证明。 */
     int insertDelivery(@Param("tenant") long tenant,@Param("order") long order,@Param("number") String number,@Param("actor") String actor,@Param("event") String event,@Param("evidence") String evidence,@Param("at") Instant at,@Param("hash") String hash,@Param("now") Instant now);
     /** 订单锁后读取永久整单履约，不依据短期命令记录判断已交付。 */
     List<FulfillmentRecord> lockByOrder(@Param("tenant") long tenant,@Param("order") long order);

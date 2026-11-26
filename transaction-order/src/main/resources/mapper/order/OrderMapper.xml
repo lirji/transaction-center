@@ -55,9 +55,6 @@
     UPDATE tc_order SET status='CANCELLED',cancelled_at=#{now},updated_at=#{now},version=version+1
     WHERE tenant_id=#{tenant} AND id=#{order} AND version=#{version} AND status='CLOSING' AND financial_status='UNPAID'
   </update>
-  <select id="lockBusinessNumber" resultType="string" useCache="false">
-    SELECT business_no FROM tc_order WHERE business_no=#{number} FOR UPDATE
-  </select>
   <insert id="insertOrder">
     INSERT INTO tc_order(tenant_id,order_no,business_no,member_id,quote_id,merchant_id,merchant_no,warehouse_id,status,financial_status,
       gross_amount,discount_amount,payable_amount,currency,created_at,updated_at,expires_at)
@@ -65,7 +62,7 @@
       #{gross},#{discount},#{amount},#{currency},#{created},#{created},#{expires})
   </insert>
   <select id="findOwn" resultMap="header" useCache="false">
-    SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND <choose><when test="businessNumber">business_no=#{number}</when><otherwise>order_no=#{number}</otherwise></choose>
+    SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND <choose><when test='number.startsWith("TRD-ORD-")'>business_no=#{number}</when><otherwise>order_no=#{number}</otherwise></choose>
   </select>
   <select id="lockOwn" resultMap="header" useCache="false">
     SELECT <include refid="headerColumns"/> FROM tc_order WHERE tenant_id=#{tenant} AND member_id=#{member} AND order_no=#{number} FOR UPDATE

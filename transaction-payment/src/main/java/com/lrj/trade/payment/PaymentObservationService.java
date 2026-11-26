@@ -56,7 +56,7 @@ public class PaymentObservationService implements PaymentObservationPort {
                 Long.parseLong(order.orderId()),channel.channelCode(),channel.channelMerchantNo(),transaction,
                 amount,currency,providerPaid,now,disposition,evidence);
             receipt=mapper.lockReceipt(tenant,channel.channelCode(),channel.channelMerchantNo(),transaction).stream().findFirst().orElse(null);
-            if(receipt!=null || mapper.lockReceiptBusinessNumber(number)==null) break;
+            if(receipt!=null) break;
         }
         if(receipt==null) throw new TradeException("PAYMENT_FACT_CONFLICT","收款唯一约束与渠道引用冲突");
         if(!receipt.receiptNo().equals(receiptNo)) {
@@ -65,7 +65,7 @@ public class PaymentObservationService implements PaymentObservationPort {
             return receipt;
         }
         long receiptId=Long.parseLong(receipt.receiptId());
-        MoneyLedgerNumber.write(mapper,now,number->mapper.insertLedger(tenant,receiptId,number,amount,currency,evidence,now));
+        MoneyLedgerNumber.write(now,number->mapper.insertLedger(tenant,receiptId,number,amount,currency,evidence,now));
         if(disposition.equals("NORMAL")) {
             var confirmation=orders.confirmPayment(tenant,Long.parseLong(order.orderId()),amount,currency);
             if(mapper.markSucceeded(tenant,Long.parseLong(intent.intentId()),Long.parseLong(receipt.receiptId()),now)!=1)

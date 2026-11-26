@@ -139,7 +139,7 @@ public class OrderService implements OrderPaymentPort {
                 break;
             } catch (DuplicateKeyException duplicate) {
                 // 仅重试已被占用的编号，同报价重复下单等业务冲突仍由原约束裁决。
-                if (attempt == ORDER_NUMBER_ATTEMPTS - 1 || mapper.lockBusinessNumber(candidate) == null) {
+                if (attempt == ORDER_NUMBER_ATTEMPTS - 1 || !BusinessNumber.isNumberCollision(duplicate,"uk_order_business_no","uk_order_no")) {
                     throw duplicate;
                 }
             }
@@ -291,7 +291,7 @@ public class OrderService implements OrderPaymentPort {
     }
     private OrderHeader own(Actor actor,long member,String number,boolean lock) {
         Checks.text(number,64);
-        return (lock?mapper.lockOwn(actor.tenantId(),member,number):mapper.findOwn(actor.tenantId(),member,number,BusinessNumber.matches(BusinessNumber.Type.ORDER,number)))
+        return (lock?mapper.lockOwn(actor.tenantId(),member,number):mapper.findOwn(actor.tenantId(),member,number))
             .stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","订单不存在"));
     }
     private OrderView view(long tenant,OrderHeader row) {

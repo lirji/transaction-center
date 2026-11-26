@@ -59,7 +59,7 @@
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND <choose><when test="businessNumber">r.business_no=#{number}</when><otherwise>r.order_no=#{number}</otherwise></choose>
+    WHERE r.tenant_id=#{tenant} AND <choose><when test='number.startsWith("TRD-ORD-")'>r.business_no=#{number}</when><otherwise>r.order_no=#{number}</otherwise></choose>
   </select>
   <resultMap id="AdminOrderItem" type="com.lrj.trade.order.model.AdminOrderItem"><constructor>
     <arg column="itemId" javaType="java.lang.String"/>

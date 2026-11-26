@@ -123,7 +123,7 @@ public class QuoteService implements QuotePort {
                 mapper.insertQuote(tenant,member,amount,currency,policy,created,expires,number);
                 return number;
             } catch(org.springframework.dao.DuplicateKeyException duplicate) {
-                if(attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || mapper.lockBusinessNumber(number)==null) throw duplicate;
+                if(attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || !BusinessNumber.isNumberCollision(duplicate,"uk_quote_business_no")) throw duplicate;
             }
         }
         throw new IllegalStateException("quote number allocation exhausted");

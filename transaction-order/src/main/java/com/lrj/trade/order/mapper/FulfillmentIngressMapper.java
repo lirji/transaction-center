@@ -17,9 +17,8 @@ public interface FulfillmentIngressMapper {
     /** 租户订单ID解析为已有核心使用的订单号，不接受跨租户引用。 */
     List<String> orderNo(@Param("tenant") long tenant,@Param("id") long id);
     /** 创建退货意图，不增加已收到量和可售库存。 */
-    /** 通过全局索引确认候选的退货业务号冲突。 */
-    String lockReturnBusinessNumber(@Param("number") String number);
 
+    /** 永久退货申请号保存后才能返回首次受理。 */
     void createReturn(@Param("tenant") long tenant,@Param("number") String number,@Param("order") long order,@Param("item") long item,@Param("warehouse") long warehouse,@Param("quantity") long quantity,@Param("createdAt") java.time.Instant createdAt);
     /** 管理查询不读取证据原文。 */
     List<ReturnRequest> findReturn(@Param("tenant") long tenant,@Param("number") String number);

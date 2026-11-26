@@ -11,8 +11,6 @@ public interface ReconciliationCaseMapper {
     List<ReconciliationReportReceipt> lockReceipt(@Param("tenant") long tenant,@Param("source") String source,@Param("event") String event);
     /** 占业务唯一键，不更新既有业务内容。 */
     void insertCase(@Param("tenant") long tenant,@Param("number") String number,@Param("businessNo") String businessNo,@Param("now") java.time.Instant now,@Param("source") String source,@Param("report") ReconciliationCaseService.Report report,@Param("hash") String hash);
-    /** 当前读判断冲突发生在可读号还是原报告约束。 */
-    String lockBusinessNumber(@Param("number") String number);
     /** 当前读业务键，允许不同传输事件归于同一差异。 */
     List<ReconciliationCase> lockBusiness(@Param("tenant") long tenant,@Param("source") String source,@Param("report") ReconciliationCaseService.Report report);
     /** 只读不可变前序关联，不提前锁定其他case。 */

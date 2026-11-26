@@ -7,8 +7,6 @@ import org.apache.ibatis.annotations.*;
 public interface ReconciliationOperationMapper {
     /** 占永久主体请求键，重复不得更新原内容。 */
     void insert(@Param("tenant") long tenant,@Param("number") String number,@Param("businessNo") String businessNo,@Param("now") java.time.Instant now,@Param("actor") String actor,@Param("key") String key,@Param("hash") String hash,@Param("caseNo") String caseNo,@Param("action") String action,@Param("reason") String reason,@Param("ticket") String ticket);
-    /** 当前读判断冲突发生在可读号还是已受理请求。 */
-    String lockBusinessNumber(@Param("number") String number);
     /** 当前读永久请求结果。 */
     List<ReconciliationOperation> lockRequest(@Param("tenant") long tenant,@Param("actor") String actor,@Param("key") String key);
     /** 处理器首先锁自身操作。 */

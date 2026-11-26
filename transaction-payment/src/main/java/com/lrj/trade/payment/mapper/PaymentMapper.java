@@ -20,9 +20,8 @@ public interface PaymentMapper {
     /** 调用方已锁订单，随后锁意图形成固定锁序。 */
     List<PaymentIntent> lockByOrder(@Param("tenant") long tenant,@Param("order") long order);
     /** 本人查询显式限定会员和租户。 */
-    /** 仅在发号碰撞后通过全局唯一索引判断冲突对象。 */
-    String lockBusinessNumber(@Param("number") String number);
 
+    /** 会员支付查询仍按原始意图与当前会员归属过滤。 */
     List<PaymentView> findOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("number") String number);
     /** 最后尝试早已关闭后才取消订单时，空活跃指针仍可安全结束意图。 */
     int finishWithoutActive(@Param("tenant") long tenant,@Param("intent") long intent,@Param("now") Instant now);
@@ -43,10 +42,7 @@ public interface PaymentMapper {
     /** 无论正常或异常均保存真实资金，不因订单已付丢掉第二笔钱。 */
     int insertReceipt(@Param("tenant") long tenant,@Param("receiptNo") String receiptNo,@Param("businessNo") String businessNo,@Param("intent") long intent,@Param("attempt") long attempt,@Param("order") long order,@Param("code") String code,@Param("channelMerchant") String channelMerchant,@Param("transaction") String transaction,@Param("amount") long amount,@Param("currency") String currency,@Param("providerPaid") Instant providerPaid,@Param("now") Instant now,@Param("disposition") String disposition,@Param("evidence") String evidence);
     /** 资金流水和原收款同事务，异常资金也需逐笔可对账。 */
-    /** 实收已按渠道幂等键确认不存在时，仅此唯一号可触发重发。 */
-    String lockReceiptBusinessNumber(@Param("number") String number);
-    /** 正向和退款流水共享同一全局号空间。 */
-    String lockLedgerBusinessNumber(@Param("number") String number);
+    /** 实收的资金账本与实收和订单确认同事务。 */
     int insertLedger(@Param("tenant") long tenant,@Param("receipt") long receipt,@Param("number") String number,@Param("amount") long amount,@Param("currency") String currency,@Param("evidence") String evidence,@Param("now") Instant now);
     /** 首个正常收款绑定意图，禁止替换既有正常收款。 */
     int markSucceeded(@Param("tenant") long tenant,@Param("intent") long intent,@Param("receipt") long receipt,@Param("now") Instant now);

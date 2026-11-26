@@ -33,8 +33,8 @@ public class ReconciliationCaseService {
             String readable=BusinessNumber.next(BusinessNumber.Type.RECON_CASE,createdAt);
             mapper.insertCase(tenant,number,readable,createdAt,source,report,content);
             current=mapper.lockBusiness(tenant,source,report).stream().findFirst().orElse(null);
-            // 来源回执和修订链继续引用原 UUID；这里只重试可读号冲突。
-            if(current!=null || mapper.lockBusinessNumber(readable)==null) break;
+            // 来源回执和修订链继续引用原 UUID；查询不到原业务键时才有界重试。
+            if(current!=null) break;
         }
         if(current==null) throw new TradeException("RECONCILIATION_CASE_CONFLICT","无法建立差异编号");
         if(!current.contentHash().equals(content)) throw new TradeException("RECONCILIATION_CASE_CONFLICT","账单差异业务键已有不同证据");

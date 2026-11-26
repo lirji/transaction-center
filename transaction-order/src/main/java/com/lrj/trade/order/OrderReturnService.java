@@ -42,9 +42,8 @@ public class OrderReturnService {
                 mapper.insert(source.tenantId(),number,businessNo,id,itemId,source.key(),event,
                     warehouse,received,saleable,evidence,hash,createdAt);
                 found=mapper.lockEvent(source.tenantId(),source.key(),event);
-                // 原验收号继续作为回库关联；只为不存在的来源事件处理候选号碰撞。
-                if (found!=null || mapper.lockBusinessNumber(businessNo)==null) break;
-            }
+                // 原验收号继续作为回库关联，来源事件当前读仍为空时才重试。
+                if(found!=null) break;            }
             if(found==null || !found.requestHash().equals(hash)) throw new TradeException("RETURN_CONFLICT","验收来源事件已经绑定其他内容");
             if(!found.returnNo().equals(number)) return found.returnNo();
             if(mapper.consumeBudget(source.tenantId(),id,itemId,received)!=1) throw invalid();

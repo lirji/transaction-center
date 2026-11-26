@@ -44,13 +44,13 @@ public class AdminOrderQueryService {
     }
     /** 同租户精确读取，未知与外租户资源统一不存在。 */
     public AdminOrderView read(long tenant,String number) {
-        Checks.positive(tenant);return mapper.find(tenant,number,BusinessNumber.matches(BusinessNumber.Type.ORDER,number)).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","资源不存在"));
+        Checks.positive(tenant);return mapper.find(tenant,number).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","资源不存在"));
     }
 
     /** 详情与子记录使用一个RR快照，资金和验收事实不由页面拼凑裁决。 */
     public Detail detail(long tenant,String number) {
         Checks.positive(tenant);Instant at=clock.instant();
-        var view=mapper.find(tenant,number,BusinessNumber.matches(BusinessNumber.Type.ORDER,number)).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","资源不存在"));
+        var view=mapper.find(tenant,number).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","资源不存在"));
         return new Detail(view,at,mapper.items(tenant,view.orderId()),mapper.fulfillment(tenant,view.orderId()).stream().findFirst().orElse(null));
     }
     /** 展开安全主记录，字段兼容列表，不展开内部持久化实体。 */

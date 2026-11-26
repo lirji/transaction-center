@@ -89,9 +89,6 @@
     </constructor>
   </resultMap>
   <!-- 支付意图与订单许可同事务，订单唯一防止换幂等键创建第二意图。 -->
-  <select id="lockBusinessNumber" resultType="string" useCache="false">
-    SELECT business_no FROM tc_payment_intent WHERE business_no=#{number} FOR UPDATE
-  </select>
   <insert id="insertIntent">
     INSERT INTO tc_payment_intent(tenant_id,payment_no,business_no,order_id,member_id,expected_amount,currency,created_at,updated_at) VALUES(#{tenant},#{number},#{number},#{order},#{member},#{amount},#{currency},#{now},#{now})
   </insert>
@@ -140,12 +137,6 @@
 VALUES(#{tenant},#{receiptNo},#{businessNo},#{intent},#{attempt},#{order},#{code},#{channelMerchant},#{transaction},#{amount},#{currency},#{providerPaid},#{now},#{disposition},#{evidence},#{now},#{now})
     ON DUPLICATE KEY UPDATE id=tc_payment_receipt.id
   </insert>
-  <select id="lockReceiptBusinessNumber" resultType="string" useCache="false">
-    SELECT business_no FROM tc_payment_receipt WHERE business_no=#{number} FOR UPDATE
-  </select>
-  <select id="lockLedgerBusinessNumber" resultType="string" useCache="false">
-    SELECT business_no FROM tc_money_ledger WHERE business_no=#{number} FOR UPDATE
-  </select>
   <!-- 资金流水和原收款同事务，异常资金也需逐笔可对账。 -->
   <insert id="insertLedger">
     INSERT INTO tc_money_ledger(tenant_id,receipt_id,ledger_no,business_no,business_key,entry_type,amount,currency,evidence_ref,created_at,updated_at) VALUES(#{tenant},#{receipt},#{number},#{number},CONCAT('receipt:',#{receipt}),'RECEIPT',#{amount},#{currency},#{evidence},#{now},#{now})

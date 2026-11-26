@@ -30,7 +30,6 @@
     INSERT INTO tc_quote(tenant_id,member_id,payable_amount,currency,pricing_policy,expires_at,created_at,updated_at,business_no)
     VALUES (#{tenant},#{member},#{amount},#{currency},#{policy},#{expires},#{created},#{created},#{number})
   </insert>
-  <select id="lockBusinessNumber" resultType="string" useCache="false">SELECT business_no FROM tc_quote WHERE business_no=#{number} FOR UPDATE</select>
   <select id="lastInsertedQuoteId" resultType="java.lang.Long" useCache="false">
     SELECT id FROM tc_quote WHERE tenant_id=#{tenant} AND id=LAST_INSERT_ID()
   </select>

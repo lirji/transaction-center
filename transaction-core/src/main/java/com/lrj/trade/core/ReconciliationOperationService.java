@@ -29,7 +29,7 @@ public class ReconciliationOperationService {
             String readable=BusinessNumber.next(BusinessNumber.Type.RECON_OPERATION,createdAt);
             mapper.insert(tenant,originalNo,readable,createdAt,actor.key(),key,hash,caseNo,action,reason,ticket);
             operation=mapper.lockRequest(tenant,actor.key(),key).stream().findFirst().orElse(null);
-            if(operation!=null || mapper.lockBusinessNumber(readable)==null) break;
+            if(operation!=null) break;
         }
         if(operation==null) throw new TradeException("RECONCILIATION_OPERATION_INVALID","无法建立对账操作编号");
         if(!operation.requestHash().equals(hash)) throw new TradeException("IDEMPOTENCY_CONFLICT","查询请求键已绑定其他内容");

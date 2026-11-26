@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.springframework.dao.DuplicateKeyException;
 
 /** 交易域编号格式。生成时刻与数据库创建时刻使用相同输入，便于零点附近对账。 */
 public final class BusinessNumber {
@@ -35,6 +36,16 @@ public final class BusinessNumber {
     public static String next(Type type, Instant createdAt) {
         return type.prefix + BUSINESS_DATE.format(createdAt) + "-"
             + String.format(Locale.ROOT, "%010d", RANDOM.nextLong(SUFFIX_SPACE));
+    }
+
+    /** 由数据库报告的确切索引裁决冲突，无需跨租户查询候选号。 */
+    public static boolean isNumberCollision(DuplicateKeyException failure, String... indexes) {
+        String message=failure.getMostSpecificCause().getMessage();
+        if(message==null) return false;
+        for(String index:indexes) {
+            if(message.endsWith("."+index+"'") || message.endsWith("'"+index+"'")) return true;
+        }
+        return false;
     }
 
     /** 跨版本读路径可依靠前缀将新号和旧号引向不同索引。 */

@@ -28,12 +28,12 @@ public interface RefundMapper {
     /** 永久主体请求号去重，新插入尚不可见，资金/明细随后在同事务建立。 */
     int insertRefund(@Param("tenant") long tenant,@Param("number") String number,@Param("businessNo") String businessNo,@Param("request") String request,@Param("actor") String actor,@Param("member") long member,@Param("order") long order,@Param("orderNo") String orderNo,@Param("receipt") long receipt,@Param("receiptNo") String receiptNo,@Param("merchantRefund") String merchantRefund,@Param("amount") long amount,@Param("currency") String currency,@Param("reason") String reason,@Param("hash") String hash,@Param("status") String status,@Param("policyVersion") long policyVersion,@Param("policyLimit") long policyLimit,@Param("approval") String approval,@Param("deadline") Instant deadline,@Param("now") Instant now,@Param("compensation") Long compensation);
     /** 永久请求键占位后精确当前读，重放返回原聚合。 */
-    /** 当前读只用于确认公开编号已被其它申请使用。 */
-    String lockBusinessNumber(@Param("number") String number);
+    /** 申请来源键用于当前读，重复请求必须返回已持久化退款。 */
     List<RefundRow> lockByRequest(@Param("tenant") long tenant,@Param("actor") String actor,@Param("request") String request);
     /** 只读归属或展示，不据此作状态转换。 */
     /** 会员展示号解析使用独立唯一索引，原流程继续锁原单号。 */
     List<RefundRow> findRefundByBusinessNumber(@Param("tenant") long tenant,@Param("number") String number);
+    /** 原退款请求号在确认和重放时保持有效。 */
     List<RefundRow> findRefund(@Param("tenant") long tenant,@Param("number") String number);
     /** 在订单/资金资源锁之后精确锁定现有退款聚合。 */
     List<RefundRow> lockRefund(@Param("tenant") long tenant,@Param("number") String number);

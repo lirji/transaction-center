@@ -130,7 +130,7 @@ public class PaymentRefundService implements PaymentRefundPort {
             throw new TradeException("REFUND_FACT_CONFLICT","渠道退款号已经绑定其他退款");
         }
         changed(mapper.confirmAmount(tenant,Long.parseLong(hold.receiptId()),amount,now));
-        MoneyLedgerNumber.write(payments,now,number->mapper.insertLedger(tenant,Long.parseLong(hold.receiptId()),
+        MoneyLedgerNumber.write(now,number->mapper.insertLedger(tenant,Long.parseLong(hold.receiptId()),
             refundNo,hold.reservationNo(),number,amount,currency,evidenceRef,now));
         outbox.append(tenant,"payment.refund-succeeded.internal.v0",refundNo);
         // 不操作会员everPaid、订单履约或库存；退款成功不是退货验收事实。

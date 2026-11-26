@@ -70,6 +70,7 @@ class MultiInstanceIT {
     @Test void multiProcessCorrectnessAndRecovery() throws Exception {
         Files.createDirectories(output);
         var data=new ConsoleBusinessSeed(context,IDENTITY.issuer()).seed();
+        long seededOrders=count("tc_order"),seededReceipts=count("tc_payment_receipt");
         Node a=start("API-A"),b=start("API-B"),w1=start("Worker-A"),w2=start("Worker-B");
         assertEquals(4,nodes.stream().map(n->n.process.pid()).distinct().count());
         String member=IDENTITY.accessToken("member"),admin=IDENTITY.accessToken("admin");
@@ -83,8 +84,8 @@ class MultiInstanceIT {
         assertEquals(200,ra.statusCode(),ra.body());assertEquals(200,rb.statusCode(),rb.body());
         assertEquals(json.readTree(ra.body()).get("orderNo"),json.readTree(rb.body()).get("orderNo"));
         assertEquals(409,post(b,"/orders","multi-order",body.replace("隔离地址","不同地址"),member).statusCode());
-        assertEquals(4,count("tc_order"));
-        record("D-01","跨API订单同键同内容唯一、异内容409",Map.of("orders",4));
+        assertEquals(seededOrders+1,count("tc_order"));
+        record("D-01","跨API订单同键同内容唯一、异内容409",Map.of("orders",seededOrders+1));
         String adjustment=json.writeValueAsString(Map.of("warehouseId",Long.parseLong(data.get("warehouseId")),"skuId",Long.parseLong(data.get("skuId")),"delta",5,"reason","跨API幂等"));
         var x=CompletableFuture.supplyAsync(()->uncheckedPost(a,"/admin/inventory-adjustments","multi-adjust",adjustment,admin));
         var y=CompletableFuture.supplyAsync(()->uncheckedPost(b,"/admin/inventory-adjustments","multi-adjust",adjustment,admin));
@@ -130,16 +131,16 @@ class MultiInstanceIT {
         var batch1=w2.call(Map.of("action","batch"));var batch2=restarted.call(Map.of("action","batch"));
         assertEquals("RETRY",batch1.get("outcomes").get(0).asText());
         assertEquals("DONE",batch2.get("outcomes").get(0).asText());
-        assertEquals(2,count("tc_payment_receipt"));
+        assertEquals(seededReceipts,count("tc_payment_receipt"));
         assertEquals(108,stock());assertEquals(108,jdbc.queryForObject("SELECT available+reserved+sold FROM tc_inventory_balance WHERE tenant_id=900001",Integer.class));
-        record("worker-recovery","生产PaymentRecoveryWorker处理持久任务；无新增资金事实",Map.of("receipts",2,"results",List.of(batch1,batch2)));
+        record("worker-recovery","生产PaymentRecoveryWorker处理持久任务；无新增资金事实",Map.of("receipts",seededReceipts,"results",List.of(batch1,batch2)));
         // 模拟客户端未保留响应后API进程退出：另一新进程仍按原业务键恢复原订单。
         b.process.destroyForcibly();assertTrue(b.process.waitFor(10,TimeUnit.SECONDS));
         Node newApi=start("API-B-restarted");
         var replay=post(newApi,"/orders","multi-order",body,member);
         assertEquals(200,replay.statusCode());assertEquals(json.readTree(ra.body()).get("orderNo"),json.readTree(replay.body()).get("orderNo"));
-        assertEquals(4,count("tc_order"));assertEquals(108,stock());
-        record("D-01-restart","API退出后重试原业务号，订单及库存不重复",Map.of("orders",4,"stock",108));
+        assertEquals(seededOrders+1,count("tc_order"));assertEquals(108,stock());
+        record("D-01-restart","API退出后重试原业务号，订单及库存不重复",Map.of("orders",seededOrders+1,"stock",108));
         Collections.sort(latency);
         Files.writeString(output.resolve("result.json"),json.writeValueAsString(Map.of("status","PASS","database","transaction_center_multi_it",
             "instances",nodes.stream().map(n->Map.of("role",n.role,"pid",n.process.pid(),"port",n.port)).toList(),"cases",evidence,

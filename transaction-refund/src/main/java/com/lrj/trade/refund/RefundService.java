@@ -130,7 +130,7 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
         return List.copyOf(mapper.listQueue(tenant,status,after,limit));
     }
 
-    /** UPSERT已处理来源幂等。来源缺失时只允许重新分配真正被占用的业务编号。 */
+    /** UPSERT持有唯一键写锁。优先返回已有来源，来源缺失时有界重试分配新号。 */
     private RefundRow issueRefund(Instant now,java.util.function.Consumer<String> write,
             java.util.function.Supplier<List<RefundRow>> readSource) {
         for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
@@ -138,7 +138,7 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
             write.accept(candidate);
             var existing=readSource.get();
             if (!existing.isEmpty()) return existing.getFirst();
-            if (mapper.lockBusinessNumber(candidate)==null) break;
+
         }
         throw new TradeException("REFUND_COMPENSATION_CONFLICT","永久请求已有不同退款关联，须核对后处理");
     }

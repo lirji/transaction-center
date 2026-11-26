@@ -19,6 +19,11 @@ class Dataset:
     timestamp_column: str = "created_at"
     iso_timestamp: bool = False
     partition_column: Optional[str] = None
+    numeric_primary_key: Optional[bool] = None
+
+    @property
+    def key_is_numeric(self):
+        return self.numeric_tenant if self.numeric_primary_key is None else self.numeric_primary_key
 
 
 DATASETS = {
@@ -44,6 +49,9 @@ DATASETS = {
     "commerce-refunds": Dataset("payment_refund", "refund_id", "COM-RFD", False),
     "commerce-aftersales": Dataset("aftersales_case", "case_id", "COM-AFS", False),
     "marketing-campaigns": Dataset("mk_campaign", "campaign_id", "MKT-CMP", False, iso_timestamp=True),
+    "marketing-definition-versions": Dataset("mk_definition_version", "version_no", "MKT-DEF", False,
+                                             iso_timestamp=True, partition_column="definition_id", numeric_primary_key=True),
+    "commerce-benefit-ledger": Dataset("benefit_ledger", "entry_id", "COM-LED", False),
     "marketing-approvals": Dataset("mk_approval_case", "case_id", "MKT-APR", False, iso_timestamp=True),
     "marketing-audience-snapshots": Dataset("mk_audience_snapshot", "snapshot_id", "MKT-SNP", False, iso_timestamp=True),
     "marketing-journey-enrollments": Dataset("mk_enrollment", "enrollment_id", "MKT-JIN", False, iso_timestamp=True),
@@ -93,7 +101,7 @@ def mysql(args, query):
 
 def read_batch(args, dataset, scope, after):
     """按租户和原生主键游标分页，重跑时已编号记录自然退出。"""
-    lower = f" AND {dataset.primary_key}>{sql_identifier(after, dataset.numeric_tenant)}" if after else ""
+    lower = f" AND {dataset.primary_key}>{sql_identifier(after, dataset.key_is_numeric)}" if after else ""
     timestamp = dataset.timestamp_column
     if dataset.iso_timestamp:
         # 营销表保存 ISO-8601 UTC 字符串，解析秒及之前的信息足以计算业务日。
@@ -104,7 +112,7 @@ def read_batch(args, dataset, scope, after):
     rows = []
     for line in mysql(args, query):
         identifier, date = line.split("\t")
-        sql_identifier(identifier, dataset.numeric_tenant)
+        sql_identifier(identifier, dataset.key_is_numeric)
         if not BUSINESS_DAY.fullmatch(date):
             raise ValueError("one stored record has an invalid business day")
         rows.append((identifier, date))
@@ -114,7 +122,7 @@ def read_batch(args, dataset, scope, after):
 def fill_batch(args, dataset, scope, rows):
     """只有一次原子 UPDATE，唯一号碰撞回滚这一批后重新选号。"""
     key = dataset.primary_key
-    identifiers = [sql_identifier(identifier, dataset.numeric_tenant) for identifier, _ in rows]
+    identifiers = [sql_identifier(identifier, dataset.key_is_numeric) for identifier, _ in rows]
     for attempt in range(COLLISION_RETRIES):
         mappings = [
             f"WHEN {identifier} THEN '{dataset.prefix}-{date}-{secrets.randbelow(SUFFIX_SPACE):010d}'"
@@ -137,7 +145,7 @@ def main():
     parser.add_argument("--dataset", choices=DATASETS, required=True)
     parser.add_argument("--database", required=True)
     parser.add_argument("--tenant", required=True)
-    parser.add_argument("--partition", help="campaign ID for a release schedule dataset")
+    parser.add_argument("--partition", help="raw owner ID for a partitioned dataset")
     parser.add_argument("--defaults-file", type=Path, required=True)
     parser.add_argument("--mysql", default="mysql")
     parser.add_argument("--batch-size", type=int, default=100)
