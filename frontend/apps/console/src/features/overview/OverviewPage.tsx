@@ -76,7 +76,7 @@ export function OverviewPage() {
         </Panel>
         <Panel className="table-panel">
           <h2 className="table-title">当前待处理</h2>
-          <table className="data-table queue-table">
+          <table className="data-table queue-table overview-queue-table">
             <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
             <tbody>
               <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}

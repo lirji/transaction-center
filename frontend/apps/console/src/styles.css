@@ -131,6 +131,14 @@ main { min-width: 0; }
 .data-table th, .data-table td { padding: 12px 18px; text-align: left; font-size: 13px; border-bottom: 1px solid #edf0f1; vertical-align: top; }
 .data-table th { color: var(--ink-400); background: #f8faf9; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .data-table td small { display: block; margin-top: 4px; color: var(--ink-400); }
+.operations-summary-table { table-layout: fixed; }
+.operations-metric-name { width: 40%; }
+.operations-metric-action { width: 26%; }
+.operations-summary-table tbody th { color: var(--ink-600); font-size: 13px; letter-spacing: normal; }
+.data-table.operations-facts-table { min-width: 1060px; }
+.operations-facts-table :is(th, td):nth-child(2) { min-width: 132px; }
+.operations-facts-table :is(th, td):nth-child(3) { min-width: 92px; }
+
 .mono { font-family: "SFMono-Regular", Consolas, monospace; }
 .stack-form { max-width: 720px; }
 .page-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .8fr); gap: 16px; }
@@ -177,4 +185,8 @@ main { min-width: 0; }
   .workspace { padding: 24px 16px 80px; }
   .page-heading { flex-direction: column; align-items: flex-start; }
   .kv { grid-template-columns: 1fr; }
+  :is(.overview-queue-table, .operations-summary-table) :is(th, td) { padding-inline: 10px; }
+  .overview-queue-table th[scope="row"] { min-width: 78px; }
+  .operations-summary-table .button { padding-inline: 0; }
+
 }

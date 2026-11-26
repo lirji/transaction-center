@@ -86,12 +86,13 @@ export function OperationsSummary() {
                   <p>{formatBeijingTime(result.from)} 至 {formatBeijingTime(result.to)}（北京时间，含起始、不含结束） · {result.currency}</p>
                   <p>读取时间 {formatBeijingTime(result.observedAt)}（北京时间）</p>
                   <div className="table-scroll">
-                    <table className="data-table queue-table">
+                    <table className="data-table operations-summary-table">
+                      <colgroup><col className="operations-metric-name" /><col /><col className="operations-metric-action" /></colgroup>
                       <thead><tr><th scope="col">指标</th><th scope="col">数值</th><th scope="col">明细</th></tr></thead>
                       <tbody>
                         <tr><th scope="row">新建订单</th><td>{displayAmount(result.orderCount)} 单</td><td rowSpan={2}><Link to={`/orders?${orderQuery}`}>查看创建订单</Link></td></tr>
                         <tr><th scope="row">创建应付额</th><td>{displayAmount(result.orderPayable)}（最小单位）</td></tr>
-                        <tr><th scope="row">确认付费订单</th><td>{displayAmount(result.paidOrderCount)} 单</td><td><Button tone="ghost" onClick={() => setScope('NORMAL_RECEIPT')}>查看对应收款</Button></td></tr>
+                        <tr><th scope="row">确认付费订单</th><td>{displayAmount(result.paidOrderCount)} 单</td><td><Button tone="ghost" onClick={() => setScope('NORMAL_RECEIPT')}>查看收款</Button></td></tr>
                         {totals.map(([kind, amount]) => (
                           <tr key={kind}>
                             <th scope="row">{financeLabels[kind]}</th>
@@ -128,23 +129,25 @@ function FinancialFacts({ range, scope }: { range: OperationsRange; scope: Opera
       <PageQueryGate query={query} emptyTitle="期间无资金记录" emptyDetail="当前币种、期间和资金范围没有匹配的确认记录。">
         {(result) => (
           <>
-            <table className="data-table trade-list-table">
-              <thead><tr><th>账本流水</th><th>资金类型</th><th>最小单位金额</th><th>币种</th><th>订单号</th><th>实收号</th><th>退款单号</th><th>确认时间（北京时间）</th></tr></thead>
-              <tbody>
-                {result.items.map((row) => (
-                  <tr key={row.ledgerNo}>
-                    <td className="mono">{row.ledgerNo}</td>
-                    <td>{financeLabels[row.kind]}</td>
-                    <td>{displayAmount(row.amount)}</td>
-                    <td>{row.currency}</td>
-                    <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderNo}</Link></td>
-                    <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`}>{row.receiptNo}</Link></td>
-                    <td>{row.refundNo ? <Link to={`/refunds/${encodeURIComponent(row.refundNo)}`}>{row.refundNo}</Link> : '—'}</td>
-                    <td>{formatBeijingTime(row.confirmedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="data-table operations-facts-table">
+                <thead><tr><th>账本流水</th><th>资金类型</th><th>最小单位金额</th><th>币种</th><th>订单号</th><th>实收号</th><th>退款单号</th><th>确认时间（北京时间）</th></tr></thead>
+                <tbody>
+                  {result.items.map((row) => (
+                    <tr key={row.ledgerNo}>
+                      <td className="mono">{row.ledgerNo}</td>
+                      <td>{financeLabels[row.kind]}</td>
+                      <td>{displayAmount(row.amount)}</td>
+                      <td>{row.currency}</td>
+                      <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderNo}</Link></td>
+                      <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`}>{row.receiptNo}</Link></td>
+                      <td>{row.refundNo ? <Link to={`/refunds/${encodeURIComponent(row.refundNo)}`}>{row.refundNo}</Link> : '—'}</td>
+                      <td>{formatBeijingTime(row.confirmedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <PagePager after={after} nextAfter={result.nextAfter} hasMore={result.hasMore}
               observedAt={result.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
           </>
