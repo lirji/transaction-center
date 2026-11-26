@@ -34,6 +34,6 @@ public final class OperationsReport {
     }
 
     /** 以账本主键推进明细，真实业务号用于打开订单、退款和实收详情。 */
-    public record Fact(@JsonIgnore String cursor, String ledgerNo, String orderNo, String receiptNo,
+    public record Fact(@JsonIgnore String cursor, String ledgerNo, String businessNo, String orderNo, String receiptNo,
                        String refundNo, Scope kind, long amount, String currency, Instant confirmedAt) implements AdminPage.Row {}
 }

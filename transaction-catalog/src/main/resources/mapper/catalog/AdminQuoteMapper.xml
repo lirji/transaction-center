@@ -11,20 +11,22 @@
       <arg column="createdAt" javaType="java.time.Instant"/>
       <arg column="expiresAt" javaType="java.time.Instant"/>
       <arg column="version" javaType="_long"/>
+      <arg column="businessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
-  <sql id="columns">r.id AS `cursor`, r.id AS quoteId, r.member_id AS memberId, r.payable_amount AS payableAmount, r.currency AS currency, r.pricing_policy AS pricingPolicy, r.created_at AS createdAt, r.expires_at AS expiresAt, r.version AS version</sql>
+  <sql id="columns">r.id AS `cursor`, r.id AS quoteId, r.member_id AS memberId, r.payable_amount AS payableAmount, r.currency AS currency, r.pricing_policy AS pricingPolicy, r.created_at AS createdAt, r.expires_at AS expiresAt, r.version AS version,r.business_no AS businessNo</sql>
   <sql id="source">FROM tc_quote r </sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
     WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
     <if test="q.filters.quoteId != null">AND r.id=#{q.filters.quoteId}</if>
+    <if test="q.filters.businessNo != null">AND r.business_no=#{q.filters.businessNo}</if>
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
     ORDER BY r.id ASC LIMIT #{q.fetchLimit}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.id=#{number}
+    WHERE r.tenant_id=#{tenant} AND <choose><when test='number.startsWith("TRD-QTE-")'>r.business_no=#{number}</when><otherwise>r.id=#{number}</otherwise></choose>
   </select>
 </mapper>

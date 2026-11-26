@@ -10,6 +10,7 @@
       <arg column="pricing_policy" javaType="java.lang.String"/>
       <arg column="created_at" javaType="java.time.Instant"/>
       <arg column="expires_at" javaType="java.time.Instant"/>
+      <arg column="business_no" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
   <resultMap id="item" type="com.lrj.trade.catalog.model.QuoteItem" autoMapping="false">
@@ -26,9 +27,10 @@
   </resultMap>
   <!-- 主表、明细、命令引用同事务，不能返回未持久化的临时报价。 -->
   <insert id="insertQuote">
-    INSERT INTO tc_quote(tenant_id,member_id,payable_amount,currency,pricing_policy,expires_at,created_at,updated_at)
-    VALUES (#{tenant},#{member},#{amount},#{currency},#{policy},#{expires},#{created},#{created})
+    INSERT INTO tc_quote(tenant_id,member_id,payable_amount,currency,pricing_policy,expires_at,created_at,updated_at,business_no)
+    VALUES (#{tenant},#{member},#{amount},#{currency},#{policy},#{expires},#{created},#{created},#{number})
   </insert>
+  <select id="lockBusinessNumber" resultType="string" useCache="false">SELECT business_no FROM tc_quote WHERE business_no=#{number} FOR UPDATE</select>
   <select id="lastInsertedQuoteId" resultType="java.lang.Long" useCache="false">
     SELECT id FROM tc_quote WHERE tenant_id=#{tenant} AND id=LAST_INSERT_ID()
   </select>
@@ -39,7 +41,7 @@
       #{price},#{discount},#{amount},#{created},#{created})
   </insert>
   <select id="findOwn" resultMap="header" useCache="false">
-    SELECT id,payable_amount,currency,pricing_policy,created_at,expires_at
+    SELECT id,payable_amount,currency,pricing_policy,created_at,expires_at,business_no
     FROM tc_quote WHERE tenant_id=#{tenant} AND member_id=#{member} AND id=#{quote}
   </select>
   <select id="listItems" resultMap="item" useCache="false">

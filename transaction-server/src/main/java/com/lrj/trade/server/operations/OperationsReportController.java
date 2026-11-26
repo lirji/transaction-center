@@ -41,7 +41,7 @@ public class OperationsReportController {
     @GetMapping("/financial-facts")
     public AdminPage<OperationsReport.Fact> facts(@AuthenticationPrincipal Jwt jwt,
                                                     @RequestParam MultiValueMap<String,String> params) {
-        AdminQuery query=AdminQuery.parse(params,Map.of("currency",Set.of(),"scope",SCOPES),true);
+        AdminQuery query=AdminQuery.parse(params,Map.of("currency",Set.of(),"scope",SCOPES,"ledgerNo",Set.of()),true);
         String currency=validatedCurrency(query);
         if (!query.filters().containsKey("scope")) throw invalid();
         return report.facts(tenant(jwt),currency,query);

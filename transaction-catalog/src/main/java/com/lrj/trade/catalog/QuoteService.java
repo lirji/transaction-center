@@ -54,7 +54,7 @@ public class QuoteService implements QuotePort {
             }
             // 取得全部锁后再定有效期，避免锁等待耗尽刚生成的报价有效时间。
             var created=clock.instant().truncatedTo(ChronoUnit.MILLIS);
-            mapper.insertQuote(actor.tenantId(),member,total,currency,pricing.version(),created,created.plusSeconds(ttlSeconds));
+            insertQuote(actor.tenantId(),member,total,currency,pricing.version(),created,created.plusSeconds(ttlSeconds));
             // 紧跟INSERT且处于同一连接事务，LAST_INSERT_ID不会被其他请求或后续明细写入覆盖。
             long quote=mapper.lastInsertedQuoteId(actor.tenantId());
             for(QuoteItem line:priced) mapper.insertItem(actor.tenantId(),quote,Long.parseLong(line.skuId()),line.skuRevision(),
@@ -104,7 +104,7 @@ public class QuoteService implements QuotePort {
         var created = clock.instant().truncatedTo(ChronoUnit.MILLIS);
         if (items.isEmpty() || payable <= 0 || payable != price.payableAmount() || !created.isBefore(price.expiresAt()))
             throw new TradeException("CHECKOUT_PILOT_SOURCE_CONFLICT", "试点报价已失效或应付校验失败");
-        mapper.insertQuote(tenant, member, payable, price.currency(), CheckoutPrice.POLICY, created, price.expiresAt());
+        String number=insertQuote(tenant, member, payable, price.currency(), CheckoutPrice.POLICY, created, price.expiresAt());
         long quote = mapper.lastInsertedQuoteId(tenant);
         for (var item : items) {
             mapper.insertItem(tenant, quote, Long.parseLong(item.skuId()), item.skuRevision(), item.title(),
@@ -113,13 +113,26 @@ public class QuoteService implements QuotePort {
         }
         audit.append(actor, "quote.create", "QUOTE", Long.toString(quote), "创建试点原生报价", 0, 0);
         return new Quote(Long.toString(quote), payable, price.currency(), CheckoutPrice.POLICY, created, price.expiresAt(),
-            List.copyOf(items));
+            List.copyOf(items),number);
+    }
+    /** 普通与试点原生报价共用唯一号空间，签名引用仍使用原生报价键。 */
+    private String insertQuote(long tenant,long member,long amount,String currency,String policy,java.time.Instant created,java.time.Instant expires) {
+        for(int attempt=0;attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS;attempt++) {
+            String number=BusinessNumber.next(BusinessNumber.Type.QUOTE,created);
+            try {
+                mapper.insertQuote(tenant,member,amount,currency,policy,created,expires,number);
+                return number;
+            } catch(org.springframework.dao.DuplicateKeyException duplicate) {
+                if(attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || mapper.lockBusinessNumber(number)==null) throw duplicate;
+            }
+        }
+        throw new IllegalStateException("quote number allocation exhausted");
     }
     private Quote load(long tenant,long member,long quoteId) {
         QuoteHeader header=mapper.findOwn(tenant,member,quoteId).stream().findFirst()
             .orElseThrow(()->new TradeException("NOT_FOUND","报价不存在"));
         return new Quote(header.quoteId(),header.payableAmount(),header.currency(),header.pricingPolicy(),
-            header.createdAt(),header.expiresAt(),List.copyOf(mapper.listItems(tenant,quoteId)));
+            header.createdAt(),header.expiresAt(),List.copyOf(mapper.listItems(tenant,quoteId)),header.businessNo());
     }
     private SortedMap<Long,Long> normalize(List<QuoteSelection> selections) {
         if(selections==null || selections.isEmpty() || selections.size()>50)

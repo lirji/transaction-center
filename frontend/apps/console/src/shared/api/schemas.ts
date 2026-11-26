@@ -429,6 +429,7 @@ export const adminRefundDetailSchema = adminRefundViewSchema.extend({
 export type AdminRefundDetail = z.infer<typeof adminRefundDetailSchema>
 
 export const adminQuoteViewSchema = z.object({
+  businessNo: z.string().nullish(),
   quoteId: z.string(),
   memberId: z.string(),
   payableAmount: z.number().int().min(0),
@@ -537,7 +538,7 @@ export const operationsSummarySchema = z.object({
 const operationsFactKind = z.enum(['NORMAL_RECEIPT', 'ABNORMAL_RECEIPT', 'NORMAL_REFUND', 'ABNORMAL_REFUND'])
 export type OperationsScope = z.infer<typeof operationsFactKind> | 'NET'
 export const operationsFinancialFactSchema = z.object({
-  ledgerNo: z.string(), orderNo: z.string(), receiptNo: z.string(), refundNo: z.string().nullable(),
+  ledgerNo: z.string(), businessNo: z.string().nullish(), orderNo: z.string(), receiptNo: z.string(), refundNo: z.string().nullable(),
   kind: operationsFactKind, amount: z.number().int().positive(), currency: currencyCode, confirmedAt: isoDateTime,
 })
 

@@ -135,7 +135,7 @@ function FinancialFacts({ range, scope }: { range: OperationsRange; scope: Opera
                 <tbody>
                   {result.items.map((row) => (
                     <tr key={row.ledgerNo}>
-                      <td className="mono">{row.ledgerNo}</td>
+                      <td className="mono">{row.businessNo ?? row.ledgerNo}</td>
                       <td>{financeLabels[row.kind]}</td>
                       <td>{displayAmount(row.amount)}</td>
                       <td>{row.currency}</td>

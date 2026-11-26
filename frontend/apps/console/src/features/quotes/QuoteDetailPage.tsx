@@ -29,7 +29,7 @@ export function QuoteDetailPage() {
     <div className="workspace">
       <PageHeader
         eyebrow="Quote"
-        title={row.quoteId}
+        title={row.businessNo ?? row.quoteId}
         description="报价冻结商品。未过期不等于当前可下单。"
       />
       <Panel>

@@ -19,7 +19,7 @@ export function QuoteRows({ rows, observedAt }: { rows: AdminQuoteView[]; observ
           const expired = observedAt ? Date.parse(observedAt) >= Date.parse(row.expiresAt) : undefined
           return (
             <tr key={row.quoteId}>
-              <td><Link to={`/quotes/${encodeURIComponent(row.quoteId)}`} className="mono">{row.quoteId}</Link></td>
+              <td><Link to={`/quotes/${encodeURIComponent(row.quoteId)}`} className="mono">{row.businessNo ?? row.quoteId}</Link></td>
               <td className="mono">{row.memberId}</td>
               <td>{formatMinorAmount(row.payableAmount)}</td>
               <td>{row.currency}</td>

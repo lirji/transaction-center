@@ -79,3 +79,5 @@ python3 scripts/backfill-business-numbers.py --dataset trade-orders \
 履约与退货管理读取返回 `businessNo`。新增履约和退货申请分别使用 `TRD-FUL` 与 `TRD-RTN`。用于库存回库、重复验收和旧回执的原验收号继续由 `receiptNo` 返回，管理详情的 `inspection.businessNo` 使用 `TRD-RMA`。历史履约、退货申请及验收可通过对应补录数据集逐租户补号。
 
 实收管理查询可按原 `receiptNo` 或 `TRD-RCT` 精确查找。资金流水新记录使用 `TRD-LED`，退款和实收共享同一编号约束。原交易回执、渠道及补偿任务引用保留原值。对账差异与查询操作的 `businessNo` 分别为 `TRD-REC` 与 `TRD-ROP`，原 UUID 继续服务于报告修订链和任务恢复。
+
+普通和试点原生报价返回 `TRD-QTE` 展示号。管理端可按可读号或原数字报价 ID 查询。订单消费和试点签名继续沿用原生报价身份。

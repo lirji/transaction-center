@@ -13,7 +13,9 @@ public interface QuoteMapper {
     /** 创建不可变报价，服务端时钟和定价策略版本随主表保存。 */
     int insertQuote(@Param("tenant") long tenant,@Param("member") long member,@Param("amount") long amount,
         @Param("currency") String currency,@Param("policy") String policy,@Param("created") Instant created,
-        @Param("expires") Instant expires);
+        @Param("expires") Instant expires,@Param("number") String number);
+    /** 当前读判断是否确实撞到全局报价号，业务约束冲突不重试。 */
+    String lockBusinessNumber(@Param("number") String number);
     /** 仅在插入报价后同一事务连接立即调用，并校验租户，禁止作为普通查号接口。 */
     Long lastInsertedQuoteId(@Param("tenant") long tenant);
     /** 追加明细快照，不提供覆盖接口，失败时必须回滚整张报价。 */

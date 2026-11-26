@@ -93,7 +93,8 @@ public class AdminQueryController {
     /** 详情只返回安全投影，不解密地址或渠道凭据。 */
     @GetMapping("/quotes/{quoteId}")
     public AdminQuoteQueryService.Detail quoteDetail(@AuthenticationPrincipal Jwt jwt,@PathVariable String quoteId,@RequestParam MultiValueMap<String,String> params) {
-        AdminQueryParameters.none(params);AdminQuery.number(quoteId,false);
+        AdminQueryParameters.none(params);
+        if(!BusinessNumber.matches(BusinessNumber.Type.QUOTE,quoteId)) AdminQuery.number(quoteId,false);
         return quote.detail(actor(jwt).tenantId(),quoteId);
     }
     /** 有界租户查询，精确筛选不接受任意列名或自由文本搜索。 */

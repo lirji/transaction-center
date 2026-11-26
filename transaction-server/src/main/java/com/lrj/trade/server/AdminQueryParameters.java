@@ -20,7 +20,7 @@ public final class AdminQueryParameters {
             case "payment" -> AdminQuery.fields("paymentNo","orderNo","memberId","status");
             case "attempt" -> AdminQuery.fields("status");
             case "receipt" -> AdminQuery.fields("receiptNo","paymentNo","orderNo","channelCode","disposition","abnormalOnly");
-            case "quote" -> AdminQuery.fields("quoteId","memberId");
+            case "quote" -> AdminQuery.fields("quoteId","memberId","businessNo");
             case "refund" -> AdminQuery.fields("refundNo","orderNo","memberId","status");
             case "job" -> AdminQuery.fields("jobType","status","leaseExpired");
             case "product" -> AdminQuery.fields("productNo","skuNo","name","status");
@@ -30,6 +30,14 @@ public final class AdminQueryParameters {
         };
         switch(resource) {
             case "order" -> { fields.put("sort",Set.of(OrderSort.ID_ASC.name(),OrderSort.CREATED_DESC.name()));fields.put("status",Set.of("PENDING_PAYMENT","CLOSING","CANCELLED","PAID","FULFILLING","COMPLETED"));fields.put("financialStatus",Set.of("UNPAID","NO_PAYMENT_REQUIRED","PAID","PARTIALLY_REFUNDED","REFUNDED")); }
+            case "quote" -> {
+                var numbers=input.get("quoteId");
+                if(numbers!=null && numbers.size()==1 && com.lrj.trade.core.BusinessNumber.matches(
+                    com.lrj.trade.core.BusinessNumber.Type.QUOTE,numbers.getFirst())) {
+                    if(input.putIfAbsent("businessNo",numbers)!=null) throw new TradeException("INVALID_ARGUMENT","报价编号条件重复");
+                    input.remove("quoteId");
+                }
+            }
             case "product" -> fields.put("status",Set.of("DRAFT","PUBLISHED","OFFLINE"));
             case "member" -> fields.put("status",Set.of("ACTIVE","FROZEN"));
             case "return" -> fields.put("status",Set.of("OPEN","INSPECTED"));

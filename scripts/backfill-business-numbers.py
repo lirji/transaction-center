@@ -22,6 +22,8 @@ class Dataset:
 
 
 DATASETS = {
+    "trade-quotes": Dataset("tc_quote", "id", "TRD-QTE", True),
+    "commerce-quotes": Dataset("trade_quote", "quote_id", "COM-QTE", False),
     "trade-orders": Dataset("tc_order", "id", "TRD-ORD", True),
     "trade-payment-receipts": Dataset("tc_payment_receipt", "id", "TRD-RCT", True),
     "trade-money-ledger": Dataset("tc_money_ledger", "id", "TRD-LED", True),
@@ -36,6 +38,7 @@ DATASETS = {
     "marketing-release-operations": Dataset("mk_bundle_release_operation", "operation_id", "MKT-RLS", False, iso_timestamp=True),
     "marketing-release-schedules": Dataset("mk_bundle_activation_schedule", "schedule_id", "MKT-SCH", False,
                                            iso_timestamp=True, partition_column="campaign_id"),
+    "commerce-exports": Dataset("central_scope_export", "id", "COM-EXP", False),
     "commerce-orders": Dataset("order_record", "order_id", "COM-ORD", False),
     "commerce-payments": Dataset("payment_attempt", "payment_id", "COM-PAY", False),
     "commerce-refunds": Dataset("payment_refund", "refund_id", "COM-RFD", False),
@@ -44,6 +47,9 @@ DATASETS = {
     "marketing-approvals": Dataset("mk_approval_case", "case_id", "MKT-APR", False, iso_timestamp=True),
     "marketing-audience-snapshots": Dataset("mk_audience_snapshot", "snapshot_id", "MKT-SNP", False, iso_timestamp=True),
     "marketing-journey-enrollments": Dataset("mk_enrollment", "enrollment_id", "MKT-JIN", False, iso_timestamp=True),
+    "marketing-referral-participants": Dataset("mk_referral_participant", "participant_id", "MKT-RFP", False),
+    "marketing-referral-relations": Dataset("mk_referral_relation", "relation_id", "MKT-RLN", False),
+    "marketing-referral-rewards": Dataset("mk_referral_reward", "reward_id", "MKT-RWD", False),
     "marketing-funding": Dataset("mk_promotion_application", "application_id", "MKT-FAP", False, iso_timestamp=True),
     "marketing-ledger": Dataset("mk_funding_ledger", "ledger_id", "MKT-LED", False, "occurred_at", True),
 }
