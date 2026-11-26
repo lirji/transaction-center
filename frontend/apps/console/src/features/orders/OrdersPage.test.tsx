@@ -22,7 +22,7 @@ describe('OrdersPage', () => {
     await waitFor(() => {
       expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('after=15'))).toBe(true)
     })
-    await userEvent.type(screen.getByLabelText('orderNo'), 'ORD-9')
+    await userEvent.type(screen.getByLabelText('订单号'), 'ORD-9')
     await userEvent.click(screen.getByRole('button', { name: '查询' }))
     await waitFor(() => {
       const urls = fetchMock.mock.calls.map((call) => String(call[0]))

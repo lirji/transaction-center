@@ -1,6 +1,7 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, type ButtonHTMLAttributes, type FormEvent, type ReactElement, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { nextCursor } from '../shared/api/keys'
+import { formatBeijingTime } from '../shared/ui/display'
 
 export function PageHeader({ eyebrow, title, description, actions }: { eyebrow: string; title: string; description: string; actions?: ReactNode }) {
   return <section className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>{actions && <div className="heading-actions">{actions}</div>}</section>
@@ -135,7 +136,7 @@ export function PagePager({
 }) {
   return (
     <div className="pager">
-      {observedAt ? <small className="pager-meta">观察时刻 {observedAt} · 跨页非快照</small> : null}
+      {observedAt ? <small className="pager-meta">读取时间 {formatBeijingTime(observedAt)}（北京时间）</small> : null}
       <Button disabled={after === '0'} onClick={onReset}>回到首页</Button>
       <Button disabled={!hasMore || !nextAfter} onClick={() => { if (nextAfter) onNext(nextAfter) }}>下一页</Button>
     </div>

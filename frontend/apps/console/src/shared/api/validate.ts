@@ -1,3 +1,5 @@
+import { formatBeijingInput, parseBeijingInput } from './businessTime'
+
 export class FormValidationError extends Error {
   constructor(message: string) {
     super(message)
@@ -52,26 +54,23 @@ export function parseTimeWindow(fromLocal: string, toLocal: string): { createdFr
   const to = toLocal.trim()
   if (!from && !to) return undefined
   if (!from || !to) throw new FormValidationError('时间窗必须同时提供起止时间')
-  const fromDate = new Date(from)
-  const toDate = new Date(to)
-  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+  const fromTimestamp = parseBeijingInput(from)
+  const toTimestamp = parseBeijingInput(to)
+  if (!Number.isFinite(fromTimestamp) || !Number.isFinite(toTimestamp)) {
     throw new FormValidationError('时间窗格式无效')
   }
-  if (fromDate.getTime() >= toDate.getTime()) {
+  if (fromTimestamp >= toTimestamp) {
     throw new FormValidationError('开始时间必须早于结束时间')
   }
-  if (toDate.getTime() - fromDate.getTime() > MAX_WINDOW_MS) {
+  if (toTimestamp - fromTimestamp > MAX_WINDOW_MS) {
     throw new FormValidationError('时间窗最大 90 天')
   }
-  return { createdFrom: fromDate.toISOString(), createdTo: toDate.toISOString() }
+  return { createdFrom: new Date(fromTimestamp).toISOString(), createdTo: new Date(toTimestamp).toISOString() }
 }
 
 export function toDatetimeLocal(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const timestamp = iso ? Date.parse(iso) : Number.NaN
+  return Number.isFinite(timestamp) ? formatBeijingInput(timestamp) : ''
 }
 
 export function parseReceiptDispositionFilter(abnormalOnly: boolean, disposition: string) {

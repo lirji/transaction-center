@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseChannelCode, parseCurrencyCode, parseHttpsUrl, parseMemberId, parseReceiptDispositionFilter, parseTimeWindow } from './validate'
+import { parseChannelCode, parseCurrencyCode, parseHttpsUrl, parseMemberId, parseReceiptDispositionFilter, parseTimeWindow, toDatetimeLocal } from './validate'
 
 describe('parseChannelCode', () => {
   it('accepts OpenAPI channel codes', () => {
@@ -40,6 +40,13 @@ describe('parseTimeWindow', () => {
   it('requires both ends', () => {
     expect(() => parseTimeWindow('2026-01-01T00:00', '')).toThrow(/同时提供/)
     expect(parseTimeWindow('', '')).toBeUndefined()
+  })
+
+  it('round trips Beijing time through the UTC query without using the device time zone', () => {
+    const range = parseTimeWindow('2026-11-26T09:15:13.125', '2026-11-26T10:15')
+    expect(range).toEqual({ createdFrom: '2026-11-26T01:15:13.125Z', createdTo: '2026-11-26T02:15:00.000Z' })
+    expect(toDatetimeLocal(range?.createdFrom)).toBe('2026-11-26T09:15:13.125')
+    expect(() => parseTimeWindow('2026-02-30T09:15', '2026-03-01T10:00')).toThrow(/格式/)
   })
 
   it('rejects a span longer than 90 days', () => {

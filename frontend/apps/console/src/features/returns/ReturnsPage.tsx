@@ -153,12 +153,12 @@ export function ReturnsPage() {
       <Panel>
         <h2>退货列表</h2>
         <FilterBar onSubmit={submitFilters}>
-          <Field label="returnNo"><input value={returnNoFilter} onChange={(event) => setReturnNoFilter(event.target.value)} /></Field>
-          <Field label="orderNo"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="memberId"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-          <Field label="orderItemId"><input value={itemId} onChange={(event) => setItemId(event.target.value)} /></Field>
-          <Field label="warehouseId"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} /></Field>
-          <Field label="status"><EmptySelect value={status} onChange={setStatus} options={['OPEN', 'INSPECTED']} /></Field>
+          <Field label="退货单号"><input value={returnNoFilter} onChange={(event) => setReturnNoFilter(event.target.value)} /></Field>
+          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+          <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+          <Field label="订单明细 ID"><input value={itemId} onChange={(event) => setItemId(event.target.value)} /></Field>
+          <Field label="仓库 ID"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} /></Field>
+          <Field label="验收状态"><EmptySelect value={status} onChange={setStatus} options={['OPEN', 'INSPECTED']} /></Field>
           <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
         </FilterBar>
       </Panel>

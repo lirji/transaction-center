@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, PagePager, Panel } from '../../components/ui'
 import { api, type AdminOrderView } from '../../shared/api/client'
-import { formatMinor } from '../../shared/api/money'
+import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
-import { statusTone } from '../../shared/ui/display'
+import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
 import { financialStatusSchema, orderStatusSchema } from '../../shared/api/schemas'
+import { financialLabels, orderLabels } from './orderStatus'
 
 const ORDER_STATUSES = orderStatusSchema.options
 const FINANCIAL_STATUSES = financialStatusSchema.options
@@ -22,10 +23,10 @@ export function OrderRows({ rows }: { rows: AdminOrderView[] }) {
   }, [returnedOrder, rows])
 
   return (
-    <table className="data-table">
+    <table className="data-table trade-list-table">
       <thead>
         <tr>
-          <th>订单</th><th>会员</th><th>状态</th><th>财务</th><th>应付</th><th>创建</th>
+          <th>订单号</th><th>会员 ID</th><th>订单状态</th><th>资金状态</th><th>应付金额</th><th>币种</th><th>仓库 ID</th><th>创建时间（北京时间）</th>
         </tr>
       </thead>
       <tbody>
@@ -33,13 +34,14 @@ export function OrderRows({ rows }: { rows: AdminOrderView[] }) {
           <tr key={row.orderNo} id={`order-row-${row.orderNo}`}>
             <td>
               <Link to={`/orders/${encodeURIComponent(row.orderNo)}`} state={{ ordersSearch: location.search }} className="mono">{row.orderNo}</Link>
-              <small className="mono">{row.orderId}</small>
             </td>
             <td className="mono">{row.memberId}</td>
-            <td><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>
-            <td><Badge tone={statusTone(row.financialStatus)}>{row.financialStatus}</Badge></td>
-            <td>{formatMinor(row.payableAmount, row.currency)}<small className="mono">{row.currency} {row.payableAmount}</small></td>
-            <td className="mono">{row.createdAt}</td>
+            <td><Badge tone={statusTone(row.status)}>{orderLabels[row.status]}</Badge></td>
+            <td><Badge tone={statusTone(row.financialStatus)}>{financialLabels[row.financialStatus]}</Badge></td>
+            <td>{formatMinorAmount(row.payableAmount)}</td>
+            <td>{row.currency}</td>
+            <td>{dash(row.warehouseId)}</td>
+            <td>{formatBeijingTime(row.createdAt)}</td>
           </tr>
         ))}
       </tbody>
@@ -83,6 +85,11 @@ export function OrdersPage() {
     enabled: !memberUrlError && !incompleteWindow,
   })
 
+  function applyStatus(value: string) {
+    setStatus(value)
+    apply({ ...filters, status: value || undefined })
+  }
+
   function submit() {
     setFormError('')
     try {
@@ -106,16 +113,21 @@ export function OrdersPage() {
       <PageHeader
         eyebrow="Orders"
         title="订单"
-        description="按编号、状态或会员查询本租户订单。列表按主键升序，不是最新优先。零元订单 paidAt 为空是正常投影。"
+        description="按订单号、会员或状态查询。结果按订单内部编号升序排列。"
       />
       <Panel>
         <h2>筛选</h2>
+        <div className="queue-actions" role="group" aria-label="订单状态快捷筛选">
+          {[orderStatusSchema.enum.PENDING_PAYMENT, orderStatusSchema.enum.PAID].map((value) => (
+            <Button key={value} aria-pressed={filters.status === value} onClick={() => applyStatus(value)}>{orderLabels[value]}</Button>
+          ))}
+        </div>
         <FilterBar onSubmit={submit}>
-          <Field label="orderNo"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="memberId" error={memberDraftError || undefined}><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-          <Field label="status"><EmptySelect value={status} onChange={setStatus} options={ORDER_STATUSES} /></Field>
-          <Field label="financialStatus"><EmptySelect value={financialStatus} onChange={setFinancialStatus} options={FINANCIAL_STATUSES} /></Field>
-          <Field label="warehouseId"><input value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} /></Field>
+          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+          <Field label="会员 ID" error={memberDraftError || undefined}><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+          <Field label="订单状态"><EmptySelect value={status} onChange={setStatus} options={ORDER_STATUSES} optionLabel={(value) => orderLabels[value as keyof typeof orderLabels]} /></Field>
+          <Field label="资金状态"><EmptySelect value={financialStatus} onChange={setFinancialStatus} options={FINANCIAL_STATUSES} optionLabel={(value) => financialLabels[value as keyof typeof financialLabels]} /></Field>
+          <Field label="仓库 ID"><input value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} /></Field>
           <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
         </FilterBar>
       </Panel>

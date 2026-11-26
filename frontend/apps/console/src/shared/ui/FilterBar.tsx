@@ -32,14 +32,14 @@ export function TimeRangeFields({
   error?: string
 }) {
   return (
-    <>
-      <Field label="createdFrom" hint="须与结束时间成对；UTC [from,to)，最大 90 天">
-        <input type="datetime-local" value={from} onChange={(event) => onFrom(event.target.value)} />
+    <div className="time-range-fields">
+      <Field label="起始时间（北京时间）" hint="起止时间成对填写，最长 90 天">
+        <input type="datetime-local" step="0.001" value={from} onChange={(event) => onFrom(event.target.value)} />
       </Field>
-      <Field label="createdTo" error={error}>
-        <input type="datetime-local" value={to} onChange={(event) => onTo(event.target.value)} />
+      <Field label="结束时间（北京时间）" hint="不包含结束时刻" error={error}>
+        <input type="datetime-local" step="0.001" value={to} onChange={(event) => onTo(event.target.value)} />
       </Field>
-    </>
+    </div>
   )
 }
 

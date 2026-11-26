@@ -3,22 +3,25 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Badge, Field, PageHeader, PagePager, Panel } from '../../components/ui'
 import { api, type AdminPaymentView } from '../../shared/api/client'
-import { formatMinor } from '../../shared/api/money'
+import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
-import { dash, statusTone } from '../../shared/ui/display'
+import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
 import { paymentStatusSchema } from '../../shared/api/schemas'
 
 const PAYMENT_STATUSES = paymentStatusSchema.options
+const paymentLabels: Record<(typeof PAYMENT_STATUSES)[number], string> = {
+  READY: '待发起', PENDING: '待确认', SUCCEEDED: '支付成功', CLOSED: '已关闭', REVIEW: '待复核',
+}
 
 export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
   return (
-    <table className="data-table">
+    <table className="data-table trade-list-table">
       <thead>
         <tr>
-          <th>支付意图</th><th>订单</th><th>状态</th><th>期望金额</th><th>成功实收</th><th>关闭屏障</th>
+          <th>支付单号</th><th>订单号</th><th>支付状态</th><th>期望金额</th><th>币种</th><th>成功实收单号</th><th>关闭屏障（北京时间）</th><th>更新时间（北京时间）</th>
         </tr>
       </thead>
       <tbody>
@@ -26,13 +29,14 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
           <tr key={row.paymentNo}>
             <td>
               <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentNo}</Link>
-              <small className="mono">attempt {dash(row.activeAttemptNo)}</small>
             </td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
-            <td><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>
-            <td>{formatMinor(row.expectedAmount, row.currency)}<small className="mono">{row.currency} {row.expectedAmount}</small></td>
-            <td className="mono">{dash(row.succeededReceiptNo)}</td>
-            <td className="mono">{dash(row.closeFenceAt)}</td>
+            <td><Badge tone={statusTone(row.status)}>{paymentLabels[row.status]}</Badge></td>
+            <td>{formatMinorAmount(row.expectedAmount)}</td>
+            <td>{row.currency}</td>
+            <td className="mono">{row.succeededReceiptNo ? <Link to={`/receipts/${encodeURIComponent(row.succeededReceiptNo)}`}>{row.succeededReceiptNo}</Link> : dash(row.succeededReceiptNo)}</td>
+            <td>{formatBeijingTime(row.closeFenceAt)}</td>
+            <td>{formatBeijingTime(row.updatedAt)}</td>
           </tr>
         ))}
       </tbody>
@@ -97,10 +101,10 @@ export function PaymentsPage() {
       <Panel>
         <h2>筛选</h2>
         <FilterBar onSubmit={submit}>
-          <Field label="paymentNo"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
-          <Field label="orderNo"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="memberId"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-          <Field label="status"><EmptySelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} /></Field>
+          <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
+          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+          <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+          <Field label="支付状态"><EmptySelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} optionLabel={(value) => paymentLabels[value as keyof typeof paymentLabels]} /></Field>
           <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
         </FilterBar>
       </Panel>
