@@ -41,8 +41,12 @@ public interface PaymentMapper {
     /** 真实交易号永久去重，与回调事件或HTTP命令保留期无关。 */
     List<PaymentReceipt> lockReceipt(@Param("tenant") long tenant,@Param("code") String code,@Param("channelMerchant") String channelMerchant,@Param("transaction") String transaction);
     /** 无论正常或异常均保存真实资金，不因订单已付丢掉第二笔钱。 */
-    int insertReceipt(@Param("tenant") long tenant,@Param("receiptNo") String receiptNo,@Param("intent") long intent,@Param("attempt") long attempt,@Param("order") long order,@Param("code") String code,@Param("channelMerchant") String channelMerchant,@Param("transaction") String transaction,@Param("amount") long amount,@Param("currency") String currency,@Param("providerPaid") Instant providerPaid,@Param("now") Instant now,@Param("disposition") String disposition,@Param("evidence") String evidence);
+    int insertReceipt(@Param("tenant") long tenant,@Param("receiptNo") String receiptNo,@Param("businessNo") String businessNo,@Param("intent") long intent,@Param("attempt") long attempt,@Param("order") long order,@Param("code") String code,@Param("channelMerchant") String channelMerchant,@Param("transaction") String transaction,@Param("amount") long amount,@Param("currency") String currency,@Param("providerPaid") Instant providerPaid,@Param("now") Instant now,@Param("disposition") String disposition,@Param("evidence") String evidence);
     /** 资金流水和原收款同事务，异常资金也需逐笔可对账。 */
+    /** 实收已按渠道幂等键确认不存在时，仅此唯一号可触发重发。 */
+    String lockReceiptBusinessNumber(@Param("number") String number);
+    /** 正向和退款流水共享同一全局号空间。 */
+    String lockLedgerBusinessNumber(@Param("number") String number);
     int insertLedger(@Param("tenant") long tenant,@Param("receipt") long receipt,@Param("number") String number,@Param("amount") long amount,@Param("currency") String currency,@Param("evidence") String evidence,@Param("now") Instant now);
     /** 首个正常收款绑定意图，禁止替换既有正常收款。 */
     int markSucceeded(@Param("tenant") long tenant,@Param("intent") long intent,@Param("receipt") long receipt,@Param("now") Instant now);

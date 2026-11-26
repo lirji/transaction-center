@@ -396,10 +396,10 @@ export const api = {
       body: JSON.stringify(body),
     }, (value) => parseWith(outboxReplayResultSchema, value)),
 
-  reconciliationCases: (state: 'OPEN' | 'PROCESSING' | 'CLOSED' = 'OPEN', after = 0, limit = 50) =>
-    request(`${admin}/reconciliation-cases${cursorQuery(after, limit)}&state=${state}`, undefined, (value) => parseArray(reconciliationCaseSchema, value)),
-  reconciliationOperations: (state: 'QUEUED' | 'RUNNING' | 'RESULT_ACCEPTED' | 'REVIEW' = 'REVIEW', after = 0, limit = 50) =>
-    request(`${admin}/reconciliation-operations${cursorQuery(after, limit)}&state=${state}`, undefined, (value) => parseArray(reconciliationOperationSchema, value)),
+  reconciliationCases: (state: 'OPEN' | 'PROCESSING' | 'CLOSED' = 'OPEN', after = 0, limit = 50, number?: string) =>
+    request(`${admin}/reconciliation-cases${cursorQuery(after, limit)}&state=${state}${number ? `&number=${encodeURIComponent(number)}` : ""}`, undefined, (value) => parseArray(reconciliationCaseSchema, value)),
+  reconciliationOperations: (state: 'QUEUED' | 'RUNNING' | 'RESULT_ACCEPTED' | 'REVIEW' = 'REVIEW', after = 0, limit = 50, number?: string) =>
+    request(`${admin}/reconciliation-operations${cursorQuery(after, limit)}&state=${state}${number ? `&number=${encodeURIComponent(number)}` : ""}`, undefined, (value) => parseArray(reconciliationOperationSchema, value)),
   queryReconciliationCase: (caseNo: string, body: { expectedVersion: number; action: 'QUERY_PAYMENT' | 'QUERY_REFUND'; reason: string; ticketRef: string }) =>
     request(`${admin}/reconciliation-cases/${encodeURIComponent(caseNo)}:query`, {
       method: 'POST',

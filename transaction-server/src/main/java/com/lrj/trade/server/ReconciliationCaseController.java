@@ -25,8 +25,8 @@ public class ReconciliationCaseController {
     }
     /** 租户后台有界读取摘要，不能取得证据正文与凭据。 */
     @GetMapping("/api/v1/trade/admin/reconciliation-cases")
-    public List<ReconciliationCaseService.Summary> page(@AuthenticationPrincipal Jwt jwt,@RequestParam(defaultValue="OPEN") String state,@RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="50") int limit) {
-        return cases.page(actor(jwt).tenantId(),state,after,limit);
+    public List<ReconciliationCaseService.Summary> page(@AuthenticationPrincipal Jwt jwt,@RequestParam(defaultValue="OPEN") String state,@RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="50") int limit,@RequestParam(required=false) String number) {
+        return cases.page(actor(jwt).tenantId(),state,after,limit,number);
     }
     /** 单项证据引用读取要求独立财务服务身份，与管理摘要权限分开。 */
     @GetMapping("/internal/v1/reconciliation/cases/{caseNo}")

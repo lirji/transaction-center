@@ -27,7 +27,7 @@ export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.receiptNo}>
-            <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} className="mono">{row.receiptNo}</Link></td>
+            <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} className="mono">{row.businessNo ?? row.receiptNo}</Link></td>
             <td><Badge tone={row.disposition === NORMAL_RECEIPT ? 'good' : 'warn'}>{dispositionLabels[row.disposition]}</Badge></td>
             <td>{formatMinorAmount(row.amount)}</td>
             <td>{row.currency}</td>

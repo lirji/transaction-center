@@ -233,6 +233,7 @@ export const outboxTaskSchema = z.object({
 export type OutboxTask = z.infer<typeof outboxTaskSchema>
 
 export const reconciliationCaseSchema = z.object({
+  businessNo: z.string().nullish(),
   id: z.string(),
   caseNo: z.string(),
   channelId: z.string(),
@@ -244,6 +245,7 @@ export const reconciliationCaseSchema = z.object({
 export type ReconciliationCase = z.infer<typeof reconciliationCaseSchema>
 
 export const reconciliationQueryResultSchema = z.object({
+  businessNo: z.string().nullish(),
   operationNo: z.string(),
   caseNo: z.string(),
   caseVersion: z.number().int().min(1),
@@ -252,6 +254,7 @@ export const reconciliationQueryResultSchema = z.object({
 })
 
 export const reconciliationOperationSchema = z.object({
+  businessNo: z.string().nullish(),
   id: z.string(),
   operationNo: z.string(),
   caseNo: z.string(),
@@ -373,6 +376,7 @@ export const adminAttemptViewSchema = z.object({
 export type AdminAttemptView = z.infer<typeof adminAttemptViewSchema>
 
 export const adminReceiptViewSchema = z.object({
+  businessNo: z.string().nullish(),
   receiptNo: z.string(),
   paymentNo: z.string(),
   orderNo: z.string(),

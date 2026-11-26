@@ -19,13 +19,15 @@ export function ReconciliationPage() {
   const [opState, setOpState] = useState<'QUEUED' | 'RUNNING' | 'RESULT_ACCEPTED' | 'REVIEW'>('REVIEW')
   const [after, setAfter] = useState(0)
   const [opAfter, setOpAfter] = useState(0)
+  const [queryNumber, setQueryNumber] = useState('')
+  const [number, setNumber] = useState('')
   const [selected, setSelected] = useState<ReconciliationCase>()
   const [action, setAction] = useState<'QUERY_PAYMENT' | 'QUERY_REFUND'>('QUERY_PAYMENT')
   const [reason, setReason] = useState('')
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
-  const cases = useQuery({ queryKey: ['recon-cases', state, after], queryFn: () => api.reconciliationCases(state, after) })
-  const operations = useQuery({ queryKey: ['recon-ops', opState, opAfter], queryFn: () => api.reconciliationOperations(opState, opAfter) })
+  const cases = useQuery({ queryKey: ['recon-cases', state, after, number], queryFn: () => api.reconciliationCases(state, after, 50, number || undefined) })
+  const operations = useQuery({ queryKey: ['recon-ops', opState, opAfter, number], queryFn: () => api.reconciliationOperations(opState, opAfter, 50, number || undefined) })
   const queryCase = useMutation({
     mutationFn: (payload: { caseNo: string; expectedVersion: number; action: 'QUERY_PAYMENT' | 'QUERY_REFUND'; reason: string; ticketRef: string }) =>
       api.queryReconciliationCase(payload.caseNo, { expectedVersion: payload.expectedVersion, action: payload.action, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -45,8 +47,19 @@ export function ReconciliationPage() {
         description="只查单需要 trade.reconciliation.query，默认可能关闭。202 表示已排队，不是当前执行结果。禁止在此关单、补建或派发退款。"
       />
       {!canQuery ? <StateBanner tone="warn" title="当前令牌不能只查单" detail="仍可浏览差异列表。写入需要 trade.reconciliation.query。" /> : null}
-      <MutationBanner error={queryCase.error} success={queryCase.data ? `已排队 operationNo=${queryCase.data.operationNo}，状态 QUEUED` : undefined} />
+      <MutationBanner error={queryCase.error} success={queryCase.data ? `已排队 operationNo=${queryCase.data.businessNo ?? queryCase.data.operationNo}，状态 QUEUED` : undefined} />
       <Panel>
+        <form className="action-bar" onSubmit={(event) => {
+          event.preventDefault()
+          setNumber(queryNumber.trim())
+          setAfter(0)
+          setOpAfter(0)
+        }}>
+          <Field label="差异或操作编号">
+            <input value={queryNumber} maxLength={64} onChange={(event) => setQueryNumber(event.target.value)} />
+          </Field>
+          <Button type="submit">精确查询</Button>
+        </form>
         <Field label="差异状态">
           <select value={state} onChange={(event) => { setParams({ state: event.target.value }, { replace: true }); setAfter(0) }}>
             <option value="OPEN">OPEN</option>
@@ -64,7 +77,7 @@ export function ReconciliationPage() {
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td className="mono">{row.caseNo}</td><td>{row.statementDate}</td>
+                      <td className="mono">{row.businessNo ?? row.caseNo}</td><td>{row.statementDate}</td>
                       <td className="mono">{row.channelId}</td>
                       <td><Badge>{row.status}</Badge></td>
                       <td><Badge>{row.differenceType}</Badge></td>
@@ -98,7 +111,7 @@ export function ReconciliationPage() {
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td className="mono">{row.operationNo}</td><td className="mono">{row.caseNo}</td>
+                      <td className="mono">{row.businessNo ?? row.operationNo}</td><td className="mono">{row.caseNo}</td>
                       <td>{row.action}</td>
                       <td><Badge>{row.status}</Badge></td>
                       <td>{formatBeijingTime(row.acceptedAt)}</td><td>{row.lastCode ?? '—'}</td>

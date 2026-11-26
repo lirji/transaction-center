@@ -763,6 +763,11 @@ class FoundationTest {
         var report=caseReport(f,"event",0,null,null,null);
         var results=parallel(20,()->service.accept(f.actor(),"recon-platform",report));
         assertEquals(1,new HashSet<>(results).size());var first=results.getFirst();
+        var byNumber=service.read(tenant,first.caseNo());
+        assertTrue(byNumber.businessNo().matches("TRD-REC-[0-9]{6}-[0-9]{10}"));
+        assertEquals(byNumber,service.read(tenant,byNumber.businessNo()));
+        assertEquals(1,service.page(tenant,"OPEN",0,20,byNumber.businessNo()).size());
+        assertTrue(service.page(tenant+10000,"OPEN",0,20,byNumber.businessNo()).isEmpty());
         var sequence=new AtomicLong();
         var newEvents=parallel(12,()->service.accept(f.actor(),"recon-platform",caseReport(f,"next-"+sequence.incrementAndGet(),0,null,null,null)));
         assertTrue(newEvents.stream().allMatch(r->r.caseNo().equals(first.caseNo())));

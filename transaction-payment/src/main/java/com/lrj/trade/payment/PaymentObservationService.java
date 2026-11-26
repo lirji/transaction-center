@@ -49,16 +49,23 @@ public class PaymentObservationService implements PaymentObservationPort {
         String receiptNo="RC-"+UUID.randomUUID();
         // 不先锁不存在的交易号，避免两个不同订单互持间隙锁后插入死锁。
         // 唯一键命中时绝不覆盖资金字段，用本地业务编号识别重放而非依赖影响行数。
-        mapper.insertReceipt(tenant,receiptNo,Long.parseLong(intent.intentId()),Long.parseLong(attempt.attemptId()),Long.parseLong(order.orderId()),
-            channel.channelCode(),channel.channelMerchantNo(),transaction,amount,currency,providerPaid,now,disposition,evidence);
-        var receipt=mapper.lockReceipt(tenant,channel.channelCode(),channel.channelMerchantNo(),transaction).stream().findFirst()
-            .orElseThrow(()->new TradeException("PAYMENT_FACT_CONFLICT","收款唯一约束与渠道引用冲突"));
+        PaymentReceipt receipt=null;
+        for (int attemptNo=0; attemptNo<BusinessNumber.MAX_ISSUE_ATTEMPTS; attemptNo++) {
+            String number=BusinessNumber.next(BusinessNumber.Type.PAYMENT_RECEIPT,now);
+            mapper.insertReceipt(tenant,receiptNo,number,Long.parseLong(intent.intentId()),Long.parseLong(attempt.attemptId()),
+                Long.parseLong(order.orderId()),channel.channelCode(),channel.channelMerchantNo(),transaction,
+                amount,currency,providerPaid,now,disposition,evidence);
+            receipt=mapper.lockReceipt(tenant,channel.channelCode(),channel.channelMerchantNo(),transaction).stream().findFirst().orElse(null);
+            if(receipt!=null || mapper.lockReceiptBusinessNumber(number)==null) break;
+        }
+        if(receipt==null) throw new TradeException("PAYMENT_FACT_CONFLICT","收款唯一约束与渠道引用冲突");
         if(!receipt.receiptNo().equals(receiptNo)) {
             if(!receipt.attemptId().equals(attempt.attemptId()) || receipt.amount()!=amount || !receipt.currency().equals(currency) || !receipt.providerPaidAt().equals(providerPaid))
                 throw new TradeException("PAYMENT_FACT_CONFLICT","渠道交易号对应的收款事实冲突");
             return receipt;
         }
-        mapper.insertLedger(tenant,Long.parseLong(receipt.receiptId()),"ML-"+UUID.randomUUID(),amount,currency,evidence,now);
+        long receiptId=Long.parseLong(receipt.receiptId());
+        MoneyLedgerNumber.write(mapper,now,number->mapper.insertLedger(tenant,receiptId,number,amount,currency,evidence,now));
         if(disposition.equals("NORMAL")) {
             var confirmation=orders.confirmPayment(tenant,Long.parseLong(order.orderId()),amount,currency);
             if(mapper.markSucceeded(tenant,Long.parseLong(intent.intentId()),Long.parseLong(receipt.receiptId()),now)!=1)

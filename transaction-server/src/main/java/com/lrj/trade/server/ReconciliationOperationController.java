@@ -23,7 +23,7 @@ public class ReconciliationOperationController {
     }
     /** 执行状态从持久操作表读取，区别于永久回执的首次QUEUED。 */
     @GetMapping("/api/v1/trade/admin/reconciliation-operations")
-    public List<ReconciliationOperationService.View> page(@AuthenticationPrincipal Jwt jwt,@RequestParam(defaultValue="REVIEW") String state,@RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="50") int limit) {return operations.page(actor(jwt).tenantId(),state,after,limit);}
+    public List<ReconciliationOperationService.View> page(@AuthenticationPrincipal Jwt jwt,@RequestParam(defaultValue="REVIEW") String state,@RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="50") int limit,@RequestParam(required=false) String number) {return operations.page(actor(jwt).tenantId(),state,after,limit,number); }
     private Actor actor(Jwt jwt) {try {return new Actor(Long.parseLong(jwt.getClaimAsString("tenant_id")),jwt.getIssuer().toString(),jwt.getSubject());}catch(RuntimeException invalid) {throw new TradeException("INVALID_IDENTITY","令牌缺少有效身份");}}
     /** 仅两个动作，原因和工单不是资金变更授权。 */
     public record Input(@NotNull @PositiveOrZero Long expectedVersion,@NotBlank @Pattern(regexp="QUERY_PAYMENT|QUERY_REFUND") String action,@NotBlank @Size(max=255) String reason,@NotBlank @Size(max=128) String ticketRef) {}

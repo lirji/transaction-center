@@ -136,13 +136,19 @@
   </select>
   <!-- 无论正常或异常均保存真实资金，不因订单已付丢掉第二笔钱。 -->
   <insert id="insertReceipt">
-    INSERT INTO tc_payment_receipt(tenant_id,receipt_no,intent_id,attempt_id,order_id,channel_code,channel_merchant_no,provider_transaction_no,amount,currency,provider_paid_at,confirmed_at,disposition,evidence_ref,created_at,updated_at)
-VALUES(#{tenant},#{receiptNo},#{intent},#{attempt},#{order},#{code},#{channelMerchant},#{transaction},#{amount},#{currency},#{providerPaid},#{now},#{disposition},#{evidence},#{now},#{now})
+    INSERT INTO tc_payment_receipt(tenant_id,receipt_no,business_no,intent_id,attempt_id,order_id,channel_code,channel_merchant_no,provider_transaction_no,amount,currency,provider_paid_at,confirmed_at,disposition,evidence_ref,created_at,updated_at)
+VALUES(#{tenant},#{receiptNo},#{businessNo},#{intent},#{attempt},#{order},#{code},#{channelMerchant},#{transaction},#{amount},#{currency},#{providerPaid},#{now},#{disposition},#{evidence},#{now},#{now})
     ON DUPLICATE KEY UPDATE id=tc_payment_receipt.id
   </insert>
+  <select id="lockReceiptBusinessNumber" resultType="string" useCache="false">
+    SELECT business_no FROM tc_payment_receipt WHERE business_no=#{number} FOR UPDATE
+  </select>
+  <select id="lockLedgerBusinessNumber" resultType="string" useCache="false">
+    SELECT business_no FROM tc_money_ledger WHERE business_no=#{number} FOR UPDATE
+  </select>
   <!-- 资金流水和原收款同事务，异常资金也需逐笔可对账。 -->
   <insert id="insertLedger">
-    INSERT INTO tc_money_ledger(tenant_id,receipt_id,ledger_no,business_key,entry_type,amount,currency,evidence_ref,created_at,updated_at) VALUES(#{tenant},#{receipt},#{number},CONCAT('receipt:',#{receipt}),'RECEIPT',#{amount},#{currency},#{evidence},#{now},#{now})
+    INSERT INTO tc_money_ledger(tenant_id,receipt_id,ledger_no,business_no,business_key,entry_type,amount,currency,evidence_ref,created_at,updated_at) VALUES(#{tenant},#{receipt},#{number},#{number},CONCAT('receipt:',#{receipt}),'RECEIPT',#{amount},#{currency},#{evidence},#{now},#{now})
   </insert>
   <!-- 首个正常收款绑定意图，禁止替换既有正常收款。 -->
   <update id="markSucceeded">

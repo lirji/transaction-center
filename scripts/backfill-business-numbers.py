@@ -7,6 +7,7 @@ import secrets
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -17,21 +18,32 @@ class Dataset:
     numeric_tenant: bool
     timestamp_column: str = "created_at"
     iso_timestamp: bool = False
+    partition_column: Optional[str] = None
 
 
 DATASETS = {
     "trade-orders": Dataset("tc_order", "id", "TRD-ORD", True),
+    "trade-payment-receipts": Dataset("tc_payment_receipt", "id", "TRD-RCT", True),
+    "trade-money-ledger": Dataset("tc_money_ledger", "id", "TRD-LED", True),
     "trade-payments": Dataset("tc_payment_intent", "id", "TRD-PAY", True),
     "trade-refunds": Dataset("tc_refund", "id", "TRD-RFD", True),
     "trade-fulfillments": Dataset("tc_order_fulfillment", "id", "TRD-FUL", True),
     "trade-returns": Dataset("tc_return_request", "id", "TRD-RTN", True),
     "trade-return-receipts": Dataset("tc_return_receipt", "id", "TRD-RMA", True),
+    "trade-reconciliation-cases": Dataset("tc_reconciliation_case", "id", "TRD-REC", True),
+    "trade-reconciliation-operations": Dataset("tc_reconciliation_operation", "id", "TRD-ROP", True),
+    "marketing-release-bundles": Dataset("mk_release_bundle", "bundle_id", "MKT-BND", False, iso_timestamp=True),
+    "marketing-release-operations": Dataset("mk_bundle_release_operation", "operation_id", "MKT-RLS", False, iso_timestamp=True),
+    "marketing-release-schedules": Dataset("mk_bundle_activation_schedule", "schedule_id", "MKT-SCH", False,
+                                           iso_timestamp=True, partition_column="campaign_id"),
     "commerce-orders": Dataset("order_record", "order_id", "COM-ORD", False),
     "commerce-payments": Dataset("payment_attempt", "payment_id", "COM-PAY", False),
     "commerce-refunds": Dataset("payment_refund", "refund_id", "COM-RFD", False),
     "commerce-aftersales": Dataset("aftersales_case", "case_id", "COM-AFS", False),
     "marketing-campaigns": Dataset("mk_campaign", "campaign_id", "MKT-CMP", False, iso_timestamp=True),
     "marketing-approvals": Dataset("mk_approval_case", "case_id", "MKT-APR", False, iso_timestamp=True),
+    "marketing-audience-snapshots": Dataset("mk_audience_snapshot", "snapshot_id", "MKT-SNP", False, iso_timestamp=True),
+    "marketing-journey-enrollments": Dataset("mk_enrollment", "enrollment_id", "MKT-JIN", False, iso_timestamp=True),
     "marketing-funding": Dataset("mk_promotion_application", "application_id", "MKT-FAP", False, iso_timestamp=True),
     "marketing-ledger": Dataset("mk_funding_ledger", "ledger_id", "MKT-LED", False, "occurred_at", True),
 }
@@ -73,7 +85,7 @@ def mysql(args, query):
     return result.stdout.splitlines()
 
 
-def read_batch(args, dataset, tenant, after):
+def read_batch(args, dataset, scope, after):
     """按租户和原生主键游标分页，重跑时已编号记录自然退出。"""
     lower = f" AND {dataset.primary_key}>{sql_identifier(after, dataset.numeric_tenant)}" if after else ""
     timestamp = dataset.timestamp_column
@@ -81,19 +93,19 @@ def read_batch(args, dataset, tenant, after):
         # 营销表保存 ISO-8601 UTC 字符串，解析秒及之前的信息足以计算业务日。
         timestamp = f"CAST(REPLACE(LEFT({timestamp},19),'T',' ') AS DATETIME)"
     query = (f"SELECT {dataset.primary_key}, DATE_FORMAT({timestamp} + INTERVAL 8 HOUR, '%y%m%d') "
-             f"FROM {dataset.table} WHERE tenant_id={tenant}{lower} AND business_no IS NULL "
+             f"FROM {dataset.table} WHERE {scope}{lower} AND business_no IS NULL "
              f"ORDER BY {dataset.primary_key} LIMIT {args.batch_size};")
     rows = []
     for line in mysql(args, query):
         identifier, date = line.split("\t")
         sql_identifier(identifier, dataset.numeric_tenant)
         if not BUSINESS_DAY.fullmatch(date):
-            raise ValueError("one stored order has an invalid business day")
+            raise ValueError("one stored record has an invalid business day")
         rows.append((identifier, date))
     return rows
 
 
-def fill_batch(args, dataset, tenant, rows):
+def fill_batch(args, dataset, scope, rows):
     """只有一次原子 UPDATE，唯一号碰撞回滚这一批后重新选号。"""
     key = dataset.primary_key
     identifiers = [sql_identifier(identifier, dataset.numeric_tenant) for identifier, _ in rows]
@@ -103,7 +115,7 @@ def fill_batch(args, dataset, tenant, rows):
             for identifier, (_, date) in zip(identifiers, rows)
         ]
         query = (f"UPDATE {dataset.table} SET business_no=CASE {key} {' '.join(mappings)} END "
-                 f"WHERE tenant_id={tenant} AND {key} IN ({','.join(identifiers)}) AND business_no IS NULL; "
+                 f"WHERE {scope} AND {key} IN ({','.join(identifiers)}) AND business_no IS NULL; "
                  "SELECT ROW_COUNT();")
         try:
             return int(mysql(args, query)[0])
@@ -119,6 +131,7 @@ def main():
     parser.add_argument("--dataset", choices=DATASETS, required=True)
     parser.add_argument("--database", required=True)
     parser.add_argument("--tenant", required=True)
+    parser.add_argument("--partition", help="campaign ID for a release schedule dataset")
     parser.add_argument("--defaults-file", type=Path, required=True)
     parser.add_argument("--mysql", default="mysql")
     parser.add_argument("--batch-size", type=int, default=100)
@@ -135,17 +148,23 @@ def main():
         parser.error("batch size, batch limit or timeout is outside the supported range")
     dataset = DATASETS[args.dataset]
     try:
-        tenant = sql_identifier(args.tenant, dataset.numeric_tenant)
+        scope = f"tenant_id={sql_identifier(args.tenant, dataset.numeric_tenant)}"
+        if dataset.partition_column:
+            if not args.partition:
+                parser.error("--partition is required for the selected dataset")
+            scope += f" AND {dataset.partition_column}={sql_identifier(args.partition)}"
+        elif args.partition:
+            parser.error("--partition is only supported by partitioned datasets")
         after = args.after
         for _ in range(args.max_batches if args.apply else 1):
-            rows = read_batch(args, dataset, tenant, after)
+            rows = read_batch(args, dataset, scope, after)
             if not rows:
                 print(f"complete after={after or '(start)'}", flush=True)
                 break
             if not args.apply:
                 print(f"dry-run candidates={len(rows)} after={after or '(start)'}", flush=True)
                 break
-            updated = fill_batch(args, dataset, tenant, rows)
+            updated = fill_batch(args, dataset, scope, rows)
             after = rows[-1][0]
             print(f"updated={updated} scanned={len(rows)} after={after}", flush=True)
         else:

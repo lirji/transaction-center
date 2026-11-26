@@ -28,7 +28,7 @@ export function ReceiptDetailPage() {
     <div className="workspace">
       <PageHeader
         eyebrow="Receipt"
-        title={row.receiptNo}
+        title={row.businessNo ?? row.receiptNo}
         description="unreservedAmount 是尚未被退款预占的余额，不是退款授权。"
       />
       <Panel>

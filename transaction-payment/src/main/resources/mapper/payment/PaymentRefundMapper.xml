@@ -70,7 +70,7 @@
     WHERE tenant_id=#{tenant} AND refund_no=#{refund} AND state IN ('HELD','SUBMITTED')
   </update>
   <insert id="insertLedger">
-    INSERT INTO tc_money_ledger(tenant_id,receipt_id,refund_no,ledger_no,business_key,entry_type,amount,currency,evidence_ref,created_at,updated_at)
-    VALUES(#{tenant},#{receipt},#{refund},#{number},CONCAT('refund:',#{reservation}),'REFUND',#{amount},#{currency},#{evidence},#{now},#{now})
+    INSERT INTO tc_money_ledger(tenant_id,receipt_id,refund_no,ledger_no,business_no,business_key,entry_type,amount,currency,evidence_ref,created_at,updated_at)
+    VALUES(#{tenant},#{receipt},#{refund},#{number},#{number},CONCAT('refund:',#{reservation}),'REFUND',#{amount},#{currency},#{evidence},#{now},#{now})
   </insert>
 </mapper>

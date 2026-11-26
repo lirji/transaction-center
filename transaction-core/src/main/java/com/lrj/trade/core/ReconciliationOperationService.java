@@ -1,23 +1,37 @@
 package com.lrj.trade.core;
 import com.lrj.trade.core.mapper.ReconciliationOperationMapper;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 /** 查询申请永久幂等，原归属、差异关联、任务和审计在一个事务内提交。 */
 @Service
 public class ReconciliationOperationService {
-    private final ReconciliationOperationMapper mapper;private final ReconciliationQueryExecutorPort executor;private final JobSchedulerPort jobs;private final AuditWriter audit;
+    private final ReconciliationOperationMapper mapper;private final ReconciliationQueryExecutorPort executor;private final JobSchedulerPort jobs;private final AuditWriter audit;private final Clock clock;private final ReconciliationCaseService cases;
     /** 不在申请事务发网络，QueryExecutor.validate仅执行原绑定只读核验。 */
-    public ReconciliationOperationService(ReconciliationOperationMapper mapper,ReconciliationQueryExecutorPort executor,JobSchedulerPort jobs,AuditWriter audit) {this.mapper=mapper;this.executor=executor;this.jobs=jobs;this.audit=audit;}
+    public ReconciliationOperationService(ReconciliationOperationMapper mapper,ReconciliationQueryExecutorPort executor,JobSchedulerPort jobs,AuditWriter audit,Clock clock,ReconciliationCaseService cases) {this.mapper=mapper;this.executor=executor;this.jobs=jobs;this.audit=audit;this.clock=clock;this.cases=cases;}
     /** RC保证持差异锁读取旧操作终态时不使用更早快照，不需要反向锁旧操作。 */
     @Transactional(timeout=10,isolation=Isolation.READ_COMMITTED)
-    public Result request(Actor actor,String key,String caseNo,long expectedVersion,String action,String reason,String ticket) {
-        Checks.text(key,128);Checks.text(reason,255);Checks.text(ticket,128);uuid(caseNo);
+    public Result request(Actor actor,String key,String number,long expectedVersion,String action,String reason,String ticket) {
+        Checks.text(key,128);Checks.text(reason,255);Checks.text(ticket,128);
+        // 幂等指纹与租约始终绑定原 UUID，输入查询号不会复制操作。
+        String caseNo=BusinessNumber.matches(BusinessNumber.Type.RECON_CASE,number)
+                ? cases.read(actor.tenantId(),number).caseNo() : number;
+        uuid(caseNo);
         if(expectedVersion<0 || !Set.of("QUERY_PAYMENT","QUERY_REFUND").contains(action==null?"":action)) throw new TradeException("INVALID_ARGUMENT","查询版本或动作无效");
         long tenant=actor.tenantId();String hash=Checks.hash(caseNo,expectedVersion,action,reason,ticket);
-        mapper.insert(tenant,UUID.randomUUID().toString(),actor.key(),key,hash,caseNo,action,reason,ticket);
-        var operation=mapper.lockRequest(tenant,actor.key(),key).getFirst();
+        String originalNo=UUID.randomUUID().toString();
+        Instant createdAt=clock.instant().truncatedTo(ChronoUnit.MILLIS);
+        ReconciliationOperation operation=null;
+        for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
+            String readable=BusinessNumber.next(BusinessNumber.Type.RECON_OPERATION,createdAt);
+            mapper.insert(tenant,originalNo,readable,createdAt,actor.key(),key,hash,caseNo,action,reason,ticket);
+            operation=mapper.lockRequest(tenant,actor.key(),key).stream().findFirst().orElse(null);
+            if(operation!=null || mapper.lockBusinessNumber(readable)==null) break;
+        }
+        if(operation==null) throw new TradeException("RECONCILIATION_OPERATION_INVALID","无法建立对账操作编号");
         if(!operation.requestHash().equals(hash)) throw new TradeException("IDEMPOTENCY_CONFLICT","查询请求键已绑定其他内容");
         if(operation.acceptedAt()!=null) return result(operation);
         var cases=mapper.lockCase(tenant,caseNo);if(cases.size()!=1) throw new TradeException("NOT_FOUND","差异不存在");var current=cases.getFirst();
@@ -57,15 +71,21 @@ public class ReconciliationOperationService {
     /** 管理状态视图独立于首次永久回执；无需解析命令缓存推测执行结果。 */
     @Transactional(readOnly=true,timeout=5)
     public List<View> page(long tenant,String state,long after,int limit) {
-        Checks.positive(tenant);if(state==null || !Set.of("QUEUED","RUNNING","RESULT_ACCEPTED","REVIEW").contains(state) || after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","查询操作分页参数无效");
-        return mapper.page(tenant,state,after,limit).stream().map(o->new View(Long.toString(o.id()),o.operationNo(),o.caseNo(),o.action(),o.status(),o.lastCode(),o.version(),o.acceptedAt())).toList();
+        return page(tenant,state,after,limit,null);
     }
-    private Result result(ReconciliationOperation operation) {return new Result(operation.operationNo(),operation.caseNo(),operation.caseVersion(),"QUEUED",operation.acceptedAt());}
+    /** 管理操作号为精确筛选，历史 UUID 查询继续沿用。 */
+    @Transactional(readOnly=true,timeout=5)
+    public List<View> page(long tenant,String state,long after,int limit,String number) {
+        Checks.positive(tenant);if(state==null || !Set.of("QUEUED","RUNNING","RESULT_ACCEPTED","REVIEW").contains(state) || after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","查询操作分页参数无效");
+        if(number!=null) Checks.text(number,64);
+        return mapper.page(tenant,state,after,limit,number).stream().map(o->new View(Long.toString(o.id()),o.operationNo(),o.caseNo(),o.action(),o.status(),o.lastCode(),o.version(),o.acceptedAt(),o.businessNo())).toList();
+    }
+    private Result result(ReconciliationOperation operation) {return new Result(operation.operationNo(),operation.caseNo(),operation.caseVersion(),"QUEUED",operation.acceptedAt(),operation.businessNo());}
     private static void uuid(String value) {try {if(!UUID.fromString(value).toString().equals(value)) throw new IllegalArgumentException();} catch(RuntimeException invalid) {throw new TradeException("INVALID_ARGUMENT","差异编号必须为规范UUID");}}
     /** 操作终态不等于case关闭或真实资金成功。 */
     public static boolean terminal(String status) {return "RESULT_ACCEPTED".equals(status)||"REVIEW".equals(status);}
     /** 永久首次结果，后续完成仍返回QUEUED及原case版本。 */
-    public record Result(String operationNo,String caseNo,long caseVersion,String initialStatus,Instant acceptedAt) {}
+    public record Result(String operationNo,String caseNo,long caseVersion,String initialStatus,Instant acceptedAt,String businessNo) {}
     /** 只展示执行分类，不暴露永久请求键、主体摘要、凭据或原文。 */
-    public record View(String id,String operationNo,String caseNo,String action,String status,String lastCode,long version,Instant acceptedAt) {}
+    public record View(String id,String operationNo,String caseNo,String action,String status,String lastCode,long version,Instant acceptedAt,String businessNo) {}
 }
