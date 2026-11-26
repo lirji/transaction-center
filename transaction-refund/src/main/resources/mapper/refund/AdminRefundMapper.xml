@@ -14,14 +14,15 @@
       <arg column="policyVersion" javaType="_long"/>
       <arg column="version" javaType="_long"/>
       <arg column="createdAt" javaType="java.time.Instant"/>
+      <arg column="businessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
-  <sql id="columns">r.id AS `cursor`, r.refund_no AS refundNo, r.order_no AS orderNo, r.member_id AS memberId, r.amount AS amount, r.currency AS currency, r.status AS status, r.approval_ref AS approvalRef, r.approval_deadline AS approvalDeadline, r.policy_version AS policyVersion, r.version AS version, r.created_at AS createdAt</sql>
+  <sql id="columns">r.id AS `cursor`, r.refund_no AS refundNo, r.order_no AS orderNo, r.member_id AS memberId, r.amount AS amount, r.currency AS currency, r.status AS status, r.approval_ref AS approvalRef, r.approval_deadline AS approvalDeadline, r.policy_version AS policyVersion, r.version AS version, r.created_at AS createdAt, r.business_no AS businessNo</sql>
   <sql id="source">FROM tc_refund r </sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
     WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
-    <if test="q.filters.refundNo != null">AND r.refund_no=#{q.filters.refundNo}</if>
+    <if test="q.filters.refundNo != null">AND <choose><when test='q.filters.refundNo.startsWith("TRD-RFD-")'>r.business_no=#{q.filters.refundNo}</when><otherwise>r.refund_no=#{q.filters.refundNo}</otherwise></choose></if>
     <if test="q.filters.orderNo != null">AND r.order_no=#{q.filters.orderNo}</if>
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.filters.status != null and q.filters.status != 'ALL'">AND r.status=#{q.filters.status}</if>
@@ -31,7 +32,7 @@
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.refund_no=#{number}
+    WHERE r.tenant_id=#{tenant} AND <choose><when test='number.startsWith("TRD-RFD-")'>r.business_no=#{number}</when><otherwise>r.refund_no=#{number}</otherwise></choose>
   </select>
   <resultMap id="AdminRefundItem" type="com.lrj.trade.refund.model.AdminRefundItem"><constructor>
     <arg column="componentType" javaType="java.lang.String"/>

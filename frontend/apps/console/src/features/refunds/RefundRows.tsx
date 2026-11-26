@@ -12,7 +12,7 @@ export function RefundRows({ rows }: { rows: RefundQueueItem[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.refundNo}>
-            <td><Link to={`/refunds/${encodeURIComponent(row.refundNo)}`} className="mono">{row.refundNo}</Link></td>
+            <td><Link to={`/refunds/${encodeURIComponent(row.refundNo)}`} className="mono">{row.businessNo ?? row.refundNo}</Link></td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{refundLabels[row.status]}</Badge></td>
             <td>{formatMinorAmount(row.amount)}</td>

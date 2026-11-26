@@ -36,6 +36,7 @@
       <arg column="active_attempt_no" javaType="java.lang.String"/>
       <arg column="attempt_status" javaType="java.lang.String"/>
       <arg column="version" javaType="_long"/>
+      <arg column="business_no" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
   <update id="finishWithoutActive">
@@ -88,8 +89,11 @@
     </constructor>
   </resultMap>
   <!-- 支付意图与订单许可同事务，订单唯一防止换幂等键创建第二意图。 -->
+  <select id="lockBusinessNumber" resultType="string" useCache="false">
+    SELECT business_no FROM tc_payment_intent WHERE business_no=#{number} FOR UPDATE
+  </select>
   <insert id="insertIntent">
-    INSERT INTO tc_payment_intent(tenant_id,payment_no,order_id,member_id,expected_amount,currency,created_at,updated_at) VALUES(#{tenant},#{number},#{order},#{member},#{amount},#{currency},#{now},#{now})
+    INSERT INTO tc_payment_intent(tenant_id,payment_no,business_no,order_id,member_id,expected_amount,currency,created_at,updated_at) VALUES(#{tenant},#{number},#{number},#{order},#{member},#{amount},#{currency},#{now},#{now})
   </insert>
   <!-- 调用方已锁订单，随后锁意图形成固定锁序。 -->
   <select id="lockByOrder" resultMap="PaymentIntent" useCache="false">
@@ -97,9 +101,10 @@
   </select>
   <!-- 本人查询显式限定会员和租户。 -->
   <select id="findOwn" resultMap="PaymentView" useCache="false">
-    SELECT i.payment_no,i.order_id,i.status,i.expected_amount,i.currency,i.active_attempt_no,i.version,a.status AS attempt_status
+    SELECT i.payment_no,i.order_id,i.status,i.expected_amount,i.currency,i.active_attempt_no,i.version,a.status AS attempt_status,i.business_no
     FROM tc_payment_intent i LEFT JOIN tc_payment_attempt a ON a.tenant_id=i.tenant_id AND a.merchant_request_no=i.active_attempt_no
-    WHERE i.tenant_id=#{tenant} AND i.member_id=#{member} AND i.payment_no=#{number}
+    WHERE i.tenant_id=#{tenant} AND i.member_id=#{member} AND
+    <choose><when test='number.startsWith("TRD-PAY-")'>i.business_no=#{number}</when><otherwise>i.payment_no=#{number}</otherwise></choose>
   </select>
   <!-- 生成的渠道请求号永久保留，关闭后也不复用。 -->
   <insert id="insertAttempt">

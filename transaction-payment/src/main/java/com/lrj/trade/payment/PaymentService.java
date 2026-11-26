@@ -47,8 +47,19 @@ public class PaymentService {
             var found=mapper.lockByOrder(actor.tenantId(),orderId);
             if(found.isEmpty()) {
                 policy.requirePayment();
-                mapper.insertIntent(actor.tenantId(),"PAY-"+UUID.randomUUID(),orderId,Long.parseLong(order.memberId()),
-                    order.payableAmount(),order.currency(),now);
+                for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
+                    String number=BusinessNumber.next(BusinessNumber.Type.PAYMENT,now);
+                    try {
+                        mapper.insertIntent(actor.tenantId(),number,orderId,Long.parseLong(order.memberId()),
+                            order.payableAmount(),order.currency(),now);
+                        break;
+                    } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+                        // 订单唯一或其它冲突继续交原边界处理，只有公开编号可重新发号。
+                        if (attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || mapper.lockBusinessNumber(number)==null) {
+                            throw duplicate;
+                        }
+                    }
+                }
                 found=mapper.lockByOrder(actor.tenantId(),orderId);
             }
             var intent=found.getFirst();

@@ -20,6 +20,9 @@ public interface PaymentMapper {
     /** 调用方已锁订单，随后锁意图形成固定锁序。 */
     List<PaymentIntent> lockByOrder(@Param("tenant") long tenant,@Param("order") long order);
     /** 本人查询显式限定会员和租户。 */
+    /** 仅在发号碰撞后通过全局唯一索引判断冲突对象。 */
+    String lockBusinessNumber(@Param("number") String number);
+
     List<PaymentView> findOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("number") String number);
     /** 最后尝试早已关闭后才取消订单时，空活跃指针仍可安全结束意图。 */
     int finishWithoutActive(@Param("tenant") long tenant,@Param("intent") long intent,@Param("now") Instant now);

@@ -5555,6 +5555,8 @@ class FoundationTest {
     @Test void adminQueryPaymentsReceiptsAndAmounts() throws Exception {
         Fixture f=paymentFixture(4);var order=factOrder(f,"admin-payment");var pay=createPayment(f.actor(),"pay",order.orderNo(),"TEST_A","return");
         var normal=receive(f,pay,"admin-normal",100,"CNY");var excess=receive(f,pay,"admin-excess",100,"CNY");
+        assertTrue(pay.paymentNo().matches("TRD-PAY-[0-9]{6}-[0-9]{10}"));
+        assertEquals(pay.paymentNo(),pay.businessNo());
         jwt("query-admin","trade.admin",f.actor().tenantId());jwt("query-other","trade.admin",f.actor().tenantId()+100000);var json=tools.jackson.databind.json.JsonMapper.builder().build();
         for(String path:List.of("/payments?orderNo="+order.orderNo(),"/payments/"+pay.paymentNo(),"/payments/"+pay.paymentNo()+"/attempts","/payment-receipts?orderNo="+order.orderNo(),"/payment-receipts/"+normal.receiptNo())) {
             var response=request("GET","/api/v1/trade/admin"+path,"query-admin",null);assertEquals(200,response.statusCode(),response.body());
@@ -5570,11 +5572,16 @@ class FoundationTest {
     /** 退款队列兼容旧数组，详情原因来自持久任务，退款不伪装成实际退货。 */
     @Test void adminQueryRefundsAndReturnInspection() throws Exception {
         Fixture f=paymentFixture(2);var order=paidRefundOrder(f,"admin-refund",2);var refund=requestRefund(f,order,"refund",50);
+        assertTrue(refund.businessNo().matches("TRD-RFD-[0-9]{6}-[0-9]{10}"));
+        assertTrue(refund.refundNo().matches("RF-[a-f0-9-]{36}"));
         jwt("query-admin","trade.admin",f.actor().tenantId());jwt("query-other","trade.admin",f.actor().tenantId()+100000);var json=tools.jackson.databind.json.JsonMapper.builder().build();
         var queue=request("GET","/api/v1/trade/admin/refunds","query-admin",null);assertEquals(200,queue.statusCode(),queue.body());assertTrue(json.readTree(queue.body()).isArray());assertEquals(refund.refundNo(),json.readTree(queue.body()).get(0).path("refundNo").asText());
         assertEquals(1,json.readTree(request("GET","/api/v1/trade/admin/refunds?status=ALL&orderNo="+order.orderNo(),"query-admin",null).body()).size());
         jdbc.update("UPDATE tc_job_lease SET last_error='CHANNEL_UNAVAILABLE' WHERE tenant_id=? AND job_type='REFUND_RECOVER' AND business_key=?",f.actor().tenantId(),refund.refundNo());
         var detail=request("GET","/api/v1/trade/admin/refunds/"+refund.refundNo(),"query-admin",null);assertEquals(200,detail.statusCode(),detail.body());
+        var byBusinessNo=request("GET","/api/v1/trade/admin/refunds/"+refund.businessNo(),"query-admin",null);
+        assertEquals(200,byBusinessNo.statusCode(),byBusinessNo.body());
+        assertEquals(refund.refundNo(),json.readTree(byBusinessNo.body()).path("refundNo").asText());
         var refundJson=json.readTree(detail.body());assertEquals("CHANNEL_UNAVAILABLE",refundJson.path("processingReasonCode").asText());assertFalse(refundJson.has("reason"));assertEquals(1,refundJson.path("items").size());
         assertEquals(404,request("GET","/api/v1/trade/admin/refunds/"+refund.refundNo(),"query-other",null).statusCode());
         var ingress=application.getBean(com.lrj.trade.order.FulfillmentIngressService.class);ingress.deliver(f.actor(),"deliver",order.orderNo(),"source","proof");

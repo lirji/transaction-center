@@ -13,13 +13,14 @@ public final class BusinessNumber {
     private static final DateTimeFormatter BUSINESS_DATE = DateTimeFormatter.ofPattern("uuMMdd", Locale.ROOT)
         .withZone(BUSINESS_ZONE);
     private static final long SUFFIX_SPACE = 10_000_000_000L;
+    public static final int MAX_ISSUE_ATTEMPTS = 4;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private BusinessNumber() {}
 
     /** 每个前缀由单一业务对象拥有，从已签收的注册表分配。 */
     public enum Type {
-        ORDER("ORD");
+        ORDER("ORD"), PAYMENT("PAY"), REFUND("RFD");
 
         private final String prefix;
         private final Pattern pattern;

@@ -11,10 +11,11 @@
     <arg column="approval_ref" javaType="java.lang.String"/>
     <arg column="approval_deadline" javaType="java.time.Instant"/>
     <arg column="version" javaType="_long"/>
+    <arg column="business_no" javaType="java.lang.String"/>
   </constructor></resultMap>
   <!-- 固定状态过滤命中ix_refund_state，不用OFFSET深翻页或逐行读取组件。 -->
   <select id="listQueue" resultMap="RefundQueueItem" useCache="false">
-    SELECT id,refund_no,order_no,amount,currency,status,approval_ref,approval_deadline,version
+    SELECT id,refund_no,order_no,amount,currency,status,approval_ref,approval_deadline,version,business_no
     FROM tc_refund WHERE tenant_id=#{tenant} AND status=#{status} AND id &gt; #{after}
     ORDER BY id LIMIT #{limit}
   </select>
@@ -44,6 +45,7 @@
     <arg column="provider_refund_no" javaType="java.lang.String"/>
     <arg column="version" javaType="_long"/>
     <arg column="created_at" javaType="java.time.Instant"/>
+    <arg column="business_no" javaType="java.lang.String"/>
   </constructor></resultMap>
   <resultMap id="RefundPolicy" type="com.lrj.trade.refund.model.RefundPolicy"><constructor>
     <arg column="currency" javaType="java.lang.String"/>
@@ -66,17 +68,21 @@
   <!-- 按版本更新并由服务同事务审计。 -->
   <update id="updatePolicy">UPDATE tc_refund_policy SET currency=#{currency},auto_approve_limit=#{limit},version=version+1,updated_at=#{now} WHERE tenant_id=#{tenant} AND version=#{version}</update>
   <!-- 已持订单和来源锁后读取永久收款关联，重放不能按新身份再创建。 -->
-  <select id="lockCompensation" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND compensation_receipt_id=#{receipt} FOR UPDATE</select>
+  <select id="lockCompensation" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND compensation_receipt_id=#{receipt} FOR UPDATE</select>
   <!-- 永久主体请求号去重，新插入尚不可见，资金/明细随后在同事务建立。 -->
-  <insert id="insertRefund">INSERT INTO tc_refund(tenant_id,refund_no,source_request_id,applicant_key,member_id,order_id,order_no,receipt_id,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,created_at,updated_at,compensation_receipt_id) VALUES(#{tenant},#{number},#{request},#{actor},#{member},#{order},#{orderNo},#{receipt},#{receiptNo},#{merchantRefund},#{amount},#{currency},#{reason},#{hash},#{status},#{policyVersion},#{policyLimit},#{approval},#{deadline},#{now},#{now},#{compensation}) ON DUPLICATE KEY UPDATE id=tc_refund.id</insert>
+  <insert id="insertRefund">INSERT INTO tc_refund(tenant_id,refund_no,business_no,source_request_id,applicant_key,member_id,order_id,order_no,receipt_id,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,created_at,updated_at,compensation_receipt_id) VALUES(#{tenant},#{number},#{businessNo},#{request},#{actor},#{member},#{order},#{orderNo},#{receipt},#{receiptNo},#{merchantRefund},#{amount},#{currency},#{reason},#{hash},#{status},#{policyVersion},#{policyLimit},#{approval},#{deadline},#{now},#{now},#{compensation}) ON DUPLICATE KEY UPDATE id=tc_refund.id</insert>
+  <select id="lockBusinessNumber" resultType="string" useCache="false">
+    SELECT business_no FROM tc_refund WHERE business_no=#{number} FOR UPDATE
+  </select>
   <!-- 永久请求键占位后精确当前读，重放返回原聚合。 -->
-  <select id="lockByRequest" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND applicant_key=#{actor} AND source_request_id=#{request} FOR UPDATE</select>
+  <select id="lockByRequest" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND applicant_key=#{actor} AND source_request_id=#{request} FOR UPDATE</select>
   <!-- 只读归属或展示，不据此作状态转换。 -->
-  <select id="findRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND refund_no=#{number}</select>
-  <select id="recoveryCandidates" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND id &gt; #{after} AND status IN ('PENDING_APPROVAL','READY','SUBMITTED') ORDER BY id LIMIT #{limit}</select>
-  <select id="findByMerchantRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND merchant_refund_no=#{number}</select>
+  <select id="findRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND refund_no=#{number}</select>
+  <select id="findRefundByBusinessNumber" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND business_no=#{number}</select>
+  <select id="recoveryCandidates" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND id &gt; #{after} AND status IN ('PENDING_APPROVAL','READY','SUBMITTED') ORDER BY id LIMIT #{limit}</select>
+  <select id="findByMerchantRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND merchant_refund_no=#{number}</select>
   <!-- 在订单/资金资源锁之后精确锁定现有退款聚合。 -->
-  <select id="lockRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at FROM tc_refund WHERE tenant_id=#{tenant} AND refund_no=#{number} FOR UPDATE</select>
+  <select id="lockRefund" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND refund_no=#{number} FOR UPDATE</select>
   <!-- 按规范化组件键读取固定归属，确定性更新额度。 -->
   <select id="items" resultMap="RefundItemRow" useCache="false">SELECT component_key,component_type,order_item_id,quantity,amount FROM tc_refund_item WHERE tenant_id=#{tenant} AND refund_id=#{refund} ORDER BY component_key</select>
   <!-- 额度上限来自冻结订单，重复初始化不覆盖累计退款。 -->

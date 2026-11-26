@@ -84,3 +84,5 @@ FoundationTest覆盖实际HTTP、MySQL投影、租户隔离、会员归属、分
 真实渠道、IAM授权配置、网关集群配额、生产容量验收仍需相应部署／联调。本次前端由Cursor继续按上述合同接入，后端源码完成不代表现有运行容器已提供新接口。
 
 实际验证结果：完整 `mvn verify` 退出0，450项测试，0失败／错误／跳过，其中FoundationTest 316项、AdminQueryTest 6项。独立只读审查发现的HEAD权限和429审计问题已修复并复核。报告见 [verification.json](delivery/admin-query-apis/verification.json)，文件清单见 [FILES.txt](delivery/admin-query-apis/FILES.txt)。
+
+V045 为支付和退款增加业务编号及唯一索引。新支付使用 `TRD-PAY` 编号，退款展示和查找使用 `TRD-RFD`，V1 证据中沿用原退款引用。订单、支付及退款详情兼容旧号和可读号，真实资金动作继续使用返回的原生标识。补录工具支持 `trade-payments` 和 `trade-refunds`，记录以不可变主键辨别，旧渠道请求号、回调和审批证据按原链路处理。

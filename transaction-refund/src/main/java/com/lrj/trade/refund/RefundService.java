@@ -45,14 +45,18 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
                 throw new TradeException("REFUND_BINDING_CONFLICT","订单正常实收与冻结金额不一致");
             var components=components(order,selected);
             var policy=policies.evaluate(actor.tenantId(),source.currency(),source.refundedAmount()+source.reservedAmount()+amount,false);
-            String no="RF-"+UUID.randomUUID(); var now=now();
+            var now=now();
+            String no="RF-"+UUID.randomUUID();
             String approval=policy.requiresApproval()?"RA-"+UUID.randomUUID():null;
             // 新聚合尚未提交、没有其他工作者可见；先占永久业务请求键，再建立资金及组件。
-            mapper.insertRefund(actor.tenantId(),no,key,actor.key(),Long.parseLong(order.memberId()),orderId,orderNo,
-                Long.parseLong(source.receiptId()),source.receiptNo(),"MRF-"+UUID.randomUUID(),amount,source.currency(),reason,hash,
-                policy.requiresApproval()?"PENDING_APPROVAL":"READY",policy.version(),policy.limit(),approval,
-                approval==null?null:now.plus(Duration.ofDays(1)),now,null);
-            var row=mapper.lockByRequest(actor.tenantId(),actor.key(),key).getFirst();
+            // V1资金事件仍校验RF-UUID，业务展示号独立分配，旧消费者可继续核对。
+            var row=issueRefund(now,businessNo->
+                mapper.insertRefund(actor.tenantId(),no,businessNo,key,actor.key(),Long.parseLong(order.memberId()),orderId,orderNo,
+                    Long.parseLong(source.receiptId()),source.receiptNo(),"MRF-"+UUID.randomUUID(),amount,source.currency(),reason,hash,
+                    policy.requiresApproval()?"PENDING_APPROVAL":"READY",policy.version(),policy.limit(),approval,
+                    approval==null?null:now.plus(Duration.ofDays(1)),now,null),
+                ()->mapper.lockByRequest(actor.tenantId(),actor.key(),key));
+
             if(!row.requestHash().equals(hash)) throw new TradeException("IDEMPOTENCY_CONFLICT","永久退款请求号已绑定其他内容");
             if(!row.refundNo().equals(no)) return row.refundNo();
             funds.reserve(actor.tenantId(),no,source.receiptNo(),orderId,amount,source.currency());
@@ -88,16 +92,16 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
             long receipt=Long.parseLong(source.receiptId()),orderId=Long.parseLong(source.orderId());
             var order=orders.lockTrusted(tenant,orderId);
             var policy=policies.evaluate(tenant,source.currency(),source.amount(),true);
-            String no="RF-"+UUID.randomUUID(),approval="RA-"+UUID.randomUUID(); var now=now();
+            String no="RF-"+UUID.randomUUID(), approval="RA-"+UUID.randomUUID(); var now=now();
             String reason="abnormal-receipt:"+source.disposition();
             String hash=Checks.hash(receiptNo,source.amount(),source.currency(),source.disposition());
-            mapper.insertRefund(tenant,no,key,actor.key(),Long.parseLong(order.memberId()),orderId,order.orderNo(),receipt,
-                receiptNo,"MRF-"+UUID.randomUUID(),source.amount(),source.currency(),reason,hash,"PENDING_APPROVAL",
-                policy.version(),policy.limit(),approval,now.plus(Duration.ofDays(1)),now,receipt);
-            // 先UPSERT占永久唯一键再当前读，避免RR隔离下不同收款的缺失键间隙锁互相阻塞插入。
-            var existing=mapper.lockCompensation(tenant,receipt);
-            if(existing.isEmpty()) throw new TradeException("REFUND_COMPENSATION_CONFLICT","永久请求已有不同补偿关联，须核对后处理");
-            var row=existing.getFirst();
+            // 继续按原始收款键串行化补偿，同源重放返回原退款号。
+            var row=issueRefund(now,businessNo->
+                mapper.insertRefund(tenant,no,businessNo,key,actor.key(),Long.parseLong(order.memberId()),orderId,
+                    order.orderNo(),receipt,receiptNo,"MRF-"+UUID.randomUUID(),source.amount(),source.currency(),reason,hash,
+                    "PENDING_APPROVAL",policy.version(),policy.limit(),approval,now.plus(Duration.ofDays(1)),now,receipt),
+                ()->mapper.lockCompensation(tenant,receipt));
+
             if(!row.refundNo().equals(no)) return row.refundNo();
             // 成功或释放后的重放先返回永久申请，不能因已退余额拒绝正确重试。
             if(source.refundedAmount()!=0 || source.reservedAmount()!=0)
@@ -126,9 +130,25 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
         return List.copyOf(mapper.listQueue(tenant,status,after,limit));
     }
 
+    /** UPSERT已处理来源幂等。来源缺失时只允许重新分配真正被占用的业务编号。 */
+    private RefundRow issueRefund(Instant now,java.util.function.Consumer<String> write,
+            java.util.function.Supplier<List<RefundRow>> readSource) {
+        for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
+            String candidate=BusinessNumber.next(BusinessNumber.Type.REFUND,now);
+            write.accept(candidate);
+            var existing=readSource.get();
+            if (!existing.isEmpty()) return existing.getFirst();
+            if (mapper.lockBusinessNumber(candidate)==null) break;
+        }
+        throw new TradeException("REFUND_COMPENSATION_CONFLICT","永久请求已有不同退款关联，须核对后处理");
+    }
+
     /** 仅申请主体可读取；后台与多身份委托须通过后续显式授权入口，不能靠猜编号。 */
     public RefundView read(Actor actor,String number) {
-        var row=find(actor.tenantId(),number);
+        var row=BusinessNumber.matches(BusinessNumber.Type.REFUND,number)
+            ? mapper.findRefundByBusinessNumber(actor.tenantId(),number).stream().findFirst()
+              .orElseThrow(()->new TradeException("NOT_FOUND","退款申请不存在"))
+            : find(actor.tenantId(),number);
         if(!row.applicantKey().equals(actor.key())) throw new TradeException("NOT_FOUND","退款申请不存在");
         return view(actor.tenantId(),row);
     }
@@ -279,7 +299,7 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
     private RefundView view(long tenant,RefundRow row) {
         return new RefundView(row.refundNo(),row.orderNo(),row.amount(),row.currency(),row.reason(),row.status(),row.approvalRef(),
             row.policyVersion(),row.version(),row.createdAt(),mapper.items(tenant,row.refundId()).stream()
-                .map(i->new RefundSelection(i.componentType(),i.orderItemId()==null?null:Long.toString(i.orderItemId()),i.quantity(),i.amount())).toList());
+                .map(i->new RefundSelection(i.componentType(),i.orderItemId()==null?null:Long.toString(i.orderItemId()),i.quantity(),i.amount())).toList(),row.businessNo());
     }
     private List<RefundSelection> normalize(List<RefundSelection> input) {
         if(input==null || input.isEmpty() || input.size()>100) throw new TradeException("INVALID_ARGUMENT","退款明细数量必须为1至100");

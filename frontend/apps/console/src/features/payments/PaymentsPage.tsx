@@ -28,7 +28,7 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
         {rows.map((row) => (
           <tr key={row.paymentNo}>
             <td>
-              <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentNo}</Link>
+              <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.businessNo ?? row.paymentNo}</Link>
             </td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{paymentLabels[row.status]}</Badge></td>

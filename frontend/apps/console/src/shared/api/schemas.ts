@@ -124,6 +124,7 @@ export const refundStatusSchema = z.enum([
 export const refundQueueItemSchema = z.object({
   cursor: memberIdString,
   refundNo: z.string(),
+  businessNo: z.string().nullish(),
   orderNo: z.string(),
   amount: z.number().int(),
   currency: z.string(),
@@ -334,6 +335,7 @@ export type AdminOrderDetail = z.infer<typeof adminOrderDetailSchema>
 
 export const adminPaymentViewSchema = z.object({
   paymentNo: z.string(),
+  businessNo: z.string().nullish(),
   orderId: z.string(),
   orderNo: z.string(),
   memberId: z.string(),
@@ -390,6 +392,7 @@ export type AdminReceiptDetail = z.infer<typeof adminReceiptDetailSchema>
 
 export const adminRefundViewSchema = z.object({
   refundNo: z.string(),
+  businessNo: z.string().nullish(),
   orderNo: z.string(),
   memberId: z.string(),
   amount: z.number().int().min(0),

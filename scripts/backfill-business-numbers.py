@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""为指定租户有界补录订单展示号。原生订单标识、外键和资金记录由业务系统持有。"""
+"""为指定租户有界补录业务展示号。原生订单标识、外键和资金记录由业务系统持有。"""
 
 import argparse
 import re
@@ -15,11 +15,22 @@ class Dataset:
     primary_key: str
     prefix: str
     numeric_tenant: bool
+    timestamp_column: str = "created_at"
+    iso_timestamp: bool = False
 
 
 DATASETS = {
     "trade-orders": Dataset("tc_order", "id", "TRD-ORD", True),
+    "trade-payments": Dataset("tc_payment_intent", "id", "TRD-PAY", True),
+    "trade-refunds": Dataset("tc_refund", "id", "TRD-RFD", True),
     "commerce-orders": Dataset("order_record", "order_id", "COM-ORD", False),
+    "commerce-payments": Dataset("payment_attempt", "payment_id", "COM-PAY", False),
+    "commerce-refunds": Dataset("payment_refund", "refund_id", "COM-RFD", False),
+    "commerce-aftersales": Dataset("aftersales_case", "case_id", "COM-AFS", False),
+    "marketing-campaigns": Dataset("mk_campaign", "campaign_id", "MKT-CMP", False, iso_timestamp=True),
+    "marketing-approvals": Dataset("mk_approval_case", "case_id", "MKT-APR", False, iso_timestamp=True),
+    "marketing-funding": Dataset("mk_promotion_application", "application_id", "MKT-FAP", False, iso_timestamp=True),
+    "marketing-ledger": Dataset("mk_funding_ledger", "ledger_id", "MKT-LED", False, "occurred_at", True),
 }
 IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
 POSITIVE_ID = re.compile(r"[1-9][0-9]{0,19}")
@@ -51,7 +62,8 @@ def sql_identifier(value, numeric=False):
 def mysql(args, query):
     """用独立短连接执行一批，标准输出只返回查询结果。"""
     command = [args.mysql, f"--defaults-extra-file={args.defaults_file}", "--batch",
-               "--raw", "--skip-column-names", f"--database={args.database}"]
+               "--raw", "--skip-column-names", "--init-command=SET SESSION time_zone='+00:00'",
+               f"--database={args.database}"]
     result = subprocess.run(command, input=query, text=True, capture_output=True, timeout=args.timeout)
     if result.returncode:
         raise MysqlError(result.stderr)
@@ -61,7 +73,11 @@ def mysql(args, query):
 def read_batch(args, dataset, tenant, after):
     """按租户和原生主键游标分页，重跑时已编号记录自然退出。"""
     lower = f" AND {dataset.primary_key}>{sql_identifier(after, dataset.numeric_tenant)}" if after else ""
-    query = (f"SELECT {dataset.primary_key}, DATE_FORMAT(created_at + INTERVAL 8 HOUR, '%y%m%d') "
+    timestamp = dataset.timestamp_column
+    if dataset.iso_timestamp:
+        # 营销表保存 ISO-8601 UTC 字符串，解析秒及之前的信息足以计算业务日。
+        timestamp = f"CAST(REPLACE(LEFT({timestamp},19),'T',' ') AS DATETIME)"
+    query = (f"SELECT {dataset.primary_key}, DATE_FORMAT({timestamp} + INTERVAL 8 HOUR, '%y%m%d') "
              f"FROM {dataset.table} WHERE tenant_id={tenant}{lower} AND business_no IS NULL "
              f"ORDER BY {dataset.primary_key} LIMIT {args.batch_size};")
     rows = []

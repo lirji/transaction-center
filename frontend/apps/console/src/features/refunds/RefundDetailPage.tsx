@@ -28,7 +28,7 @@ export function RefundDetailPage() {
     <div className="workspace">
       <PageHeader
         eyebrow="Refund"
-        title={row.refundNo}
+        title={row.businessNo ?? row.refundNo}
         description="只读。不展示用户申请原因。processingReasonCode 是本地处理分类，不是渠道最终失败原因。本台不能批准或驳回。"
       />
       <StateBanner tone="warn" title="不能在此批准退款" detail="没有批准或驳回按钮。需要独立审批签收。" />

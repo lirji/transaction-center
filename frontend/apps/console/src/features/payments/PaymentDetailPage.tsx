@@ -38,7 +38,7 @@ export function PaymentDetailPage() {
     <div className="workspace">
       <PageHeader
         eyebrow="Payment"
-        title={payment.paymentNo}
+        title={payment.businessNo ?? payment.paymentNo}
         description="UNKNOWN 不等于失败。closeFenceAt 只是本地关闭屏障，不是渠道已关单证明。"
       />
       <div className="section-gap">
