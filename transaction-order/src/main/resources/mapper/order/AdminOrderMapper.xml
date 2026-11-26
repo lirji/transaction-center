@@ -44,6 +44,7 @@
     <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
     <if test="q.filters.financialStatus != null">AND r.financial_status=#{q.filters.financialStatus}</if>
     <if test="q.filters.warehouseId != null">AND r.warehouse_id=#{q.filters.warehouseId}</if>
+    <if test="q.filters.currency != null">AND r.currency=#{q.filters.currency}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
     <choose>
       <when test="q.filters.sort == 'CREATED_DESC'">ORDER BY r.created_at DESC,r.id DESC</when>

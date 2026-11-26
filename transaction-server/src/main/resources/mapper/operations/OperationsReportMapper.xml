@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.server.operations.OperationsReportMapper">
+  <resultMap id="Totals" type="com.lrj.trade.server.operations.OperationsReport$Totals">
+    <constructor>
+      <arg column="order_count" javaType="_long"/>
+      <arg column="order_payable" javaType="java.math.BigDecimal"/>
+      <arg column="paid_order_count" javaType="_long"/>
+      <arg column="normal_receipt" javaType="java.math.BigDecimal"/>
+      <arg column="abnormal_receipt" javaType="java.math.BigDecimal"/>
+      <arg column="normal_refund" javaType="java.math.BigDecimal"/>
+      <arg column="abnormal_refund" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="Fact" type="com.lrj.trade.server.operations.OperationsReport$Fact">
+    <constructor>
+      <arg column="ledger_id" javaType="java.lang.String"/>
+      <arg column="ledger_no" javaType="java.lang.String"/>
+      <arg column="order_no" javaType="java.lang.String"/>
+      <arg column="receipt_no" javaType="java.lang.String"/>
+      <arg column="refund_no" javaType="java.lang.String"/>
+      <arg column="kind" javaType="com.lrj.trade.server.operations.OperationsReport$Scope"/>
+      <arg column="amount" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="confirmed_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <!-- 对账同样采用永久资金账本、原实收及已成功退款确认事实。退款以自身确认时间归期。 -->
+  <sql id="confirmedFunds">
+    SELECT l.id AS ledger_id,l.ledger_no,r.order_id,r.receipt_no,l.refund_no,l.amount,l.currency,r.confirmed_at,
+      CASE WHEN r.disposition='NORMAL' THEN 'NORMAL_RECEIPT' ELSE 'ABNORMAL_RECEIPT' END AS kind
+    FROM tc_payment_receipt r
+    JOIN tc_money_ledger l ON l.tenant_id=r.tenant_id AND l.receipt_id=r.id AND l.entry_type='RECEIPT'
+    WHERE r.tenant_id=#{tenant} AND r.currency=#{currency} AND l.currency=#{currency}
+      AND r.confirmed_at &gt;= #{q.createdFrom} AND r.confirmed_at &lt; #{q.createdTo}
+    <if test="q.after != 0">AND l.id &gt; #{q.after}</if>
+    UNION ALL
+    SELECT l.id,l.ledger_no,r.order_id,r.receipt_no,l.refund_no,l.amount,l.currency,h.confirmed_at,
+      CASE WHEN r.disposition='NORMAL' THEN 'NORMAL_REFUND' ELSE 'ABNORMAL_REFUND' END
+    FROM tc_payment_refund_hold h
+    JOIN tc_money_ledger l ON l.tenant_id=h.tenant_id AND l.receipt_id=h.receipt_id AND l.refund_no=h.refund_no AND l.entry_type='REFUND'
+    JOIN tc_payment_receipt r ON r.tenant_id=h.tenant_id AND r.id=h.receipt_id
+    WHERE h.tenant_id=#{tenant} AND h.currency=#{currency} AND l.currency=#{currency} AND h.state='SUCCEEDED'
+      AND h.confirmed_at &gt;= #{q.createdFrom} AND h.confirmed_at &lt; #{q.createdTo}
+    <if test="q.after != 0">AND l.id &gt; #{q.after}</if>
+  </sql>
+
+  <!-- 正常实收对每个订单有唯一数据库槽位，因此逐笔计数就是确认付费订单数。 -->
+  <select id="summary" resultMap="Totals" useCache="false" timeout="3">
+    WITH funds AS (<include refid="confirmedFunds"/>)
+    SELECT orders.order_count,orders.order_payable,confirmed.paid_order_count,confirmed.normal_receipt,
+           confirmed.abnormal_receipt,confirmed.normal_refund,confirmed.abnormal_refund
+    FROM (
+      SELECT COUNT(*) AS order_count,COALESCE(SUM(payable_amount),0) AS order_payable
+      FROM tc_order WHERE tenant_id=#{tenant} AND currency=#{currency}
+        AND created_at &gt;= #{q.createdFrom} AND created_at &lt; #{q.createdTo}
+    ) orders CROSS JOIN (
+      SELECT COUNT(CASE WHEN kind='NORMAL_RECEIPT' THEN 1 END) AS paid_order_count,
+        COALESCE(SUM(CASE WHEN kind='NORMAL_RECEIPT' THEN amount END),0) AS normal_receipt,
+        COALESCE(SUM(CASE WHEN kind='ABNORMAL_RECEIPT' THEN amount END),0) AS abnormal_receipt,
+        COALESCE(SUM(CASE WHEN kind='NORMAL_REFUND' THEN amount END),0) AS normal_refund,
+        COALESCE(SUM(CASE WHEN kind='ABNORMAL_REFUND' THEN amount END),0) AS abnormal_refund
+      FROM funds
+    ) confirmed
+  </select>
+
+  <select id="facts" resultMap="Fact" useCache="false" timeout="3">
+    WITH funds AS (<include refid="confirmedFunds"/>)
+    SELECT f.ledger_id,f.ledger_no,o.order_no,f.receipt_no,f.refund_no,f.kind,f.amount,f.currency,f.confirmed_at
+    FROM funds f
+    JOIN tc_order o ON o.tenant_id=#{tenant} AND o.id=f.order_id
+    <choose>
+      <when test="q.filters.scope == 'NET'">WHERE f.kind IN ('NORMAL_RECEIPT','NORMAL_REFUND')</when>
+      <otherwise>WHERE f.kind=#{q.filters.scope}</otherwise>
+    </choose>
+    ORDER BY f.ledger_id LIMIT #{q.fetchLimit}
+  </select>
+</mapper>

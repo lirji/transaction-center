@@ -514,6 +514,22 @@ export const customerEligibilityResultSchema = z.object({
 })
 export type CustomerEligibilityResult = z.infer<typeof customerEligibilityResultSchema>
 
+const minorTotal = z.string().regex(/^(0|[1-9][0-9]*)$/)
+export const operationsSummarySchema = z.object({
+  from: isoDateTime, to: isoDateTime, observedAt: isoDateTime, currency: currencyCode,
+  orderCount: z.number().int().nonnegative(), orderPayable: minorTotal,
+  paidOrderCount: z.number().int().nonnegative(),
+  normalReceipt: minorTotal, abnormalReceipt: minorTotal,
+  normalRefund: minorTotal, abnormalRefund: minorTotal,
+  netReceipt: z.string().regex(/^(0|-?[1-9][0-9]*)$/),
+})
+const operationsFactKind = z.enum(['NORMAL_RECEIPT', 'ABNORMAL_RECEIPT', 'NORMAL_REFUND', 'ABNORMAL_REFUND'])
+export type OperationsScope = z.infer<typeof operationsFactKind> | 'NET'
+export const operationsFinancialFactSchema = z.object({
+  ledgerNo: z.string(), orderNo: z.string(), receiptNo: z.string(), refundNo: z.string().nullable(),
+  kind: operationsFactKind, amount: z.number().int().positive(), currency: currencyCode, confirmedAt: isoDateTime,
+})
+
 export function pageSchema<T extends z.ZodType>(item: T) {
   return z.object({
     items: z.array(item),

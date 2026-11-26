@@ -54,6 +54,7 @@ class ConsoleIntegrationIT {
         String base="http://127.0.0.1:"+port;
         assertEquals(401,get(base,"orders",null));
         assertEquals(403,get(base,"orders",IDENTITY.accessToken("reader")));
+        assertEquals(403,get(base,"operations/summary",IDENTITY.accessToken("reader")));
         assertEquals(403,get(base,"jobs",IDENTITY.accessToken("admin")));
         assertEquals(200,get(base,"jobs",IDENTITY.accessToken("diagnostic")));
         Path root=Path.of(System.getProperty("user.dir")).toAbsolutePath();
@@ -81,8 +82,8 @@ class ConsoleIntegrationIT {
     }
     /** 只读SQL检查落库结果；种子写入仍全部由生产领域服务执行。 */
     private void verifySeedDatabase() {
-        assertEquals(3,count("tc_order"));assertEquals(2,count("tc_payment_intent"));
-        assertEquals(2,count("tc_payment_attempt"));assertEquals(2,count("tc_payment_receipt"));
+        assertEquals(5,count("tc_order"));assertEquals(2,count("tc_payment_intent"));
+        assertEquals(2,count("tc_payment_attempt"));assertEquals(3,count("tc_payment_receipt"));
         assertEquals(4,count("tc_refund"));assertEquals(1,count("tc_return_receipt"));
         var jdbc=context.getBean(JdbcTemplate.class);
         assertEquals(Set.of("PENDING_APPROVAL","REJECTED","SUCCEEDED","SUBMITTED"),

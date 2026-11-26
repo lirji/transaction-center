@@ -30,6 +30,8 @@ for path in ROOT.glob('transaction-*/src/main/java/com/lrj/trade/*/model/Admin*.
     text=path.read_text();match=re.search(r'public record (\w+)\((.*?)\)\s*(?:implements[^\{]*)?\{',text,re.S)
     if not match: continue
     name,body=match.groups();props={}
+    # 商品搜索使用独立目录契约，保留兼容 Product 的约束与可空修订。
+    if name=='AdminProduct': continue
     for typ,key in re.findall(r'(Map<String,String>|String|long|Instant|boolean)\s+(\w+)',body):
         if key=='cursor': continue
         field={'type':{'String':'string','long':'integer','Instant':'string','boolean':'boolean','Map<String,String>':'object'}[typ]}
@@ -61,7 +63,10 @@ for name,enums in states.items():
 def param(name,typ=None,enum=None,default=None):
     s={'type':typ or 'string'}
     if name.endswith('Id'):s['pattern']='^[1-9][0-9]{0,18}$'
-    if name.startswith('created'):s.update(format='date-time',description='两端同时提供，UTC毫秒精度，[from,to)，最大90天。')
+    if name.startswith(('created','confirmed','approvalDeadline')):s.update(format='date-time',description='两端同时提供，UTC毫秒精度，[from,to)，最大90天。')
+    if name.startswith('confirmed'):s['description']='交易中心确认实收时间。'+s['description']+' 与创建时间条件取交集。'
+    if name.startswith('approvalDeadline'):s['description']='审批截止时间。'+s['description']+' 与创建时间条件取交集。'
+    if name=='currency':s['pattern']='^[A-Z]{3}$'
     if name=='after':s.update(pattern='^(0|[1-9][0-9]{0,18})$',default='0')
     if name=='limit':s.update(type='integer',minimum=1,maximum=100,default=20)
     if enum:s['enum']=enum
@@ -84,7 +89,7 @@ def operation(path,method,name,response,parameters,scope=None,body=None,legacy=F
     spec['paths'].setdefault(base+path,{})[method]=d
     return d
 
-filters={'Order':'orderNo memberId status financialStatus warehouseId','Return':'returnNo orderNo memberId orderItemId warehouseId status','Payment':'paymentNo orderNo memberId status','Receipt':'receiptNo paymentNo orderNo channelCode disposition abnormalOnly','Quote':'quoteId memberId','Refund':'refundNo orderNo memberId status','Job':'jobType status leaseExpired'}
+filters={'Order':'orderNo memberId status financialStatus warehouseId currency','Return':'returnNo orderNo memberId orderItemId warehouseId status','Payment':'paymentNo orderNo memberId status','Receipt':'receiptNo paymentNo orderNo channelCode disposition abnormalOnly','Quote':'quoteId memberId','Refund':'refundNo orderNo memberId status','Job':'jobType status leaseExpired'}
 paths={'Order':('orders','orderNo'),'Return':('returns','returnNo'),'Payment':('payments','paymentNo'),'Receipt':('payment-receipts','receiptNo'),'Quote':('quotes','quoteId'),'Refund':('refunds','refundNo'),'Job':('jobs','jobId')}
 for name,(route,idname) in paths.items():
     parameters=[param('after'),param('limit'),param('createdFrom'),param('createdTo')]
@@ -92,8 +97,17 @@ for name,(route,idname) in paths.items():
         choices=states[name].get(field)
         if name=='Refund' and field=='status':choices=['ALL']+choices
         parameters.append(param(field,'boolean' if field in ('abnormalOnly','leaseExpired') else None,choices,'PENDING_APPROVAL' if name=='Refund' and field=='status' else None))
+    if name=='Order':
+        parameters.append(param('sort',enum=['ID_ASC','CREATED_DESC'],default='ID_ASC'))
+        parameters[-1]['description']='CREATED_DESC按创建时间和主键降序，传上一页游标。切换排序时从首页读取。'
+    if name=='Refund':
+        parameters.extend([param('approvalDeadlineFrom'),param('approvalDeadlineTo')])
+    if name=='Receipt':
+        parameters.extend([param('confirmedFrom'),param('confirmedTo')])
     scope='trade.admin.jobs.read' if name=='Job' else None
-    operation('/'+route,'get',name+'List',array('RefundQueueItem') if name=='Refund' else ref('Admin'+name+'Page'),parameters,scope,legacy=name=='Refund')
+    listing=operation('/'+route,'get',name+'List',array('RefundQueueItem') if name=='Refund' else ref('Admin'+name+'Page'),parameters,scope,legacy=name=='Refund')
+    if name=='Order':
+        listing['description']=listing['description'].replace('新列表主键升序游标','默认主键升序游标，可按创建时间和主键降序')
     detail=operation('/'+route+'/{'+idname+'}','get',name+'Detail',ref('Admin'+name+'Detail'),[{'in':'path','name':idname,'required':True,'schema':{'type':'string','maxLength':64}}],scope)
     if name=='Return': detail['responses']['200']['headers']['ETag']={'description':'退货申请版本，验收请求使用If-Match。','schema':{'type':'string'}}
 
@@ -102,4 +116,30 @@ props=dict(schemas['OrderReferralEvidence']['properties']);props['orderNo']={'ty
 operation('/orders/{orderNo}/referral-evidence','get','OrderEvidence',ref('AdminOrderEvidence'),[{'in':'path','name':'orderNo','required':True,'schema':{'type':'string'}}],'trade.admin.evidence.read')
 body=obj({'policyVersion':{'type':'string','enum':['REGISTERED_DURING_CAMPAIGN_V1','NEVER_CONFIRMED_PAID_V1']},'campaignStartAt':{'type':['string','null'],'format':'date-time'},'evaluatedAt':{'type':['string','null'],'format':'date-time'}});body['required']=['policyVersion'];body['description']='活动注册策略必须传campaignStartAt；evaluatedAt可省略，禁止未来时间。只读，不预占资格。'
 operation('/members/{memberId}/eligibility:query','post','MemberEligibility',ref('CustomerEligibilityResult'),[{'in':'path','name':'memberId','required':True,'schema':{'type':'string','pattern':'^[1-9][0-9]{0,18}$'}}],'trade.admin.evidence.read',body)
+fund_kinds=['NORMAL_RECEIPT','ABNORMAL_RECEIPT','NORMAL_REFUND','ABNORMAL_REFUND']
+unsigned_minor={'type':'string','pattern':'^(0|[1-9][0-9]*)$'}
+schemas['OperationsSummary']=obj({
+    'from':instant(),'to':instant(),'observedAt':instant(),'currency':param('currency')['schema'],
+    'orderCount':{'type':'integer','minimum':0},'orderPayable':unsigned_minor,
+    'paidOrderCount':{'type':'integer','minimum':0},
+    'normalReceipt':unsigned_minor,'abnormalReceipt':unsigned_minor,
+    'normalRefund':unsigned_minor,'abnormalRefund':unsigned_minor,
+    'netReceipt':{'type':'string','pattern':'^(0|-?[1-9][0-9]*)$'},
+})
+schemas['OperationsFinancialFact']=obj({
+    'ledgerNo':{'type':'string'},'orderNo':{'type':'string'},'receiptNo':{'type':'string'},
+    'refundNo':{'type':['string','null']},'kind':{'type':'string','enum':fund_kinds},
+    'amount':{'type':'integer','minimum':1,'maximum':9007199254740991},
+    'currency':param('currency')['schema'],'confirmedAt':instant(),
+})
+schemas['OperationsFinancialFactPage']=obj({
+    'items':array('OperationsFinancialFact'),'nextAfter':{'type':['string','null'],'pattern':'^[1-9][0-9]{0,18}$'},
+    'hasMore':{'type':'boolean'},'observedAt':instant(),
+})
+range_params=[{**param(name),'required':True} for name in ('createdFrom','createdTo','currency')]
+summary=operation('/operations/summary','get','OperationsSummary',ref('OperationsSummary'),range_params)
+summary['description']='当前 JWT 租户的单币种经营汇总。订单按创建时间，含取消及零元；正常实收和成功退款按各自本地确认时间。过去的正常实收在本期间的成功退款仍计入。汇总金额以最小币种单位的十进制整数字符串返回。需要 trade.admin。'
+facts=operation('/operations/financial-facts','get','OperationsFinancialFacts',ref('OperationsFinancialFactPage'),
+                range_params+[{**param('scope',enum=fund_kinds+['NET']),'required':True},param('after'),param('limit')])
+facts['description']='当前 JWT 租户经营汇总的资金明细。NET 包含正常实收和原收款为正常实收的成功退款，可按账本游标继续读取。不保证跨请求快照。需要 trade.admin。'
 p.write_text(json.dumps(spec,ensure_ascii=False,indent=2)+'\n')

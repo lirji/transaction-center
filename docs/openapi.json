@@ -5168,24 +5168,6 @@
           },
           {
             "in": "query",
-            "name": "approvalDeadlineFrom",
-            "schema": {
-              "type": "string",
-              "format": "date-time",
-              "description": "审批截止时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
-            }
-          },
-          {
-            "in": "query",
-            "name": "approvalDeadlineTo",
-            "schema": {
-              "type": "string",
-              "format": "date-time",
-              "description": "审批截止时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
-            }
-          },
-          {
-            "in": "query",
             "name": "refundNo",
             "schema": {
               "type": "string"
@@ -5222,6 +5204,24 @@
                 "EXPIRED"
               ],
               "default": "PENDING_APPROVAL"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalDeadlineFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "审批截止时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天。 与创建时间条件取交集。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalDeadlineTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "审批截止时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天。 与创建时间条件取交集。"
             }
           }
         ],
@@ -7705,7 +7705,7 @@
         "tags": [
           "Admin queries"
         ],
-        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。新列表主键升序游标，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
+        "description": "当前JWT租户只读查询。需要 trade.admin。未知或重复查询参数拒绝；查询无渠道或资金副作用。默认主键升序游标，可按创建时间和主键降序，不保证跨页快照；单实例并发及租户配额保护，响应禁止缓存。",
         "security": [
           {
             "BearerJWT": []
@@ -7732,16 +7732,6 @@
               "minimum": 1,
               "maximum": 100,
               "default": 20
-            }
-          },
-          {
-            "in": "query",
-            "name": "sort",
-            "description": "ID_ASC 保持原主键升序；CREATED_DESC 按创建时间及主键降序。使用相同筛选和排序继续游标，切换时从首页开始。",
-            "schema": {
-              "type": "string",
-              "enum": ["ID_ASC", "CREATED_DESC"],
-              "default": "ID_ASC"
             }
           },
           {
@@ -7813,6 +7803,27 @@
               "type": "string",
               "pattern": "^[1-9][0-9]{0,18}$"
             }
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ID_ASC",
+                "CREATED_DESC"
+              ],
+              "default": "ID_ASC"
+            },
+            "description": "CREATED_DESC按创建时间和主键降序，传上一页游标。切换排序时从首页读取。"
           }
         ],
         "responses": {
@@ -8288,24 +8299,6 @@
           },
           {
             "in": "query",
-            "name": "confirmedFrom",
-            "schema": {
-              "type": "string",
-              "format": "date-time",
-              "description": "交易中心确认实收时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
-            }
-          },
-          {
-            "in": "query",
-            "name": "confirmedTo",
-            "schema": {
-              "type": "string",
-              "format": "date-time",
-              "description": "交易中心确认实收时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
-            }
-          },
-          {
-            "in": "query",
             "name": "receiptNo",
             "schema": {
               "type": "string"
@@ -8351,6 +8344,24 @@
             "name": "abnormalOnly",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirmedFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "交易中心确认实收时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天。 与创建时间条件取交集。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirmedTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "交易中心确认实收时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天。 与创建时间条件取交集。"
             }
           }
         ],
@@ -9453,6 +9464,270 @@
                 ],
                 "additionalProperties": false,
                 "description": "活动注册策略必须传campaignStartAt；evaluatedAt可省略，禁止未来时间。只读，不预占资格。"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/operations/summary": {
+      "get": {
+        "operationId": "adminQueryOperationsSummary",
+        "summary": "OperationsSummary",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前 JWT 租户的单币种经营汇总。订单按创建时间，含取消及零元；正常实收和成功退款按各自本地确认时间。过去的正常实收在本期间的成功退款仍计入。汇总金额以最小币种单位的十进制整数字符串返回。需要 trade.admin。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/operations/financial-facts": {
+      "get": {
+        "operationId": "adminQueryOperationsFinancialFacts",
+        "summary": "OperationsFinancialFacts",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "当前 JWT 租户经营汇总的资金明细。NET 包含正常实收和原收款为正常实收的成功退款，可按账本游标继续读取。不保证跨请求快照。需要 trade.admin。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NORMAL_RECEIPT",
+                "ABNORMAL_RECEIPT",
+                "NORMAL_REFUND",
+                "ABNORMAL_REFUND",
+                "NET"
+              ]
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$",
+              "default": "0"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsFinancialFactPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "404": {
+            "description": "资源不存在或属于其他租户",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
               }
             }
           }
@@ -13619,6 +13894,159 @@
           "completedAt",
           "asOf",
           "orderNo"
+        ],
+        "additionalProperties": false
+      },
+      "OperationsSummary": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "orderCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "orderPayable": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "paidOrderCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "normalReceipt": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "abnormalReceipt": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "normalRefund": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "abnormalRefund": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "netReceipt": {
+            "type": "string",
+            "pattern": "^(0|-?[1-9][0-9]*)$"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "observedAt",
+          "currency",
+          "orderCount",
+          "orderPayable",
+          "paidOrderCount",
+          "normalReceipt",
+          "abnormalReceipt",
+          "normalRefund",
+          "abnormalRefund",
+          "netReceipt"
+        ],
+        "additionalProperties": false
+      },
+      "OperationsFinancialFact": {
+        "type": "object",
+        "properties": {
+          "ledgerNo": {
+            "type": "string"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "receiptNo": {
+            "type": "string"
+          },
+          "refundNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "NORMAL_RECEIPT",
+              "ABNORMAL_RECEIPT",
+              "NORMAL_REFUND",
+              "ABNORMAL_REFUND"
+            ]
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "ledgerNo",
+          "orderNo",
+          "receiptNo",
+          "refundNo",
+          "kind",
+          "amount",
+          "currency",
+          "confirmedAt"
+        ],
+        "additionalProperties": false
+      },
+      "OperationsFinancialFactPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationsFinancialFact"
+            }
+          },
+          "nextAfter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "items",
+          "nextAfter",
+          "hasMore",
+          "observedAt"
         ],
         "additionalProperties": false
       }

@@ -127,6 +127,61 @@ test('product SKU, member registration, and available inventory filters read pas
   expect((await api(page, '/admin/inventories?maxAvailable=-1')).status).toBe(400)
 })
 
+test('operations totals reconcile with paged facts for the same window, currency and tenant', async ({ page }) => {
+  await login(page, 'admin', '/')
+  const paid = await api(page, `/admin/orders/${data.paidOrder}`)
+  const seedTime = Date.parse(paid.body.createdAt)
+  const beijing = (epoch: number) => new Date(epoch + 8 * 3_600_000).toISOString().slice(0, 16)
+  const from = seedTime - 3_600_000
+  const to = seedTime + 3_600_000
+  const makeRange = (start: number, end: number, currency: string) => new URLSearchParams({
+    createdFrom: new Date(start).toISOString(), createdTo: new Date(end).toISOString(), currency,
+  })
+  const cny = makeRange(from, to, 'CNY')
+  const totals = await api(page, `/admin/operations/summary?${cny}`)
+  expect(totals.status).toBe(200)
+  expect(totals.body).toMatchObject({
+    currency: 'CNY', orderCount: 4, orderPayable: '60000', paidOrderCount: 1,
+    normalReceipt: '20000', abnormalReceipt: '100', normalRefund: '1000', abnormalRefund: '0', netReceipt: '19000',
+  })
+  const orders = await api(page, `/admin/orders?${cny}`)
+  expect(orders.body.items.map((row: { orderNo: string }) => row.orderNo)).toContain(data.freeOrder)
+  expect(orders.body.items.map((row: { orderNo: string }) => row.orderNo)).toContain(data.cancelledOrder)
+  expect(orders.body.items.map((row: { orderNo: string }) => row.orderNo)).not.toContain(data.usdOrder)
+  expect(orders.body.items.reduce((sum: number, row: { payableAmount: number }) => sum + row.payableAmount, 0)).toBe(60000)
+
+  const normal = await api(page, `/admin/operations/financial-facts?${cny}&scope=NET&limit=1`)
+  expect(normal.status).toBe(200)
+  expect(normal.body.hasMore).toBe(true)
+  expect(normal.body.items[0]).toMatchObject({ kind: 'NORMAL_RECEIPT', receiptNo: data.receiptNo, amount: 20000 })
+  const netRefund = await api(page, `/admin/operations/financial-facts?${cny}&scope=NET&limit=1&after=${normal.body.nextAfter}`)
+  expect(netRefund.body.hasMore).toBe(false)
+  expect(netRefund.body.items[0]).toMatchObject({ kind: 'NORMAL_REFUND', refundNo: data.successfulRefund, amount: 1000 })
+
+  const refundAt = Date.parse(netRefund.body.items[0].confirmedAt)
+  const refundOnly = makeRange(refundAt, refundAt + 1, 'CNY')
+  expect((await api(page, `/admin/operations/summary?${refundOnly}`)).body).toMatchObject({ orderCount: 0, normalReceipt: '0', normalRefund: '1000', netReceipt: '-1000' })
+  const empty = makeRange(to, to + 1, 'CNY')
+  expect((await api(page, `/admin/operations/summary?${empty}`)).body).toMatchObject({ orderCount: 0, normalReceipt: '0', normalRefund: '0', netReceipt: '0' })
+  const usd = makeRange(from, to, 'USD')
+  expect((await api(page, `/admin/operations/summary?${usd}`)).body).toMatchObject({
+    orderCount: 1, orderPayable: '250', paidOrderCount: 0, normalReceipt: '0', abnormalReceipt: '210', netReceipt: '0',
+  })
+  expect((await api(page, '/admin/operations/summary?currency=CNY')).status).toBe(400)
+
+  await page.getByLabel('统计起始时间（北京时间）').fill(beijing(from))
+  await page.getByLabel('统计结束时间（北京时间）').fill(beijing(to))
+  await page.getByRole('button', { name: '查询', exact: true }).click()
+  await expect(page.getByRole('row', { name: /期间净收款/ })).toContainText('19,000')
+  await page.getByRole('button', { name: '查看期间净收款明细' }).click()
+  await expect(page.getByRole('heading', { name: '期间净收款明细' })).toBeVisible()
+  await expect(page.getByRole('link', { name: data.successfulRefund, exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: data.submittedRefund, exact: true })).toHaveCount(0)
+  await page.getByRole('link', { name: '查看创建订单' }).click()
+  await expect(page.getByLabel('币种', { exact: true })).toHaveValue('CNY')
+  await expect(page.getByRole('link', { name: data.freeOrder, exact: true })).toBeVisible()
+})
+
 test('real member freeze/unfreeze writes and tenant-safe database reads', async ({ page }) => {
   await login(page, 'admin', '/members')
   const row = page.getByRole('row').filter({ hasText: '联调会员' })
@@ -199,6 +254,9 @@ test('ordinary admin scope denial and genuine rate-limit response', async ({ pag
 test('another tenant sees no seeded orders and cannot drill into them', async ({ page }) => {
   await login(page, 'other')
   expect((await api(page, '/admin/orders')).body.items).toEqual([])
+  const range = new URLSearchParams({ createdFrom: new Date(Date.now() - 3_600_000).toISOString(), createdTo: new Date(Date.now() + 3_600_000).toISOString(), currency: 'CNY' })
+  expect((await api(page, `/admin/operations/summary?${range}`)).body).toMatchObject({ orderCount: 0, normalReceipt: '0', netReceipt: '0' })
+  expect((await api(page, `/admin/operations/financial-facts?${range}&scope=NET`)).body.items).toEqual([])
   expect((await api(page, `/admin/orders/${data.paidOrder}`)).status).toBe(404)
   expect((await api(page, '/admin/products/search?skuNo=INTEGRATION-ALT-SECOND')).body).toEqual([])
   expect((await api(page, `/admin/members?memberId=${data.memberId}`)).body).toEqual([])

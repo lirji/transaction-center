@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Badge, Button, Field, PageHeader, PagePager, Panel } from '../../components/ui'
 import { api, type AdminOrderView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
-import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
+import { FormValidationError, parseCurrencyCode, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
@@ -57,6 +57,7 @@ export function OrdersPage() {
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
   const [status, setStatus] = useState(() => params.get('status') ?? '')
   const [financialStatus, setFinancialStatus] = useState(() => params.get('financialStatus') ?? '')
+  const [currency, setCurrency] = useState(() => params.get('currency') ?? '')
   const [warehouseId, setWarehouseId] = useState(() => params.get('warehouseId') ?? '')
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
@@ -72,6 +73,7 @@ export function OrdersPage() {
     memberId: params.get('memberId') || undefined,
     status: params.get('status') || undefined,
     financialStatus: params.get('financialStatus') || undefined,
+    currency: params.get('currency') || undefined,
     warehouseId: params.get('warehouseId') || undefined,
     createdFrom: params.get('createdFrom') || undefined,
     createdTo: params.get('createdTo') || undefined,
@@ -103,6 +105,7 @@ export function OrdersPage() {
         memberId: memberId.trim() ? parseMemberId(memberId) : undefined,
         status: status || undefined,
         financialStatus: financialStatus || undefined,
+        currency: currency.trim() ? parseCurrencyCode(currency) : undefined,
         warehouseId: warehouseId.trim() || undefined,
         createdFrom: window?.createdFrom,
         createdTo: window?.createdTo,
@@ -131,6 +134,7 @@ export function OrdersPage() {
           <Field label="会员 ID" error={memberDraftError || undefined}><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
           <Field label="订单状态"><EmptySelect value={status} onChange={setStatus} options={ORDER_STATUSES} optionLabel={(value) => orderLabels[value as keyof typeof orderLabels]} /></Field>
           <Field label="资金状态"><EmptySelect value={financialStatus} onChange={setFinancialStatus} options={FINANCIAL_STATUSES} optionLabel={(value) => financialLabels[value as keyof typeof financialLabels]} /></Field>
+          <Field label="币种"><input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} /></Field>
           <Field label="仓库 ID"><input value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} /></Field>
           <Field label="排序">
             <select value={sort} onChange={(event) => setSort(event.target.value)}>

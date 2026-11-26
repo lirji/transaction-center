@@ -44,6 +44,8 @@ public final class ConsoleBusinessSeed {
         data.put("warehouseId",Long.toString(warehouse));data.put("skuId",sku);
         bean(ChannelConfigurationService.class).create(operator,"seed-channel","INTEGRATION","isolated-merchant","CNY","test:isolated","return","https://shop.test/return");
         OrderView pending=order("pending",sku,warehouse);data.put("pendingOrder",pending.orderNo());
+        data.put("freeOrder",serviceOrder("free",0,"CNY").orderNo());
+        data.put("usdOrder",serviceOrder("usd",125,"USD").orderNo());
         var pendingPayment=bean(PaymentService.class).create(member,"seed-payment-pending",pending.orderNo(),"INTEGRATION","return");
         data.put("pendingPayment",pendingPayment.paymentNo());
         OrderView cancel=order("cancel",sku,warehouse);bean(OrderService.class).cancel(member,"seed-cancel",cancel.orderNo(),"联调取消");data.put("cancelledOrder",cancel.orderNo());
@@ -52,6 +54,7 @@ public final class ConsoleBusinessSeed {
         // 显式测试渠道输入模拟已验真结果，生产签名入口/供应商联调不由本种子冒充。
         var receipt=bean(PaymentObservationService.class).received(900001,payment.activeAttemptNo(),"integration-paid",paid.payableAmount(),"CNY",Instant.parse("2026-01-01T00:00:00Z"),"test:verified-payment");
         var abnormal=bean(PaymentObservationService.class).received(900001,payment.activeAttemptNo(),"integration-extra",100,"CNY",Instant.parse("2026-01-01T00:00:00Z"),"test:verified-extra");
+        bean(PaymentObservationService.class).received(900001,payment.activeAttemptNo(),"integration-extra-usd",210,"USD",Instant.parse("2026-01-01T00:00:00Z"),"test:verified-extra-usd");
         data.put("paidOrder",paid.orderNo());data.put("paymentNo",payment.paymentNo());data.put("receiptNo",receipt.receiptNo());data.put("abnormalReceiptNo",abnormal.receiptNo());
         data.put("quoteId",paid.quoteId());
         var refundService=bean(RefundService.class);
@@ -82,6 +85,17 @@ public final class ConsoleBusinessSeed {
         return Map.copyOf(data);
     }
     private List<RefundSelection> selection(OrderView order,long amount) {return List.of(new RefundSelection("GOODS",order.items().getFirst().itemId(),0,amount));}
+    // 使用真实纯服务订单验证零元和币种边界，同时保持实物库存样本不变。
+    private OrderView serviceOrder(String key,long price,String currency) {
+        var catalog=bean(CatalogService.class);
+        var skus=bean(SkuService.class);
+        long product=Long.parseLong(catalog.create(operator,"seed-service-"+key,"SERVICE-"+key,"联调服务 "+key,"SKU-"+key,price,currency));
+        String sku=catalog.detail(operator.tenantId(),product,true).skuId();
+        skus.edit(operator,"seed-service-sku-"+key,product,Long.parseLong(sku),0,price,currency,"SERVICE",Map.of());
+        catalog.publish(operator,"seed-service-publish-"+key,product,1);
+        var quote=bean(QuoteService.class).create(member,"seed-quote-"+key,List.of(new QuoteSelection(sku,2L)));
+        return bean(OrderService.class).create(member,"seed-order-"+key,Long.parseLong(quote.quoteId()),null,null);
+    }
     private OrderView order(String key,String sku,long warehouse) {
         var quote=bean(QuoteService.class).create(member,"seed-quote-"+key,List.of(new QuoteSelection(sku,2L)));
         return bean(OrderService.class).create(member,"seed-order-"+key,Long.parseLong(quote.quoteId()),warehouse,new ShippingAddress("联调收件人","13800138000","隔离测试地址"));

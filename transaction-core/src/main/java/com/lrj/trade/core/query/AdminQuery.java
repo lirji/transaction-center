@@ -48,6 +48,10 @@ public record AdminQuery(long after,int limit,Instant createdFrom,Instant create
                     if(!choices.isEmpty() && !choices.contains(value)) throw invalid();
                     if(key.endsWith("Id")) filters.put(key,number(value,false));
                     else if(key.equals("maxAvailable")) filters.put(key,number(value,true));
+                    else if(key.equals("currency")) {
+                        if(!value.matches("[A-Z]{3}")) throw invalid();
+                        filters.put(key,value);
+                    }
                     else if(key.equals("abnormalOnly") || key.equals("leaseExpired")) {
                         if(!Set.of("true","false").contains(value)) throw invalid();filters.put(key,Boolean.valueOf(value));
                     } else { text(value,key.equals("name")?MAX_QUERY_NAME:64);filters.put(key,value); }

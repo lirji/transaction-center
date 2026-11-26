@@ -7,6 +7,7 @@ import { merchantSchema } from '../../shared/api/schemas'
 import { useAuth } from '../../shared/auth/useAuth'
 import { formatBeijingTime } from '../../shared/ui/display'
 import { dispositionLabels } from '../receipts/receiptDisposition'
+import { OperationsSummary } from './OperationsSummary'
 
 const SAMPLE_LIMIT = 1
 const PENDING_REFUND = { status: 'PENDING_APPROVAL', limit: SAMPLE_LIMIT } as const
@@ -91,6 +92,7 @@ export function OverviewPage() {
             </tbody>
           </table>
         </Panel>
+        <OperationsSummary />
       </div>
     </div>
   )

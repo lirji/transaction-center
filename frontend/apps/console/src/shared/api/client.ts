@@ -26,6 +26,9 @@ import {
   ledgerEntrySchema,
   memberSchema,
   merchantSchema,
+  operationsFinancialFactSchema,
+  operationsSummarySchema,
+  type OperationsScope,
   outboxPublicationSchema,
   outboxReplayResultSchema,
   outboxTaskSchema,
@@ -233,6 +236,8 @@ export function describeProblem(error: unknown): { title: string; detail: string
 
 const admin = '/api/v1/trade/admin'
 
+export type OperationsRange = { createdFrom: string; createdTo: string; currency: string }
+
 export const api = {
   members: (query: { after?: string; limit?: number; memberId?: string; status?: string; registeredFrom?: string; registeredTo?: string } = {}) =>
     request(`${admin}/members${pageQuery(query)}`, undefined, (value) => parseArray(memberSchema, value)),
@@ -402,6 +407,10 @@ export const api = {
       body: JSON.stringify(body),
     }, (value) => parseWith(reconciliationQueryResultSchema, value)),
 
+  operationsSummary: (range: OperationsRange, signal?: AbortSignal) =>
+    request(`${admin}/operations/summary?${new URLSearchParams(range)}`, { signal }, (value) => parseWith(operationsSummarySchema, value)),
+  operationsFinancialFacts: (query: OperationsRange & { scope: OperationsScope; after: string }, signal?: AbortSignal) =>
+    request(`${admin}/operations/financial-facts${pageQuery(query)}`, { signal }, (value) => parsePage(operationsFinancialFactSchema, value)),
   orders: (query: Record<string, QueryScalar> = {}) =>
     request(`${admin}/orders${pageQuery(query)}`, undefined, (value) => parsePage(adminOrderViewSchema, value)),
   order: (orderNo: string) =>

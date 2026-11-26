@@ -14,7 +14,7 @@ public final class AdminQueryParameters {
     public static AdminQuery parse(String resource,MultiValueMap<String,String> params) {
         Map<String,List<String>> input=new HashMap<>(params);
         Map<String,Set<String>> fields=switch(resource) {
-            case "order" -> AdminQuery.fields("orderNo","memberId","status","financialStatus","warehouseId");
+            case "order" -> AdminQuery.fields("orderNo","memberId","status","financialStatus","warehouseId","currency");
             case "return" -> AdminQuery.fields("returnNo","orderNo","memberId","orderItemId","warehouseId","status");
             case "payment" -> AdminQuery.fields("paymentNo","orderNo","memberId","status");
             case "attempt" -> AdminQuery.fields("status");
