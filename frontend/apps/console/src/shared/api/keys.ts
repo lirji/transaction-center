@@ -40,6 +40,8 @@ export type RefundQueueQuery = {
   memberId?: string
   createdFrom?: string
   createdTo?: string
+  approvalDeadlineFrom?: string
+  approvalDeadlineTo?: string
 }
 
 export function refundQueueQuery(query: RefundQueueQuery = {}): string {
@@ -53,6 +55,8 @@ export function refundQueueQuery(query: RefundQueueQuery = {}): string {
     memberId: query.memberId,
     createdFrom: query.createdFrom,
     createdTo: query.createdTo,
+    approvalDeadlineFrom: query.approvalDeadlineFrom,
+    approvalDeadlineTo: query.approvalDeadlineTo,
   })
   return `?${search.toString()}`
 }

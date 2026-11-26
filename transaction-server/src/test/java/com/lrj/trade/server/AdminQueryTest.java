@@ -31,6 +31,20 @@ class AdminQueryTest {
         assertEquals("ALL",AdminQueryParameters.parse("refund",params("status","ALL")).filters().get("status"));
         assertEquals(Instant.parse("2026-01-01T00:00:00Z"),AdminQueryParameters.parse("order",params("createdFrom","2026-01-01T00:00:00Z","createdTo","2026-01-02T00:00:00Z")).createdFrom());
     }
+    @Test void businessTimeWindowsArePairedBoundedAndResourceSpecific() {
+        String first="2026-01-01T00:00:00.001Z",last="2026-01-02T00:00:00Z";
+        var refund=AdminQueryParameters.parse("refund",params("approvalDeadlineFrom",first,"approvalDeadlineTo",last));
+        assertEquals(Instant.parse(first),refund.filters().get("approvalDeadlineFrom"));
+        assertEquals("PENDING_APPROVAL",refund.filters().get("status"));
+        var receipt=AdminQueryParameters.parse("receipt",params("confirmedFrom",first,"confirmedTo",last,"createdFrom",first,"createdTo",last));
+        assertEquals(Instant.parse(last),receipt.filters().get("confirmedTo"));
+        assertEquals(Instant.parse(first),receipt.createdFrom());
+        for (var invalid:List.of(params("confirmedFrom",first),params("confirmedFrom",last,"confirmedTo",first),
+                params("confirmedFrom",first,"confirmedTo","2026-06-01T00:00:00Z"),params("confirmedFrom",first,"confirmedFrom",first,"confirmedTo",last))) {
+            assertEquals("INVALID_ARGUMENT",assertThrows(TradeException.class,()->AdminQueryParameters.parse("receipt",invalid)).code());
+        }
+        assertThrows(TradeException.class,()->AdminQueryParameters.parse("refund",params("confirmedFrom",first,"confirmedTo",last)));
+    }
     @Test void pageDoesNotExposeExtraProbeRowAndEmptyHasNoNextCursor() {
         record Row(String cursor) implements AdminPage.Row {}
         var page=AdminPage.of(List.of(new Row("10"),new Row("12")),1,Instant.EPOCH);

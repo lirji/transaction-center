@@ -5,6 +5,9 @@ import java.util.*;
 import org.springframework.util.MultiValueMap;
 /** 每个资源独立参数白名单，避免错拼条件变成扩大范围的查询。 */
 public final class AdminQueryParameters {
+    private static final AdminQuery.WindowKeys APPROVAL_DEADLINE=new AdminQuery.WindowKeys("approvalDeadlineFrom","approvalDeadlineTo");
+    private static final AdminQuery.WindowKeys RECEIPT_CONFIRMATION=new AdminQuery.WindowKeys("confirmedFrom","confirmedTo");
+    private enum OrderSort { ID_ASC, CREATED_DESC }
     private AdminQueryParameters() {}
     /** 原队列默认值只在未传状态时补充，空值或重复值仍拒绝。 */
     public static AdminQuery parse(String resource,MultiValueMap<String,String> params) {
@@ -21,7 +24,7 @@ public final class AdminQueryParameters {
             default -> throw new IllegalArgumentException("未知管理查询资源");
         };
         switch(resource) {
-            case "order" -> { fields.put("status",Set.of("PENDING_PAYMENT","CLOSING","CANCELLED","PAID","FULFILLING","COMPLETED"));fields.put("financialStatus",Set.of("UNPAID","NO_PAYMENT_REQUIRED","PAID","PARTIALLY_REFUNDED","REFUNDED")); }
+            case "order" -> { fields.put("sort",Set.of(OrderSort.ID_ASC.name(),OrderSort.CREATED_DESC.name()));fields.put("status",Set.of("PENDING_PAYMENT","CLOSING","CANCELLED","PAID","FULFILLING","COMPLETED"));fields.put("financialStatus",Set.of("UNPAID","NO_PAYMENT_REQUIRED","PAID","PARTIALLY_REFUNDED","REFUNDED")); }
             case "return" -> fields.put("status",Set.of("OPEN","INSPECTED"));
             case "payment" -> fields.put("status",Set.of("READY","PENDING","SUCCEEDED","CLOSED","REVIEW"));
             case "attempt" -> fields.put("status",Set.of("PREPARED","UNKNOWN","SUCCEEDED","CLOSED"));
@@ -30,7 +33,12 @@ public final class AdminQueryParameters {
             case "job" -> { fields.put("status",Set.of("READY","RUNNING","DONE","REVIEW"));fields.put("jobType",Arrays.stream(JobType.values()).map(Enum::name).collect(java.util.stream.Collectors.toUnmodifiableSet())); }
             default -> { }
         }
-        return AdminQuery.parse(input,fields,!resource.equals("attempt"));
+        return switch(resource) {
+            case "refund" -> AdminQuery.parse(input,fields,true,APPROVAL_DEADLINE);
+            case "receipt" -> AdminQuery.parse(input,fields,true,RECEIPT_CONFIRMATION);
+            case "attempt" -> AdminQuery.parse(input,fields,false);
+            default -> AdminQuery.parse(input,fields,true);
+        };
     }
     /** 详情无查询参数，未知字段不会被静默忽略。 */
     public static void none(MultiValueMap<String,String> params) { if(!params.isEmpty()) throw new TradeException("INVALID_ARGUMENT","详情接口不接受查询参数"); }

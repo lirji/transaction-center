@@ -26,6 +26,7 @@
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.filters.status != null and q.filters.status != 'ALL'">AND r.status=#{q.filters.status}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    <if test="q.filters.approvalDeadlineFrom != null">AND r.approval_deadline &gt;= #{q.filters.approvalDeadlineFrom} AND r.approval_deadline &lt; #{q.filters.approvalDeadlineTo}</if>
     ORDER BY r.id ASC LIMIT #{q.fetchLimit}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">

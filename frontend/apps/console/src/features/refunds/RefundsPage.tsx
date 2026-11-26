@@ -26,6 +26,8 @@ export function RefundsPage() {
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
+  const [businessFrom, setBusinessFrom] = useState(() => isoFromSearch(params, 'approvalDeadlineFrom'))
+  const [businessTo, setBusinessTo] = useState(() => isoFromSearch(params, 'approvalDeadlineTo'))
   const [policyOpen, setPolicyOpen] = useState(false)
   const [currency, setCurrency] = useState<string>()
   const [limit, setLimit] = useState<string>()
@@ -40,11 +42,14 @@ export function RefundsPage() {
     memberId: params.get('memberId') || undefined,
     createdFrom: params.get('createdFrom') || undefined,
     createdTo: params.get('createdTo') || undefined,
+    approvalDeadlineFrom: params.get('approvalDeadlineFrom') || undefined,
+    approvalDeadlineTo: params.get('approvalDeadlineTo') || undefined,
   }
   const memberUrlError = filters.memberId ? (() => {
     try { parseMemberId(filters.memberId); return '' } catch { return 'memberId 须为正整数文本' }
   })() : ''
-  const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
+  const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo) ||
+    Boolean(filters.approvalDeadlineFrom) !== Boolean(filters.approvalDeadlineTo)
 
   const policy = useQuery({ queryKey: ['refund-policy'], queryFn: api.refundPolicy, enabled: policyOpen, retry: false })
   const queue = useQuery({
@@ -94,6 +99,7 @@ export function RefundsPage() {
     setFilterError('')
     try {
       const window = parseTimeWindow(from, to)
+      const businessWindow = parseTimeWindow(businessFrom, businessTo)
       const search = new URLSearchParams()
       search.set('status', status)
       if (refundNo.trim()) search.set('refundNo', refundNo.trim())
@@ -102,6 +108,10 @@ export function RefundsPage() {
       if (window) {
         search.set('createdFrom', window.createdFrom)
         search.set('createdTo', window.createdTo)
+      }
+      if (businessWindow) {
+        search.set('approvalDeadlineFrom', businessWindow.createdFrom)
+        search.set('approvalDeadlineTo', businessWindow.createdTo)
       }
       setAfter(0)
       setParams(search, { replace: true })
@@ -142,7 +152,8 @@ export function RefundsPage() {
             <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
             <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
             <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-            <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
+            <TimeRangeFields labelPrefix="申请" from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
+          <TimeRangeFields labelPrefix="审批截止" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
           </FilterBar>
         </Panel>
         <Panel className="table-panel">

@@ -48,17 +48,62 @@ test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ p
   expect((await api(page, `/admin/refunds?orderNo=${data.paidOrder}&status=ALL`)).body.length).toBe(4)
 })
 
+test('approval deadline and receipt confirmation use half-open server time windows', async ({ page }) => {
+  await login(page)
+  const refund = await api(page, `/admin/refunds/${data.refundNo}`)
+  expect(refund.status).toBe(200)
+  const receipt = await api(page, `/admin/payment-receipts/${data.abnormalReceiptNo}`)
+  expect(receipt.status).toBe(200)
+  const approval = new Date(refund.body.approvalDeadline)
+  const confirmed = new Date(receipt.body.confirmedAt)
+  const window = (field: string, date: Date, fromOffset: number, toOffset: number) => new URLSearchParams({
+    [`${field}From`]: new Date(date.getTime() + fromOffset).toISOString(),
+    [`${field}To`]: new Date(date.getTime() + toOffset).toISOString(),
+  })
+  const refundInside = await api(page, `/admin/refunds?${window('approvalDeadline', approval, 0, 1)}`)
+  expect(refundInside.status).toBe(200)
+  expect(refundInside.body.map((row: { refundNo: string }) => row.refundNo)).toContain(data.refundNo)
+  const refundOutside = await api(page, `/admin/refunds?${window('approvalDeadline', approval, -1, 0)}`)
+  expect(refundOutside.status).toBe(200)
+  expect(refundOutside.body.map((row: { refundNo: string }) => row.refundNo)).not.toContain(data.refundNo)
+  const receiptInside = await api(page, `/admin/payment-receipts?abnormalOnly=true&${window('confirmed', confirmed, 0, 1)}`)
+  expect(receiptInside.status).toBe(200)
+  expect(receiptInside.body.items.map((row: { receiptNo: string }) => row.receiptNo)).toContain(data.abnormalReceiptNo)
+  const receiptOutside = await api(page, `/admin/payment-receipts?abnormalOnly=true&${window('confirmed', confirmed, -1, 0)}`)
+  expect(receiptOutside.status).toBe(200)
+  expect(receiptOutside.body.items.map((row: { receiptNo: string }) => row.receiptNo)).not.toContain(data.abnormalReceiptNo)
+})
+
+test('latest orders keep the same order across cursor pages', async ({ page }) => {
+  await login(page)
+  const full = await api(page, '/admin/orders?sort=CREATED_DESC&limit=100')
+  expect(full.status).toBe(200)
+  const rows: { orderId: string; orderNo: string; createdAt: string }[] = full.body.items
+  expect(rows.length).toBeGreaterThan(1)
+  const expected = [...rows].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || (BigInt(a.orderId) > BigInt(b.orderId) ? -1 : 1))
+  expect(rows.map(row => row.orderNo)).toEqual(expected.map(row => row.orderNo))
+  let after = '0'
+  for (const row of expected) {
+    const current = await api(page, `/admin/orders?sort=CREATED_DESC&limit=1&after=${after}`)
+    expect(current.status).toBe(200)
+    expect(current.body.items[0].orderNo).toBe(row.orderNo)
+    after = current.body.nextAfter
+  }
+  expect(after).toBeNull()
+  expect((await api(page, '/admin/orders?sort=member_id')).status).toBe(400)
+})
+
 test('real member freeze/unfreeze writes and tenant-safe database reads', async ({ page }) => {
   await login(page, 'admin', '/members')
   const row = page.getByRole('row').filter({ hasText: '联调会员' })
   await row.getByRole('button', { name: '冻结', exact: true }).click()
   await page.getByLabel('原因').fill('真实接口联调冻结')
   await page.getByRole('button', { name: '提交', exact: true }).click()
-  await expect(row).toContainText('FROZEN')
+  await expect(row.getByRole('cell', { name: '冻结', exact: true })).toBeVisible()
   await row.getByRole('button', { name: '解冻', exact: true }).click()
   await page.getByLabel('原因').fill('真实接口联调恢复')
   await page.getByRole('button', { name: '提交', exact: true }).click()
-  await expect(row).toContainText('ACTIVE')
+  await expect(row.getByRole('cell', { name: '正常', exact: true })).toBeVisible()
 })
 
 test('return inspection uses real ETag, idempotency and inventory flow', async ({ page }) => {

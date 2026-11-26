@@ -4949,6 +4949,24 @@
           },
           {
             "in": "query",
+            "name": "approvalDeadlineFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "审批截止时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalDeadlineTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "审批截止时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
+            }
+          },
+          {
+            "in": "query",
             "name": "refundNo",
             "schema": {
               "type": "string"
@@ -7499,6 +7517,16 @@
           },
           {
             "in": "query",
+            "name": "sort",
+            "description": "ID_ASC 保持原主键升序；CREATED_DESC 按创建时间及主键降序。使用相同筛选和排序继续游标，切换时从首页开始。",
+            "schema": {
+              "type": "string",
+              "enum": ["ID_ASC", "CREATED_DESC"],
+              "default": "ID_ASC"
+            }
+          },
+          {
+            "in": "query",
             "name": "createdFrom",
             "schema": {
               "type": "string",
@@ -8037,6 +8065,24 @@
               "type": "string",
               "format": "date-time",
               "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirmedFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "交易中心确认实收时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirmedTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "交易中心确认实收时间。两端同时提供，UTC毫秒精度，[from,to)，最大90天；与创建时间条件取交集。"
             }
           },
           {

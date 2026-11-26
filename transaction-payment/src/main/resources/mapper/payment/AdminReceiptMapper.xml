@@ -32,6 +32,7 @@
     <if test="q.filters.disposition != null">AND r.disposition=#{q.filters.disposition}</if>
     <if test="q.filters.abnormalOnly == true">AND r.disposition != 'NORMAL'</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+    <if test="q.filters.confirmedFrom != null">AND r.confirmed_at &gt;= #{q.filters.confirmedFrom} AND r.confirmed_at &lt; #{q.filters.confirmedTo}</if>
     ORDER BY r.id ASC LIMIT #{q.fetchLimit}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">

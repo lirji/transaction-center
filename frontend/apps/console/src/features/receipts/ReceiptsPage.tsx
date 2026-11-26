@@ -53,6 +53,8 @@ export function ReceiptsPage() {
   const [abnormalOnly, setAbnormalOnly] = useState(() => params.get('abnormalOnly') === 'true')
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
+  const [businessFrom, setBusinessFrom] = useState(() => isoFromSearch(params, 'confirmedFrom'))
+  const [businessTo, setBusinessTo] = useState(() => isoFromSearch(params, 'confirmedTo'))
   const [formError, setFormError] = useState('')
 
   const conflict = abnormalOnly && disposition === NORMAL_RECEIPT
@@ -65,9 +67,12 @@ export function ReceiptsPage() {
     abnormalOnly: params.get('abnormalOnly') === 'true' || undefined,
     createdFrom: params.get('createdFrom') || undefined,
     createdTo: params.get('createdTo') || undefined,
+    confirmedFrom: params.get('confirmedFrom') || undefined,
+    confirmedTo: params.get('confirmedTo') || undefined,
   }
   const urlConflict = filters.abnormalOnly && filters.disposition === NORMAL_RECEIPT
-  const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
+  const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo) ||
+    Boolean(filters.confirmedFrom) !== Boolean(filters.confirmedTo)
 
   const query = useQuery({
     queryKey: ['admin-receipts', after, filters],
@@ -88,6 +93,7 @@ export function ReceiptsPage() {
     try {
       const parsed = parseReceiptDispositionFilter(abnormalOnly, disposition)
       const window = parseTimeWindow(from, to)
+      const businessWindow = parseTimeWindow(businessFrom, businessTo)
       apply({
         receiptNo: receiptNo.trim() || undefined,
         paymentNo: paymentNo.trim() || undefined,
@@ -97,6 +103,8 @@ export function ReceiptsPage() {
         abnormalOnly: parsed.abnormalOnly ? 'true' : undefined,
         createdFrom: window?.createdFrom,
         createdTo: window?.createdTo,
+        confirmedFrom: businessWindow?.createdFrom,
+        confirmedTo: businessWindow?.createdTo,
       })
     } catch (cause) {
       setFormError(cause instanceof FormValidationError || cause instanceof Error ? cause.message : '筛选无效')
@@ -128,7 +136,8 @@ export function ReceiptsPage() {
               <option value="true">仅异常</option>
             </select>
           </Field>
-          <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <TimeRangeFields labelPrefix="登记" from={from} to={to} onFrom={setFrom} onTo={setTo} />
+          <TimeRangeFields labelPrefix="确认" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
         </FilterBar>
       </Panel>
       <Panel className="table-panel">

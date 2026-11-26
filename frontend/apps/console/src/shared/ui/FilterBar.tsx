@@ -24,19 +24,21 @@ export function TimeRangeFields({
   onFrom,
   onTo,
   error,
+  labelPrefix = '',
 }: {
   from: string
   to: string
   onFrom: (value: string) => void
   onTo: (value: string) => void
   error?: string
+  labelPrefix?: string
 }) {
   return (
     <div className="time-range-fields">
-      <Field label="起始时间（北京时间）" hint="起止时间成对填写，最长 90 天">
+      <Field label={`${labelPrefix}起始时间（北京时间）`} hint="起止时间成对填写，最长 90 天">
         <input type="datetime-local" step="0.001" value={from} onChange={(event) => onFrom(event.target.value)} />
       </Field>
-      <Field label="结束时间（北京时间）" hint="不包含结束时刻" error={error}>
+      <Field label={`${labelPrefix}结束时间（北京时间）`} hint="不包含结束时刻" error={error}>
         <input type="datetime-local" step="0.001" value={to} onChange={(event) => onTo(event.target.value)} />
       </Field>
     </div>

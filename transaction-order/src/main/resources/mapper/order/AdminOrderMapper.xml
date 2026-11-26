@@ -27,14 +27,29 @@
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+    <if test="q.filters.sort == 'CREATED_DESC' and q.after &gt; 0">
+      JOIN tc_order anchor ON anchor.tenant_id=#{tenant} AND anchor.id=#{q.after}
+    </if>
+    WHERE r.tenant_id=#{tenant}
+    <choose>
+      <when test="q.filters.sort == 'CREATED_DESC'">
+        <if test="q.after &gt; 0">
+          AND (r.created_at &lt; anchor.created_at OR (r.created_at=anchor.created_at AND r.id &lt; anchor.id))
+        </if>
+      </when>
+      <otherwise>AND r.id &gt; #{q.after}</otherwise>
+    </choose>
     <if test="q.filters.orderNo != null">AND r.order_no=#{q.filters.orderNo}</if>
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
     <if test="q.filters.financialStatus != null">AND r.financial_status=#{q.filters.financialStatus}</if>
     <if test="q.filters.warehouseId != null">AND r.warehouse_id=#{q.filters.warehouseId}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
-    ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+    <choose>
+      <when test="q.filters.sort == 'CREATED_DESC'">ORDER BY r.created_at DESC,r.id DESC</when>
+      <otherwise>ORDER BY r.id ASC</otherwise>
+    </choose>
+    LIMIT #{q.fetchLimit}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>

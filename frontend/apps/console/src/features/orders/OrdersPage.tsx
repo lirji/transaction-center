@@ -12,6 +12,7 @@ import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
 import { financialStatusSchema, orderStatusSchema } from '../../shared/api/schemas'
 import { financialLabels, orderLabels } from './orderStatus'
 
+const sortOptions = { ID_ASC: '编号升序', CREATED_DESC: '创建时间最新优先' } as const
 const ORDER_STATUSES = orderStatusSchema.options
 const FINANCIAL_STATUSES = financialStatusSchema.options
 
@@ -51,6 +52,7 @@ export function OrderRows({ rows }: { rows: AdminOrderView[] }) {
 
 export function OrdersPage() {
   const { params, after, apply, setAfter } = useAdminListSearch()
+  const [sort, setSort] = useState(() => params.get('sort') ?? 'ID_ASC')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
   const [status, setStatus] = useState(() => params.get('status') ?? '')
@@ -65,6 +67,7 @@ export function OrdersPage() {
   })()
 
   const filters = {
+    sort: params.get('sort') || undefined,
     orderNo: params.get('orderNo') || undefined,
     memberId: params.get('memberId') || undefined,
     status: params.get('status') || undefined,
@@ -95,6 +98,7 @@ export function OrdersPage() {
     try {
       const window = parseTimeWindow(from, to)
       apply({
+        sort: sort === 'ID_ASC' ? undefined : sort,
         orderNo: orderNo.trim() || undefined,
         memberId: memberId.trim() ? parseMemberId(memberId) : undefined,
         status: status || undefined,
@@ -113,7 +117,7 @@ export function OrdersPage() {
       <PageHeader
         eyebrow="Orders"
         title="订单"
-        description="按订单号、会员或状态查询。结果按订单内部编号升序排列。"
+        description="按订单号、会员或状态查询，可按创建时间查看最近订单。"
       />
       <Panel>
         <h2>筛选</h2>
@@ -128,6 +132,11 @@ export function OrdersPage() {
           <Field label="订单状态"><EmptySelect value={status} onChange={setStatus} options={ORDER_STATUSES} optionLabel={(value) => orderLabels[value as keyof typeof orderLabels]} /></Field>
           <Field label="资金状态"><EmptySelect value={financialStatus} onChange={setFinancialStatus} options={FINANCIAL_STATUSES} optionLabel={(value) => financialLabels[value as keyof typeof financialLabels]} /></Field>
           <Field label="仓库 ID"><input value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} /></Field>
+          <Field label="排序">
+            <select value={sort} onChange={(event) => setSort(event.target.value)}>
+              {Object.entries(sortOptions).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+            </select>
+          </Field>
           <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
         </FilterBar>
       </Panel>
