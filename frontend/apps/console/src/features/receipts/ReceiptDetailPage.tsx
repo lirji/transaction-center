@@ -33,8 +33,8 @@ export function ReceiptDetailPage() {
       />
       <Panel>
         <dl className="kv">
-          <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderNo}</Link></dd>
-          <dt>支付</dt><dd><Link className="mono" to={`/payments/${encodeURIComponent(row.paymentNo)}`}>{row.paymentNo}</Link></dd>
+          <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderBusinessNo ?? row.orderNo}</Link></dd>
+          <dt>支付</dt><dd><Link className="mono" to={`/payments/${encodeURIComponent(row.paymentNo)}`}>{row.paymentBusinessNo ?? row.paymentNo}</Link></dd>
           <dt>尝试</dt><dd className="mono">{row.attemptNo}</dd>
           <dt>渠道</dt><dd className="mono">{row.channelCode}</dd>
           <dt>处置</dt><dd><Badge tone={row.disposition === 'NORMAL' ? 'good' : 'warn'}>{row.disposition}</Badge></dd>

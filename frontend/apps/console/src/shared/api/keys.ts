@@ -35,6 +35,7 @@ export type RefundQueueQuery = {
   status?: string
   after?: string | number
   limit?: number
+  approvalNo?: string
   refundNo?: string
   orderNo?: string
   memberId?: string
@@ -50,6 +51,7 @@ export function refundQueueQuery(query: RefundQueueQuery = {}): string {
   search.set('limit', boundedLimit(query.limit))
   search.set('status', query.status ?? 'PENDING_APPROVAL')
   appendKnown(search, {
+    approvalNo: query.approvalNo,
     refundNo: query.refundNo,
     orderNo: query.orderNo,
     memberId: query.memberId,

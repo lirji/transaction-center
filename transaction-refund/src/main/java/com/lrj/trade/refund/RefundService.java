@@ -54,6 +54,7 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
                 mapper.insertRefund(actor.tenantId(),no,businessNo,key,actor.key(),Long.parseLong(order.memberId()),orderId,orderNo,
                     Long.parseLong(source.receiptId()),source.receiptNo(),"MRF-"+UUID.randomUUID(),amount,source.currency(),reason,hash,
                     policy.requiresApproval()?"PENDING_APPROVAL":"READY",policy.version(),policy.limit(),approval,
+                    approval==null?null:BusinessNumber.next(BusinessNumber.Type.REFUND_APPROVAL,now),
                     approval==null?null:now.plus(Duration.ofDays(1)),now,null),
                 ()->mapper.lockByRequest(actor.tenantId(),actor.key(),key));
 
@@ -99,7 +100,8 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
             var row=issueRefund(now,businessNo->
                 mapper.insertRefund(tenant,no,businessNo,key,actor.key(),Long.parseLong(order.memberId()),orderId,
                     order.orderNo(),receipt,receiptNo,"MRF-"+UUID.randomUUID(),source.amount(),source.currency(),reason,hash,
-                    "PENDING_APPROVAL",policy.version(),policy.limit(),approval,now.plus(Duration.ofDays(1)),now,receipt),
+                    "PENDING_APPROVAL",policy.version(),policy.limit(),approval,BusinessNumber.next(BusinessNumber.Type.REFUND_APPROVAL,now),
+                    now.plus(Duration.ofDays(1)),now,receipt),
                 ()->mapper.lockCompensation(tenant,receipt));
 
             if(!row.refundNo().equals(no)) return row.refundNo();

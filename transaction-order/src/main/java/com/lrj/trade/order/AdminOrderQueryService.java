@@ -51,8 +51,9 @@ public class AdminOrderQueryService {
     public Detail detail(long tenant,String number) {
         Checks.positive(tenant);Instant at=clock.instant();
         var view=mapper.find(tenant,number).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","资源不存在"));
-        return new Detail(view,at,mapper.items(tenant,view.orderId()),mapper.fulfillment(tenant,view.orderId()).stream().findFirst().orElse(null));
+        return new Detail(view,at,mapper.items(tenant,view.orderId()),mapper.fulfillment(tenant,view.orderId()).stream().findFirst().orElse(null),
+            mapper.quoteNumber(tenant,view.quoteId()));
     }
     /** 展开安全主记录，字段兼容列表，不展开内部持久化实体。 */
-    public record Detail(@com.fasterxml.jackson.annotation.JsonUnwrapped AdminOrderView summary,Instant observedAt,List<AdminOrderItem> items,AdminFulfillmentView fulfillment) {}
+    public record Detail(@com.fasterxml.jackson.annotation.JsonUnwrapped AdminOrderView summary,Instant observedAt,List<AdminOrderItem> items,AdminFulfillmentView fulfillment,String quoteBusinessNo) {}
 }

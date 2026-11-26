@@ -31,10 +31,10 @@
   <insert id="insert">
     INSERT INTO tc_refund_callback(tenant_id,callback_no,refund_no,channel_code,channel_merchant_no,provider_event_id,merchant_refund_no,
       observation_kind,provider_transaction_no,provider_refund_no,amount,currency,occurred_at,payload_hash,fact_hash,payload_cipher,key_version,signature_version,
-      status,received_at,created_at,updated_at)
+      status,received_at,created_at,updated_at,business_no)
     VALUES(#{tenant},#{number},#{refund},#{code},#{merchant},#{event},#{request},
       #{kind},#{transaction},#{providerRefund},#{amount},#{currency},#{paid},#{payloadHash},#{factHash},#{cipher},#{keyVersion},#{signature},
-      'PENDING',UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))
+      'PENDING',#{now},#{now},#{now},#{businessNo})
     ON DUPLICATE KEY UPDATE id=tc_refund_callback.id
   </insert>
   <select id="lockEvent" resultMap="record" useCache="false">

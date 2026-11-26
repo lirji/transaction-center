@@ -35,11 +35,11 @@ export function RefundDetailPage() {
       <div className="section-gap">
         <Panel>
           <dl className="kv">
-            <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderNo}</Link></dd>
+            <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderBusinessNo ?? row.orderNo}</Link></dd>
             <dt>会员</dt><dd className="mono">{row.memberId}</dd>
             <dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{row.status}</Badge></dd>
             <dt>金额</dt><dd>{formatMinor(row.amount, row.currency)} <small className="mono">{row.currency} {row.amount}</small></dd>
-            <dt>审批引用</dt><dd>{dash(row.approvalRef)}</dd>
+            <dt>审批单号</dt><dd>{dash(row.approvalBusinessNo ?? row.approvalRef)}</dd>
             <dt>审批截止（北京时间）</dt><dd className="mono">{formatBeijingTime(row.approvalDeadline)}</dd>
             <dt>政策版本</dt><dd className="mono">{row.policyVersion}</dd>
             <dt>版本</dt><dd className="mono">{row.version}</dd>

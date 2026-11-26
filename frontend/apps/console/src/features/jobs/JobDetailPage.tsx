@@ -52,8 +52,8 @@ export function JobDetailPage() {
           <dt>业务引用</dt>
           <dd>{row.businessReference
             ? href
-              ? <Link className="mono" to={href}>{row.businessReference.resourceType} {row.businessReference.resourceNo}</Link>
-              : <span className="mono">{row.businessReference.resourceType} {row.businessReference.resourceNo}</span>
+              ? <Link className="mono" to={href}>{row.businessReference.resourceType} {row.businessReference.businessNo ?? row.businessReference.resourceNo}</Link>
+              : <span className="mono">{row.businessReference.resourceType} {row.businessReference.businessNo ?? row.businessReference.resourceNo}</span>
             : '—'}</dd>
           <dt>版本</dt><dd className="mono">{row.version}</dd>
           <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.observedAt)}</dd>

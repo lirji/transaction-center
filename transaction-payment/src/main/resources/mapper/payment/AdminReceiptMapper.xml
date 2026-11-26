@@ -19,8 +19,10 @@
       <arg column="unreservedAmount" javaType="_long"/>
       <arg column="version" javaType="_long"/>
       <arg column="businessNo" javaType="java.lang.String"/>
+      <arg column="orderBusinessNo" javaType="java.lang.String"/>
+      <arg column="paymentBusinessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
-  <sql id="columns">r.id AS `cursor`, r.receipt_no AS receiptNo, p.payment_no AS paymentNo, o.order_no AS orderNo, a.merchant_request_no AS attemptNo, r.channel_code AS channelCode, r.amount AS amount, r.currency AS currency, r.disposition AS disposition, r.provider_paid_at AS providerPaidAt, r.confirmed_at AS confirmedAt, r.created_at AS createdAt, r.refunded_amount AS refundedAmount, r.refund_reserved_amount AS refundReservedAmount, (r.amount-r.refunded_amount-r.refund_reserved_amount) AS unreservedAmount, r.version AS version,r.business_no AS businessNo</sql>
+  <sql id="columns">r.id AS `cursor`, r.receipt_no AS receiptNo, p.payment_no AS paymentNo, o.order_no AS orderNo, a.merchant_request_no AS attemptNo, r.channel_code AS channelCode, r.amount AS amount, r.currency AS currency, r.disposition AS disposition, r.provider_paid_at AS providerPaidAt, r.confirmed_at AS confirmedAt, r.created_at AS createdAt, r.refunded_amount AS refundedAmount, r.refund_reserved_amount AS refundReservedAmount, (r.amount-r.refunded_amount-r.refund_reserved_amount) AS unreservedAmount, r.version AS version,r.business_no AS businessNo, o.business_no AS orderBusinessNo, p.business_no AS paymentBusinessNo</sql>
   <sql id="source">FROM tc_payment_receipt r JOIN tc_payment_intent p ON p.tenant_id=r.tenant_id AND p.id=r.intent_id JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id JOIN tc_payment_attempt a ON a.tenant_id=r.tenant_id AND a.id=r.attempt_id AND a.intent_id=r.intent_id</sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">

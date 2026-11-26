@@ -11,6 +11,8 @@ public interface AdminOrderMapper {
     List<AdminOrderView> page(@Param("tenant") long tenant,@Param("q") AdminQuery q);
     /** 精确查询仍必须限定租户，外租户与不存在相同。 */
     List<AdminOrderView> find(@Param("tenant") long tenant,@Param("number") String number);
+    /** 详情显示创建时关联的报价业务号，订单分页不读取报价表。 */
+    String quoteNumber(@Param("tenant") long tenant,@Param("quoteId") String quoteId);
     /** 同租户已验证父资源的只读明细。 */
     List<AdminOrderItem> items(@Param("tenant") long tenant,@Param("number") String number);
     /** 同租户已验证父资源的只读明细。 */

@@ -2598,6 +2598,16 @@ class FoundationTest {
         assertEquals(1,numbers.stream().distinct().count()); String number=numbers.getFirst();
         assertEquals(1,count("SELECT COUNT(*) FROM tc_refund_callback WHERE tenant_id=?",tenant));
         assertEquals(1,count("SELECT COUNT(*) FROM tc_job_lease WHERE tenant_id=? AND job_type='REFUND_CALLBACK'",tenant));
+        String readable=jdbc.queryForObject("SELECT business_no FROM tc_refund_callback WHERE tenant_id=? AND callback_no=?",String.class,tenant,number);
+        assertTrue(readable.matches("TRD-RCB-[0-9]{6}-[0-9]{10}"));
+        jwt("callback-operations","trade.admin trade.admin.jobs.read",tenant);
+        var json=tools.jackson.databind.json.JsonMapper.builder().build();
+        var path="/api/v1/trade/admin/jobs?callbackNo=";
+        var page=request("GET",path+readable,"callback-operations",null);
+        assertEquals(200,page.statusCode(),page.body());
+        var items=json.readTree(page.body()).path("items");
+        assertEquals(1,items.size());
+        assertEquals(items,json.readTree(request("GET",path+number,"callback-operations",null).body()).path("items"));
         assertApplicationAmounts(f,100,0);
         var lease=jobLeases.claim(tenant,JobType.REFUND_CALLBACK,"worker",1,30000).getFirst();
         var outcomes=parallel(10,()->refundCallbackWorker.processLease(lease));
@@ -2970,6 +2980,14 @@ class FoundationTest {
         var response=request("GET",path+"?limit=1","queue-admin",null); assertEquals(200,response.statusCode());
         var json=tools.jackson.databind.json.JsonMapper.builder().build(); var page=json.readTree(response.body());
         assertEquals(1,page.size()); assertEquals(first.refundNo(),page.get(0).path("refundNo").asText());
+        String approvalNo=page.get(0).path("approvalBusinessNo").asText();
+        assertTrue(approvalNo.matches("TRD-APR-[0-9]{6}-[0-9]{10}"));
+        for(String alias:List.of(approvalNo,first.approvalRef())) {
+            var match=request("GET",path+"?approvalNo="+alias,"queue-admin",null);
+            assertEquals(200,match.statusCode(),match.body());
+            assertEquals(first.refundNo(),json.readTree(match.body()).get(0).path("refundNo").asText());
+            assertEquals("[]",request("GET",path+"?approvalNo="+alias,"queue-other",null).body());
+        }
         String cursor=page.get(0).path("cursor").asText(); assertTrue(cursor.matches("[1-9][0-9]*"));
         var next=json.readTree(request("GET",path+"?after="+cursor,"queue-admin",null).body());
         assertEquals(1,next.size()); assertEquals(second.refundNo(),next.get(0).path("refundNo").asText());
@@ -4011,6 +4029,8 @@ class FoundationTest {
         var input=verifiedCallback(f,payment,"event-one","txn-one",100);
         var received=parallel(20,()->callbackInbox.accept(f.actor().tenantId(),input));
         assertEquals(1,received.stream().distinct().count());
+        assertTrue(jdbc.queryForObject("SELECT business_no FROM tc_payment_callback WHERE tenant_id=? AND callback_no=?",
+            String.class,f.actor().tenantId(),received.getFirst()).matches("TRD-PCB-[0-9]{6}-[0-9]{10}"));
         assertEquals(1,count("SELECT COUNT(*) FROM tc_payment_callback WHERE tenant_id=?",f.actor().tenantId()));
         assertEquals(0,count("SELECT COUNT(*) FROM tc_payment_receipt WHERE tenant_id=?",f.actor().tenantId()));
         byte[] cipher=jdbc.queryForObject("SELECT payload_cipher FROM tc_payment_callback WHERE tenant_id=?",byte[].class,f.actor().tenantId());

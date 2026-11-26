@@ -21,8 +21,8 @@ public final class AdminQueryParameters {
             case "attempt" -> AdminQuery.fields("status");
             case "receipt" -> AdminQuery.fields("receiptNo","paymentNo","orderNo","channelCode","disposition","abnormalOnly");
             case "quote" -> AdminQuery.fields("quoteId","memberId","businessNo");
-            case "refund" -> AdminQuery.fields("refundNo","orderNo","memberId","status");
-            case "job" -> AdminQuery.fields("jobType","status","leaseExpired");
+            case "refund" -> AdminQuery.fields("refundNo","orderNo","memberId","status","approvalNo");
+            case "job" -> AdminQuery.fields("jobType","status","leaseExpired","callbackNo");
             case "product" -> AdminQuery.fields("productNo","skuNo","name","status");
             case "member" -> AdminQuery.fields("memberId","status");
             case "inventory" -> AdminQuery.fields("warehouseId","skuId","maxAvailable");

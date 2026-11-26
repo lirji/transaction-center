@@ -5,6 +5,7 @@ import com.lrj.trade.payment.mapper.*;
 import com.lrj.trade.payment.model.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -24,12 +25,14 @@ public class PaymentCallbackService implements PaymentCallbackPort {
     private final PaymentObservationPort observations;
     private final JobSchedulerPort jobs;
     private final TransactionTemplate tx;
+    private final Clock clock;
 
     /** 接收独立提交，处理加入租约事务；两阶段避免业务故障导致已应答报文丢失。 */
     public PaymentCallbackService(CallbackMapper callbacks,PaymentMapper payments,ChannelMapper channels,
-        CallbackPayloadProtector protector,PaymentObservationPort observations,JobSchedulerPort jobs,PlatformTransactionManager transactions) {
+        CallbackPayloadProtector protector,PaymentObservationPort observations,JobSchedulerPort jobs,PlatformTransactionManager transactions,Clock clock) {
         this.callbacks=callbacks; this.payments=payments; this.channels=channels; this.protector=protector;
         this.observations=observations; this.jobs=jobs;
+        this.clock=clock;
         this.tx=new TransactionTemplate(transactions); this.tx.setTimeout(10);
     }
 
@@ -56,15 +59,23 @@ public class PaymentCallbackService implements PaymentCallbackPort {
         try { encrypted=protector.encrypt(binding,raw); }
         finally { Arrays.fill(raw,(byte)0); }
         return tx.execute(status->{
-            callbacks.insert(tenant,number,Long.parseLong(attemptId),input.channelCode(),input.channelMerchantNo(),input.eventId(),
+            Instant now=clock.instant().truncatedTo(ChronoUnit.MILLIS);
+            List<CallbackRecord> stored=List.of();
+            // 接收号与验签后的密文同事务写入；重放始终读取原事件和原绑定。
+            for(int attempt=0;attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS;attempt++) {
+                String businessNo=BusinessNumber.next(BusinessNumber.Type.PAYMENT_CALLBACK,now);
+                callbacks.insert(tenant,number,Long.parseLong(attemptId),input.channelCode(),input.channelMerchantNo(),input.eventId(),
                 input.requestNo(),input.kind(),input.transactionNo(),input.amount(),input.currency(),paid,rawHash,facts,
-                encrypted.ciphertext(),encrypted.keyVersion(),input.signatureVersion());
-            var stored=callbacks.lockEvent(tenant,input.channelCode(),input.channelMerchantNo(),input.eventId()).stream().findFirst()
-                .orElseThrow(()->new TradeException("CALLBACK_FACT_CONFLICT","事件唯一键与租户路由冲突"));
-            if(!MessageDigest.isEqual(stored.payloadHash(),rawHash) || !stored.factHash().equals(facts))
+                encrypted.ciphertext(),encrypted.keyVersion(),input.signatureVersion(),businessNo,now);
+                stored=callbacks.lockEvent(tenant,input.channelCode(),input.channelMerchantNo(),input.eventId());
+                if(!stored.isEmpty()) break;
+            }
+            if(stored.isEmpty()) throw new TradeException("CALLBACK_FACT_CONFLICT","事件唯一键与租户路由冲突");
+            var row=stored.getFirst();
+            if(!MessageDigest.isEqual(row.payloadHash(),rawHash) || !row.factHash().equals(facts))
                 throw new TradeException("CALLBACK_FACT_CONFLICT","相同事件键的原文或解析事实发生冲突");
-            jobs.enqueue(tenant,JobType.PAYMENT_CALLBACK,stored.callbackNo());
-            return stored.callbackNo();
+            jobs.enqueue(tenant,JobType.PAYMENT_CALLBACK,row.callbackNo());
+            return row.callbackNo();
         });
     }
 

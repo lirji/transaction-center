@@ -44,14 +44,14 @@ export function PaymentDetailPage() {
       <div className="section-gap">
         <Panel>
           <dl className="kv">
-            <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(payment.orderNo)}`}>{payment.orderNo}</Link></dd>
+            <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(payment.orderNo)}`}>{payment.orderBusinessNo ?? payment.orderNo}</Link></dd>
             <dt>会员</dt><dd className="mono">{payment.memberId}</dd>
             <dt>状态</dt><dd><Badge tone={statusTone(payment.status)}>{payment.status}</Badge></dd>
             <dt>期望金额</dt><dd>{formatMinor(payment.expectedAmount, payment.currency)} <small className="mono">{payment.currency} {payment.expectedAmount}</small></dd>
             <dt>当前尝试</dt><dd className="mono">{dash(payment.activeAttemptNo)}</dd>
             <dt>成功实收</dt>
             <dd>{payment.succeededReceiptNo
-              ? <Link className="mono" to={`/receipts/${encodeURIComponent(payment.succeededReceiptNo)}`}>{payment.succeededReceiptNo}</Link>
+              ? <Link className="mono" to={`/receipts/${encodeURIComponent(payment.succeededReceiptNo)}`}>{payment.succeededReceiptBusinessNo ?? payment.succeededReceiptNo}</Link>
               : '—'}</dd>
             <dt>关闭屏障（北京时间）</dt><dd className="mono">{formatBeijingTime(payment.closeFenceAt)}</dd>
             <dt>版本</dt><dd className="mono">{payment.version}</dd>

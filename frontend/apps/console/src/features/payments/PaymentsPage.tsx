@@ -30,11 +30,11 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
             <td>
               <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.businessNo ?? row.paymentNo}</Link>
             </td>
-            <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
+            <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{paymentLabels[row.status]}</Badge></td>
             <td>{formatMinorAmount(row.expectedAmount)}</td>
             <td>{row.currency}</td>
-            <td className="mono">{row.succeededReceiptNo ? <Link to={`/receipts/${encodeURIComponent(row.succeededReceiptNo)}`}>{row.succeededReceiptNo}</Link> : dash(row.succeededReceiptNo)}</td>
+            <td className="mono">{row.succeededReceiptNo ? <Link to={`/receipts/${encodeURIComponent(row.succeededReceiptNo)}`}>{row.succeededReceiptBusinessNo ?? row.succeededReceiptNo}</Link> : dash(row.succeededReceiptNo)}</td>
             <td>{formatBeijingTime(row.closeFenceAt)}</td>
             <td>{formatBeijingTime(row.updatedAt)}</td>
           </tr>

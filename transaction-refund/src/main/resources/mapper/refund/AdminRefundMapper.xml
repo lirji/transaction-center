@@ -15,15 +15,21 @@
       <arg column="version" javaType="_long"/>
       <arg column="createdAt" javaType="java.time.Instant"/>
       <arg column="businessNo" javaType="java.lang.String"/>
+      <arg column="orderBusinessNo" javaType="java.lang.String"/>
+      <arg column="approvalBusinessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
-  <sql id="columns">r.id AS `cursor`, r.refund_no AS refundNo, r.order_no AS orderNo, r.member_id AS memberId, r.amount AS amount, r.currency AS currency, r.status AS status, r.approval_ref AS approvalRef, r.approval_deadline AS approvalDeadline, r.policy_version AS policyVersion, r.version AS version, r.created_at AS createdAt, r.business_no AS businessNo</sql>
-  <sql id="source">FROM tc_refund r </sql>
+  <sql id="columns">r.id AS `cursor`, r.refund_no AS refundNo, r.order_no AS orderNo, r.member_id AS memberId, r.amount AS amount, r.currency AS currency, r.status AS status, r.approval_ref AS approvalRef, r.approval_deadline AS approvalDeadline, r.policy_version AS policyVersion, r.version AS version, r.created_at AS createdAt, r.business_no AS businessNo, o.business_no AS orderBusinessNo,r.approval_business_no AS approvalBusinessNo</sql>
+  <sql id="source">FROM tc_refund r JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id</sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
     WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
     <if test="q.filters.refundNo != null">AND <choose><when test='q.filters.refundNo.startsWith("TRD-RFD-")'>r.business_no=#{q.filters.refundNo}</when><otherwise>r.refund_no=#{q.filters.refundNo}</otherwise></choose></if>
-    <if test="q.filters.orderNo != null">AND r.order_no=#{q.filters.orderNo}</if>
+    <if test="q.filters.orderNo != null">AND <choose><when test='q.filters.orderNo.startsWith("TRD-ORD-")'>o.business_no=#{q.filters.orderNo}</when><otherwise>r.order_no=#{q.filters.orderNo}</otherwise></choose></if>
+    <if test="q.filters.approvalNo != null">AND <choose>
+      <when test='q.filters.approvalNo.startsWith("TRD-APR-")'>r.approval_business_no=#{q.filters.approvalNo}</when>
+      <otherwise>r.approval_ref=#{q.filters.approvalNo}</otherwise>
+    </choose></if>
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.filters.status != null and q.filters.status != 'ALL'">AND r.status=#{q.filters.status}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>

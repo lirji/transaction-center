@@ -20,6 +20,9 @@
       <arg column="order_no" javaType="java.lang.String"/>
       <arg column="receipt_no" javaType="java.lang.String"/>
       <arg column="refund_no" javaType="java.lang.String"/>
+      <arg column="order_business_no" javaType="java.lang.String"/>
+      <arg column="receipt_business_no" javaType="java.lang.String"/>
+      <arg column="refund_business_no" javaType="java.lang.String"/>
       <arg column="kind" javaType="com.lrj.trade.server.operations.OperationsReport$Scope"/>
       <arg column="amount" javaType="_long"/>
       <arg column="currency" javaType="java.lang.String"/>
@@ -29,7 +32,7 @@
 
   <!-- 对账同样采用永久资金账本、原实收及已成功退款确认事实。退款以自身确认时间归期。 -->
   <sql id="confirmedFunds">
-    SELECT l.id AS ledger_id,l.ledger_no,l.business_no,r.order_id,r.receipt_no,l.refund_no,l.amount,l.currency,r.confirmed_at,
+    SELECT l.id AS ledger_id,l.ledger_no,l.business_no,r.order_id,r.receipt_no,r.business_no AS receipt_business_no,l.refund_no,l.amount,l.currency,r.confirmed_at,
       CASE WHEN r.disposition='NORMAL' THEN 'NORMAL_RECEIPT' ELSE 'ABNORMAL_RECEIPT' END AS kind
     FROM tc_payment_receipt r
     JOIN tc_money_ledger l ON l.tenant_id=r.tenant_id AND l.receipt_id=r.id AND l.entry_type='RECEIPT'
@@ -37,7 +40,7 @@
       AND r.confirmed_at &gt;= #{q.createdFrom} AND r.confirmed_at &lt; #{q.createdTo}
     <if test="q.after != 0">AND l.id &gt; #{q.after}</if>
     UNION ALL
-    SELECT l.id,l.ledger_no,l.business_no,r.order_id,r.receipt_no,l.refund_no,l.amount,l.currency,h.confirmed_at,
+    SELECT l.id,l.ledger_no,l.business_no,r.order_id,r.receipt_no,r.business_no AS receipt_business_no,l.refund_no,l.amount,l.currency,h.confirmed_at,
       CASE WHEN r.disposition='NORMAL' THEN 'NORMAL_REFUND' ELSE 'ABNORMAL_REFUND' END
     FROM tc_payment_refund_hold h
     JOIN tc_money_ledger l ON l.tenant_id=h.tenant_id AND l.receipt_id=h.receipt_id AND l.refund_no=h.refund_no AND l.entry_type='REFUND'
@@ -68,9 +71,12 @@
 
   <select id="facts" resultMap="Fact" useCache="false" timeout="3">
     WITH funds AS (<include refid="confirmedFunds"/>)
-    SELECT f.ledger_id,f.ledger_no,f.business_no,o.order_no,f.receipt_no,f.refund_no,f.kind,f.amount,f.currency,f.confirmed_at
+    SELECT f.ledger_id,f.ledger_no,f.business_no,o.order_no,f.receipt_no,f.refund_no,
+           o.business_no AS order_business_no,f.receipt_business_no,r.business_no AS refund_business_no,
+           f.kind,f.amount,f.currency,f.confirmed_at
     FROM funds f
     JOIN tc_order o ON o.tenant_id=#{tenant} AND o.id=f.order_id
+    LEFT JOIN tc_refund r ON r.tenant_id=o.tenant_id AND r.order_id=o.id AND r.refund_no=f.refund_no
     <choose>
       <when test="q.filters.scope == 'NET'">WHERE f.kind IN ('NORMAL_RECEIPT','NORMAL_REFUND')</when>
       <otherwise>WHERE f.kind=#{q.filters.scope}</otherwise>

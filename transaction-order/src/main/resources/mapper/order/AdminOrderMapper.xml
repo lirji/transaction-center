@@ -61,6 +61,9 @@
     SELECT <include refid="columns"/> <include refid="source"/>
     WHERE r.tenant_id=#{tenant} AND <choose><when test='number.startsWith("TRD-ORD-")'>r.business_no=#{number}</when><otherwise>r.order_no=#{number}</otherwise></choose>
   </select>
+  <select id="quoteNumber" resultType="java.lang.String" useCache="false" timeout="3">
+    SELECT business_no FROM tc_quote WHERE tenant_id=#{tenant} AND id=#{quoteId}
+  </select>
   <resultMap id="AdminOrderItem" type="com.lrj.trade.order.model.AdminOrderItem"><constructor>
     <arg column="itemId" javaType="java.lang.String"/>
     <arg column="skuId" javaType="java.lang.String"/>

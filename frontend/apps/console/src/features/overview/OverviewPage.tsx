@@ -80,13 +80,13 @@ export function OverviewPage() {
             <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
             <tbody>
               <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}
-                describe={(item) => `${item.receiptNo} · ${dispositionLabels[item.disposition]}`} />
+                describe={(item) => `${item.businessNo ?? item.receiptNo} · ${dispositionLabels[item.disposition]}`} />
               <QueueRow label="待审批退款" href={`/refunds?status=${PENDING_REFUND.status}`} query={refunds}
                 describe={(item) => item.approvalDeadline
-                  ? `${item.refundNo} · ${formatBeijingTime(item.approvalDeadline)}（北京时间）截止`
-                  : item.refundNo} />
+                  ? `${item.businessNo ?? item.refundNo} · ${formatBeijingTime(item.approvalDeadline)}（北京时间）截止`
+                  : item.businessNo ?? item.refundNo} />
               <QueueRow label="未结对账差异" href={`/reconciliation?state=${OPEN_CASE}`} query={reconciliation}
-                describe={(item) => `${item.caseNo} · ${item.differenceType}`} />
+                describe={(item) => `${item.businessNo ?? item.caseNo} · ${item.differenceType}`} />
               <QueueRow label="发布异常" href={`/outbox?state=${PUBLICATION_REVIEW}`} query={publications}
                 describe={(item) => `${item.eventId} · ${item.eventType}`} />
             </tbody>

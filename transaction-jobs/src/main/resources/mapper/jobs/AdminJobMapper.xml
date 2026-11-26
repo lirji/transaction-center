@@ -22,6 +22,16 @@
     SELECT <include refid="columns"/> <include refid="source"/>
     WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
     <if test="q.filters.jobType != null">AND r.job_type=#{q.filters.jobType}</if>
+    <if test="q.filters.callbackNo != null">AND (
+      (r.job_type='PAYMENT_CALLBACK' AND EXISTS (
+        SELECT 1 FROM tc_payment_callback c WHERE c.tenant_id=r.tenant_id AND c.callback_no=r.business_key
+          AND <choose><when test='q.filters.callbackNo.startsWith("TRD-PCB-")'>c.business_no=#{q.filters.callbackNo}</when>
+            <otherwise>c.callback_no=#{q.filters.callbackNo}</otherwise></choose>))
+      OR (r.job_type='REFUND_CALLBACK' AND EXISTS (
+        SELECT 1 FROM tc_refund_callback c WHERE c.tenant_id=r.tenant_id AND c.callback_no=r.business_key
+          AND <choose><when test='q.filters.callbackNo.startsWith("TRD-RCB-")'>c.business_no=#{q.filters.callbackNo}</when>
+            <otherwise>c.callback_no=#{q.filters.callbackNo}</otherwise></choose>))
+    )</if>
     <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
     <if test="q.filters.leaseExpired != null">AND (r.status='RUNNING' AND r.lease_until &lt;= #{at})=#{q.filters.leaseExpired}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
@@ -37,32 +47,40 @@
     AND business_key=#{number} AND status IN ('READY','RUNNING','REVIEW')
   </select>
   <resultMap id="Reference" type="com.lrj.trade.jobs.model.AdminBusinessReference"><constructor>
-    <arg column="resourceType" javaType="java.lang.String"/><arg column="resourceNo" javaType="java.lang.String"/>
+    <arg column="resourceType" javaType="java.lang.String"/><arg column="resourceNo" javaType="java.lang.String"/><arg column="businessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
   <!-- 每个分支显式核对业务表租户与持久键，未知类型/坏键不会被原样回显。 -->
   <select id="reference" resultMap="Reference" useCache="false" timeout="3">
-    SELECT 'ORDER' AS resourceType,o.order_no AS resourceNo FROM tc_job_lease j
+    SELECT 'ORDER' AS resourceType,o.order_no AS resourceNo,o.business_no AS businessNo FROM tc_job_lease j
     JOIN tc_order o ON o.tenant_id=j.tenant_id AND o.order_no=j.business_key
     WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='ORDER_RESOLVE'
     UNION ALL
-    SELECT 'PAYMENT',p.payment_no FROM tc_job_lease j
+    SELECT 'PAYMENT',p.payment_no,p.business_no FROM tc_job_lease j
     JOIN tc_payment_attempt a ON a.tenant_id=j.tenant_id AND a.merchant_request_no=j.business_key
     JOIN tc_payment_intent p ON p.tenant_id=a.tenant_id AND p.id=a.intent_id
     WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='PAYMENT_RECOVER'
     UNION ALL
-    SELECT 'REFUND',r.refund_no FROM tc_job_lease j
+    SELECT 'REFUND',r.refund_no,r.business_no FROM tc_job_lease j
     JOIN tc_refund r ON r.tenant_id=j.tenant_id AND r.refund_no=j.business_key
     WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='REFUND_RECOVER'
     UNION ALL
-    SELECT 'PAYMENT_RECEIPT',r.receipt_no FROM tc_job_lease j
+    SELECT 'PAYMENT_RECEIPT',r.receipt_no,r.business_no FROM tc_job_lease j
     JOIN tc_payment_receipt r ON r.tenant_id=j.tenant_id AND r.receipt_no=j.business_key
     WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='REFUND_COMPENSATE'
     UNION ALL
-    SELECT 'OUTBOX_EVENT',o.event_id FROM tc_job_lease j
+    SELECT 'PAYMENT_CALLBACK',c.callback_no,c.business_no FROM tc_job_lease j
+    JOIN tc_payment_callback c ON c.tenant_id=j.tenant_id AND c.callback_no=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='PAYMENT_CALLBACK'
+    UNION ALL
+    SELECT 'REFUND_CALLBACK',c.callback_no,c.business_no FROM tc_job_lease j
+    JOIN tc_refund_callback c ON c.tenant_id=j.tenant_id AND c.callback_no=j.business_key
+    WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='REFUND_CALLBACK'
+    UNION ALL
+    SELECT 'OUTBOX_EVENT',o.event_id,NULL FROM tc_job_lease j
     JOIN tc_outbox o ON o.tenant_id=j.tenant_id AND o.event_id=j.business_key
     WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='OUTBOX_PUBLISH'
     UNION ALL
-    SELECT 'RECONCILIATION_OPERATION',o.operation_no FROM tc_job_lease j
+    SELECT 'RECONCILIATION_OPERATION',o.operation_no,o.business_no FROM tc_job_lease j
     JOIN tc_reconciliation_operation o ON o.tenant_id=j.tenant_id AND o.operation_no=j.business_key
     WHERE j.tenant_id=#{tenant} AND j.id=#{number} AND j.job_type='RECON_QUERY'
   </select>

@@ -21,6 +21,7 @@ export function RefundsPage() {
   const [params, setParams] = useSearchParams()
   const status = STATUSES.find((value) => value === params.get('status')) ?? 'PENDING_APPROVAL'
   const [after, setAfter] = useState(0)
+  const [approvalNo, setApprovalNo] = useState(() => params.get('approvalNo') ?? '')
   const [refundNo, setRefundNo] = useState(() => params.get('refundNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
@@ -37,6 +38,7 @@ export function RefundsPage() {
 
   const filters = {
     status,
+    approvalNo: params.get('approvalNo') || undefined,
     refundNo: params.get('refundNo') || undefined,
     orderNo: params.get('orderNo') || undefined,
     memberId: params.get('memberId') || undefined,
@@ -102,6 +104,7 @@ export function RefundsPage() {
       const businessWindow = parseTimeWindow(businessFrom, businessTo)
       const search = new URLSearchParams()
       search.set('status', status)
+      if (approvalNo.trim()) search.set('approvalNo', approvalNo.trim())
       if (refundNo.trim()) search.set('refundNo', refundNo.trim())
       if (orderNo.trim()) search.set('orderNo', orderNo.trim())
       if (memberId.trim()) search.set('memberId', parseMemberId(memberId))
@@ -149,6 +152,7 @@ export function RefundsPage() {
                 {STATUSES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
               </select>
             </Field>
+            <Field label="审批单号"><input value={approvalNo} onChange={(event) => setApprovalNo(event.target.value)} /></Field>
             <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
             <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
             <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>

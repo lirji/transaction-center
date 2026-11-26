@@ -21,7 +21,8 @@ public final class BusinessNumber {
 
     /** 每个前缀由单一业务对象拥有，从已签收的注册表分配。 */
     public enum Type {
-        ORDER("ORD"), PAYMENT("PAY"), REFUND("RFD"), FULFILLMENT("FUL"), RETURN_REQUEST("RTN"), RETURN_RECEIPT("RMA"), PAYMENT_RECEIPT("RCT"), MONEY_LEDGER("LED"), RECON_CASE("REC"), RECON_OPERATION("ROP"), QUOTE("QTE");
+        ORDER("ORD"), PAYMENT("PAY"), REFUND("RFD"), FULFILLMENT("FUL"), RETURN_REQUEST("RTN"), RETURN_RECEIPT("RMA"), PAYMENT_RECEIPT("RCT"), MONEY_LEDGER("LED"), RECON_CASE("REC"), RECON_OPERATION("ROP"), QUOTE("QTE"),
+        PAYMENT_CALLBACK("PCB"), REFUND_CALLBACK("RCB"), REFUND_APPROVAL("APR");
 
         private final String prefix;
         private final Pattern pattern;

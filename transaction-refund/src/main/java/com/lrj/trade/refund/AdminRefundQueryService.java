@@ -37,6 +37,6 @@ public class AdminRefundQueryService {
     public List<RefundQueueItem> queue(long tenant,AdminQuery query) {
         Checks.positive(tenant);
         return mapper.page(tenant,query).stream().limit(query.limit())
-            .map(v->new RefundQueueItem(v.cursor(),v.refundNo(),v.orderNo(),v.amount(),v.currency(),v.status(),v.approvalRef(),v.approvalDeadline(),v.version(),v.businessNo())).toList();
+            .map(v->new RefundQueueItem(v.cursor(),v.refundNo(),v.orderNo(),v.amount(),v.currency(),v.status(),v.approvalRef(),v.approvalDeadline(),v.version(),v.businessNo(),v.orderBusinessNo(),v.approvalBusinessNo())).toList();
     }
 }

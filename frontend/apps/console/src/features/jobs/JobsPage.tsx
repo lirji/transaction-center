@@ -35,6 +35,7 @@ export function JobRows({ rows }: { rows: AdminJobView[] }) {
 
 export function JobsPage() {
   const { params, after, apply, setAfter } = useAdminListSearch()
+  const [callbackNo, setCallbackNo] = useState(() => params.get('callbackNo') ?? '')
   const [jobType, setJobType] = useState(() => params.get('jobType') ?? '')
   const [status, setStatus] = useState(() => params.get('status') ?? '')
   const [leaseExpired, setLeaseExpired] = useState(() => params.get('leaseExpired') ?? '')
@@ -42,6 +43,7 @@ export function JobsPage() {
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
   const [formError, setFormError] = useState('')
   const filters = {
+    callbackNo: params.get('callbackNo') || undefined,
     jobType: params.get('jobType') || undefined,
     status: params.get('status') || undefined,
     leaseExpired: params.get('leaseExpired') === 'true' ? true : params.get('leaseExpired') === 'false' ? false : undefined,
@@ -61,6 +63,7 @@ export function JobsPage() {
     try {
       const window = parseTimeWindow(from, to)
       apply({
+        callbackNo: callbackNo.trim() || undefined,
         jobType: jobType || undefined,
         status: status || undefined,
         leaseExpired: leaseExpired || undefined,
@@ -82,6 +85,7 @@ export function JobsPage() {
       <Panel>
         <h2>筛选</h2>
         <FilterBar onSubmit={submit}>
+          <Field label="回调接收号"><input value={callbackNo} onChange={(event) => setCallbackNo(event.target.value)} /></Field>
           <Field label="任务类型"><EmptySelect value={jobType} onChange={setJobType} options={JOB_TYPES} /></Field>
           <Field label="状态"><EmptySelect value={status} onChange={setStatus} options={JOB_STATUSES} /></Field>
           <Field label="租约过期">

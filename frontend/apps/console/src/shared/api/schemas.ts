@@ -122,6 +122,8 @@ export const refundStatusSchema = z.enum([
   'PENDING_APPROVAL', 'READY', 'SUBMITTED', 'SUCCEEDED', 'FAILED', 'REJECTED', 'EXPIRED',
 ])
 export const refundQueueItemSchema = z.object({
+  orderBusinessNo: z.string().nullish(),
+  approvalBusinessNo: z.string().nullish(),
   cursor: memberIdString,
   refundNo: z.string(),
   businessNo: z.string().nullish(),
@@ -157,6 +159,7 @@ export const adminInspectionViewSchema = z.object({
 export type AdminInspectionView = z.infer<typeof adminInspectionViewSchema>
 
 export const adminReturnViewSchema = z.object({
+  orderBusinessNo: z.string().nullish(),
   businessNo: z.string().nullish(),
   returnId: z.string(),
   returnNo: z.string(),
@@ -333,6 +336,7 @@ export const adminFulfillmentViewSchema = z.object({
 export type AdminFulfillmentView = z.infer<typeof adminFulfillmentViewSchema>
 
 export const adminOrderDetailSchema = adminOrderViewSchema.extend({
+  quoteBusinessNo: z.string().nullish(),
   observedAt: isoDateTime,
   items: z.array(adminOrderItemSchema),
   fulfillment: adminFulfillmentViewSchema.nullable(),
@@ -340,6 +344,8 @@ export const adminOrderDetailSchema = adminOrderViewSchema.extend({
 export type AdminOrderDetail = z.infer<typeof adminOrderDetailSchema>
 
 export const adminPaymentViewSchema = z.object({
+  orderBusinessNo: z.string().nullish(),
+  succeededReceiptBusinessNo: z.string().nullish(),
   paymentNo: z.string(),
   businessNo: z.string().nullish(),
   orderId: z.string(),
@@ -376,6 +382,8 @@ export const adminAttemptViewSchema = z.object({
 export type AdminAttemptView = z.infer<typeof adminAttemptViewSchema>
 
 export const adminReceiptViewSchema = z.object({
+  orderBusinessNo: z.string().nullish(),
+  paymentBusinessNo: z.string().nullish(),
   businessNo: z.string().nullish(),
   receiptNo: z.string(),
   paymentNo: z.string(),
@@ -398,6 +406,8 @@ export const adminReceiptDetailSchema = adminReceiptViewSchema.extend({ observed
 export type AdminReceiptDetail = z.infer<typeof adminReceiptDetailSchema>
 
 export const adminRefundViewSchema = z.object({
+  approvalBusinessNo: z.string().nullish(),
+  orderBusinessNo: z.string().nullish(),
   refundNo: z.string(),
   businessNo: z.string().nullish(),
   orderNo: z.string(),
@@ -475,6 +485,7 @@ export const adminJobViewSchema = z.object({
 export type AdminJobView = z.infer<typeof adminJobViewSchema>
 
 export const adminBusinessReferenceSchema = z.object({
+  businessNo: z.string().nullish(),
   resourceType: z.string(),
   resourceNo: z.string(),
 })
@@ -538,6 +549,9 @@ export const operationsSummarySchema = z.object({
 const operationsFactKind = z.enum(['NORMAL_RECEIPT', 'ABNORMAL_RECEIPT', 'NORMAL_REFUND', 'ABNORMAL_REFUND'])
 export type OperationsScope = z.infer<typeof operationsFactKind> | 'NET'
 export const operationsFinancialFactSchema = z.object({
+  orderBusinessNo: z.string().nullish(),
+  receiptBusinessNo: z.string().nullish(),
+  refundBusinessNo: z.string().nullish(),
   ledgerNo: z.string(), businessNo: z.string().nullish(), orderNo: z.string(), receiptNo: z.string(), refundNo: z.string().nullable(),
   kind: operationsFactKind, amount: z.number().int().positive(), currency: currencyCode, confirmedAt: isoDateTime,
 })

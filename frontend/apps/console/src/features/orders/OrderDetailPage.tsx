@@ -89,7 +89,7 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
             <div><dt>支付确认时间（北京时间）</dt><dd>{noPayment ? '无需支付' : formatBeijingTime(order.paidAt)}</dd></div>
             <div><dt>有效至（北京时间）</dt><dd>{formatBeijingTime(order.expiresAt)}</dd></div>
             <div><dt>会员 ID</dt><dd className="mono">{order.memberId}</dd></div>
-            <div><dt>报价编号</dt><dd><Link className="mono" to={`/quotes/${encodeURIComponent(order.quoteId)}`}>{order.quoteId}</Link></dd></div>
+            <div><dt>报价编号</dt><dd><Link className="mono" to={`/quotes/${encodeURIComponent(order.quoteId)}`}>{order.quoteBusinessNo ?? order.quoteId}</Link></dd></div>
             <div><dt>仓库 ID</dt><dd className="mono">{dash(order.warehouseId)}</dd></div>
           </dl>
           <details className="order-metadata">

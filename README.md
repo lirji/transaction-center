@@ -40,6 +40,12 @@ mvn verify
 
 需要 Java 21、Maven、Docker。测试使用 `mysql:8.4` 临时隔离容器，与 dev_infra 镜像标签一致；自动回收测试资源，不连接共享数据库、不执行共享实例故障注入。测试容器创建与首次初始化需要时间；没有 Docker 时测试应失败，不静默跳过数据库验收。`mvn -DskipTests package` 仅用于快速打包，不表示验收通过。
 
+## 运营业务编号
+
+V050 增加支付回调、退款回调和退款审批的运营编号。任务列表可用回调接收号查找，退款列表可用审批单号查找，新旧编号均可输入。订单、实收、支付、退款和资金总览优先显示所属单据的业务号；回调验签、历史密文、审批回执和任务关联继续使用原引用。
+
+历史补录使用 `scripts/backfill-business-numbers.py`，默认预览，按目标租户、数据集和游标分批执行。退款审批只补已有审批引用的退款单。
+
 ## 管理台前端
 
 运营 SPA 在 `frontend/apps/console`（Vite，`http://127.0.0.1:4180`，`/api` 代理到 `8400`）。登录走 Casdoor，令牌须 `aud=transaction-center`、`scope` 含 `trade.admin`、`tenant_id` 为正整数文本。详见 [frontend/apps/console/README.md](frontend/apps/console/README.md)。

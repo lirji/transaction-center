@@ -4,6 +4,7 @@ import com.lrj.trade.core.*;
 import com.lrj.trade.refund.mapper.RefundInboxMapper;
 import com.lrj.trade.refund.model.*;
 import java.security.*;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -21,11 +22,13 @@ public class RefundInboxService implements RefundEvidencePort,RefundCallbackPort
     private final EvidenceProtectionPort protector;
     private final JobSchedulerPort jobs;
     private final TransactionTemplate tx;
+    private final Clock clock;
 
     /** 接收使用独立短事务，处理由外层租约事务负责原子提交资金与处理标记。 */
     public RefundInboxService(RefundInboxMapper mapper,RefundService refunds,EvidenceProtectionPort protector,
-        JobSchedulerPort jobs,PlatformTransactionManager transactions) {
+        JobSchedulerPort jobs,PlatformTransactionManager transactions,Clock clock) {
         this.mapper=mapper; this.refunds=refunds; this.protector=protector; this.jobs=jobs;
+        this.clock=clock;
         this.tx=new TransactionTemplate(transactions); this.tx.setTimeout(10);
     }
 
@@ -54,16 +57,24 @@ public class RefundInboxService implements RefundEvidencePort,RefundCallbackPort
                 input.channelMerchantNo(),input.eventId(),facts,input.signatureVersion(),hash),raw);
         } finally { Arrays.fill(raw,(byte)0); }
         return tx.execute(status->{
-            mapper.insert(tenant,number,route.refundNo(),input.channelCode(),input.channelMerchantNo(),input.eventId(),
+            Instant now=clock.instant().truncatedTo(ChronoUnit.MILLIS);
+            List<RefundCallbackRecord> stored=List.of();
+            // 接收号与验签后的密文同事务写入；重放始终读取原事件和原绑定。
+            for(int attempt=0;attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS;attempt++) {
+                String businessNo=BusinessNumber.next(BusinessNumber.Type.REFUND_CALLBACK,now);
+                mapper.insert(tenant,number,route.refundNo(),input.channelCode(),input.channelMerchantNo(),input.eventId(),
                 input.merchantRefundNo(),input.kind().name(),input.providerTransactionNo(),input.providerRefundNo(),
-                input.amount(),input.currency(),occurred,hash,facts,encrypted.ciphertext(),encrypted.keyVersion(),input.signatureVersion());
-            var stored=mapper.lockEvent(tenant,input.channelCode(),input.channelMerchantNo(),input.eventId()).stream().findFirst()
-                .orElseThrow(()->new TradeException("REFUND_CALLBACK_FACT_CONFLICT","退款事件唯一键与租户冲突"));
-            if(!MessageDigest.isEqual(stored.payloadHash(),hash) || !stored.factHash().equals(facts)
-                || !stored.refundNo().equals(route.refundNo()))
+                input.amount(),input.currency(),occurred,hash,facts,encrypted.ciphertext(),encrypted.keyVersion(),input.signatureVersion(),businessNo,now);
+                stored=mapper.lockEvent(tenant,input.channelCode(),input.channelMerchantNo(),input.eventId());
+                if(!stored.isEmpty()) break;
+            }
+            if(stored.isEmpty()) throw new TradeException("REFUND_CALLBACK_FACT_CONFLICT","退款事件唯一键与租户冲突");
+            var row=stored.getFirst();
+            if(!MessageDigest.isEqual(row.payloadHash(),hash) || !row.factHash().equals(facts)
+                || !row.refundNo().equals(route.refundNo()))
                 throw new TradeException("REFUND_CALLBACK_FACT_CONFLICT","重复退款事件的原文或解析事实改变");
-            jobs.enqueue(tenant,JobType.REFUND_CALLBACK,stored.callbackNo());
-            return stored.callbackNo();
+            jobs.enqueue(tenant,JobType.REFUND_CALLBACK,row.callbackNo());
+            return row.callbackNo();
         });
     }
 

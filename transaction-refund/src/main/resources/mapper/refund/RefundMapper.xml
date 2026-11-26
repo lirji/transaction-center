@@ -12,12 +12,16 @@
     <arg column="approval_deadline" javaType="java.time.Instant"/>
     <arg column="version" javaType="_long"/>
     <arg column="business_no" javaType="java.lang.String"/>
+    <arg column="order_business_no" javaType="java.lang.String"/>
+    <arg column="approval_business_no" javaType="java.lang.String"/>
   </constructor></resultMap>
   <!-- 固定状态过滤命中ix_refund_state，不用OFFSET深翻页或逐行读取组件。 -->
   <select id="listQueue" resultMap="RefundQueueItem" useCache="false">
-    SELECT id,refund_no,order_no,amount,currency,status,approval_ref,approval_deadline,version,business_no
-    FROM tc_refund WHERE tenant_id=#{tenant} AND status=#{status} AND id &gt; #{after}
-    ORDER BY id LIMIT #{limit}
+    SELECT r.id,r.refund_no,r.order_no,r.amount,r.currency,r.status,r.approval_ref,r.approval_deadline,r.version,r.business_no,
+      o.business_no AS order_business_no,r.approval_business_no
+    FROM tc_refund r JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id
+    WHERE r.tenant_id=#{tenant} AND r.status=#{status} AND r.id &gt; #{after}
+    ORDER BY r.id LIMIT #{limit}
   </select>
   <update id="markExpired">UPDATE tc_refund SET status='EXPIRED',updated_at=#{now},version=version+1 WHERE tenant_id=#{tenant} AND refund_no=#{number} AND version=#{version} AND status='PENDING_APPROVAL' AND approval_deadline &lt;= #{now}</update>
   <resultMap id="RefundRow" type="com.lrj.trade.refund.model.RefundRow"><constructor>
@@ -70,7 +74,7 @@
   <!-- 已持订单和来源锁后读取永久收款关联，重放不能按新身份再创建。 -->
   <select id="lockCompensation" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND compensation_receipt_id=#{receipt} FOR UPDATE</select>
   <!-- 永久主体请求号去重，新插入尚不可见，资金/明细随后在同事务建立。 -->
-  <insert id="insertRefund">INSERT INTO tc_refund(tenant_id,refund_no,business_no,source_request_id,applicant_key,member_id,order_id,order_no,receipt_id,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,created_at,updated_at,compensation_receipt_id) VALUES(#{tenant},#{number},#{businessNo},#{request},#{actor},#{member},#{order},#{orderNo},#{receipt},#{receiptNo},#{merchantRefund},#{amount},#{currency},#{reason},#{hash},#{status},#{policyVersion},#{policyLimit},#{approval},#{deadline},#{now},#{now},#{compensation}) ON DUPLICATE KEY UPDATE id=tc_refund.id</insert>
+  <insert id="insertRefund">INSERT INTO tc_refund(tenant_id,refund_no,business_no,source_request_id,applicant_key,member_id,order_id,order_no,receipt_id,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_business_no,approval_deadline,created_at,updated_at,compensation_receipt_id) VALUES(#{tenant},#{number},#{businessNo},#{request},#{actor},#{member},#{order},#{orderNo},#{receipt},#{receiptNo},#{merchantRefund},#{amount},#{currency},#{reason},#{hash},#{status},#{policyVersion},#{policyLimit},#{approval},#{approvalBusinessNo},#{deadline},#{now},#{now},#{compensation}) ON DUPLICATE KEY UPDATE id=tc_refund.id</insert>
   <!-- 永久请求键占位后精确当前读，重放返回原聚合。 -->
   <select id="lockByRequest" resultMap="RefundRow" useCache="false">SELECT id AS refund_id,refund_no,applicant_key,member_id,order_id,order_no,receipt_no,merchant_refund_no,amount,currency,reason,request_hash,status,policy_version,policy_limit,approval_ref,approval_deadline,approval_decision_version,approval_actor_key,approval_decision,approval_evidence,provider_refund_no,version,created_at,business_no FROM tc_refund WHERE tenant_id=#{tenant} AND applicant_key=#{actor} AND source_request_id=#{request} FOR UPDATE</select>
   <!-- 只读归属或展示，不据此作状态转换。 -->

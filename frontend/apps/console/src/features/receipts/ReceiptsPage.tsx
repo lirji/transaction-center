@@ -32,8 +32,8 @@ export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
             <td>{formatMinorAmount(row.amount)}</td>
             <td>{row.currency}</td>
             <td>{row.channelCode}</td>
-            <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
-            <td><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentNo}</Link></td>
+            <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
+            <td><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentBusinessNo ?? row.paymentNo}</Link></td>
             <td>{formatBeijingTime(row.confirmedAt)}</td>
             <td>{formatMinorAmount(row.unreservedAmount)}</td>
           </tr>

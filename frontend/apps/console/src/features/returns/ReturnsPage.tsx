@@ -149,7 +149,7 @@ export function ReturnsPage() {
         description="可按申请号、订单或状态列出退货。点行读取详情后验收。申请本身不改变库存；验收后才产生实收事实。inspection.recordedAt 是登记时间，不是到货时间。"
       />
       {!canWrite ? <StateBanner tone="warn" title="当前令牌不能申请或验收退货" detail="仍可查询列表与详情。写入需要 trade.return.write。" /> : null}
-      <MutationBanner error={create.error ?? inspect.error} success={create.data ? `已申请 ${create.data.resourceNo}` : inspect.data ? `已验收 ${inspect.data.receiptNo}` : undefined} />
+      <MutationBanner error={create.error ?? inspect.error} success={create.data ? `已申请 ${create.data.resourceNo}` : inspect.data ? '已验收' : undefined} />
       <Panel>
         <h2>退货列表</h2>
         <FilterBar onSubmit={submitFilters}>
@@ -187,7 +187,7 @@ export function ReturnsPage() {
           {detail.data ? (
             <dl className="kv">
               <dt>申请</dt><dd className="mono">{detail.data.businessNo ?? detail.data.returnNo}</dd>
-              <dt>订单</dt><dd className="mono">{detail.data.orderNo}</dd>
+              <dt>订单</dt><dd className="mono">{detail.data.orderBusinessNo ?? detail.data.orderNo}</dd>
               <dt>会员</dt><dd className="mono">{detail.data.memberId}</dd>
               <dt>订单明细 ID</dt><dd className="mono">{detail.data.orderItemId}</dd><dt>仓库 ID</dt><dd className="mono">{detail.data.warehouseId}</dd>
               <dt>数量</dt><dd>{detail.data.quantity}</dd>

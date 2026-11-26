@@ -139,9 +139,9 @@ function FinancialFacts({ range, scope }: { range: OperationsRange; scope: Opera
                       <td>{financeLabels[row.kind]}</td>
                       <td>{displayAmount(row.amount)}</td>
                       <td>{row.currency}</td>
-                      <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderNo}</Link></td>
-                      <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`}>{row.receiptNo}</Link></td>
-                      <td>{row.refundNo ? <Link to={`/refunds/${encodeURIComponent(row.refundNo)}`}>{row.refundNo}</Link> : '—'}</td>
+                      <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderBusinessNo ?? row.orderNo}</Link></td>
+                      <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`}>{row.receiptBusinessNo ?? row.receiptNo}</Link></td>
+                      <td>{row.refundNo ? <Link to={`/refunds/${encodeURIComponent(row.refundNo)}`}>{row.refundBusinessNo ?? row.refundNo}</Link> : '—'}</td>
                       <td>{formatBeijingTime(row.confirmedAt)}</td>
                     </tr>
                   ))}
