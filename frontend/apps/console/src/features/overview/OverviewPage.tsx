@@ -6,6 +6,7 @@ import { api, ApiProblem } from '../../shared/api/client'
 import { merchantSchema } from '../../shared/api/schemas'
 import { useAuth } from '../../shared/auth/useAuth'
 import { formatBeijingTime } from '../../shared/ui/display'
+import { dispositionLabels } from '../receipts/receiptDisposition'
 
 const SAMPLE_LIMIT = 1
 const PENDING_REFUND = { status: 'PENDING_APPROVAL', limit: SAMPLE_LIMIT } as const
@@ -78,7 +79,7 @@ export function OverviewPage() {
             <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
             <tbody>
               <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}
-                describe={(item) => `${item.receiptNo} · ${item.disposition}`} />
+                describe={(item) => `${item.receiptNo} · ${dispositionLabels[item.disposition]}`} />
               <QueueRow label="待审批退款" href={`/refunds?status=${PENDING_REFUND.status}`} query={refunds}
                 describe={(item) => item.approvalDeadline
                   ? `${item.refundNo} · ${formatBeijingTime(item.approvalDeadline)}（北京时间）截止`

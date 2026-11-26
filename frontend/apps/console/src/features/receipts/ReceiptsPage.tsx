@@ -1,39 +1,41 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, PagePager, Panel } from '../../components/ui'
 import { api, type AdminReceiptView } from '../../shared/api/client'
-import { formatMinor } from '../../shared/api/money'
+import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseReceiptDispositionFilter, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
+import { formatBeijingTime } from '../../shared/ui/display'
 import { receiptDispositionSchema } from '../../shared/api/schemas'
+import { dispositionLabels } from './receiptDisposition'
 
 const DISPOSITIONS = receiptDispositionSchema.options
+const NORMAL_RECEIPT = receiptDispositionSchema.enum.NORMAL
 
 export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
   return (
-    <table className="data-table">
+    <table className="data-table receipt-table">
       <thead>
         <tr>
-          <th>实收</th><th>订单 / 支付</th><th>处置</th><th>金额</th><th>未占用</th>
+          <th>实收单号</th><th>实收分类</th><th>实收金额</th><th>币种</th><th>渠道</th>
+          <th>订单号</th><th>支付单号</th><th>确认时间（北京时间）</th><th>未占用金额</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.receiptNo}>
-            <td>
-              <Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} className="mono">{row.receiptNo}</Link>
-              <small className="mono">{row.channelCode}</small>
-            </td>
-            <td>
-              <Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link>
-              <small><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentNo}</Link></small>
-            </td>
-            <td><Badge tone={row.disposition === 'NORMAL' ? 'good' : 'warn'}>{row.disposition}</Badge></td>
-            <td>{formatMinor(row.amount, row.currency)}<small className="mono">{row.currency} {row.amount}</small></td>
-            <td>{formatMinor(row.unreservedAmount, row.currency)}<small>非退款授权</small></td>
+            <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} className="mono">{row.receiptNo}</Link></td>
+            <td><Badge tone={row.disposition === NORMAL_RECEIPT ? 'good' : 'warn'}>{dispositionLabels[row.disposition]}</Badge></td>
+            <td>{formatMinorAmount(row.amount)}</td>
+            <td>{row.currency}</td>
+            <td>{row.channelCode}</td>
+            <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
+            <td><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentNo}</Link></td>
+            <td>{formatBeijingTime(row.confirmedAt)}</td>
+            <td>{formatMinorAmount(row.unreservedAmount)}</td>
           </tr>
         ))}
       </tbody>
@@ -53,7 +55,7 @@ export function ReceiptsPage() {
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
   const [formError, setFormError] = useState('')
 
-  const conflict = abnormalOnly && disposition === 'NORMAL'
+  const conflict = abnormalOnly && disposition === NORMAL_RECEIPT
   const filters = {
     receiptNo: params.get('receiptNo') || undefined,
     paymentNo: params.get('paymentNo') || undefined,
@@ -64,7 +66,7 @@ export function ReceiptsPage() {
     createdFrom: params.get('createdFrom') || undefined,
     createdTo: params.get('createdTo') || undefined,
   }
-  const urlConflict = filters.abnormalOnly && filters.disposition === 'NORMAL'
+  const urlConflict = filters.abnormalOnly && filters.disposition === NORMAL_RECEIPT
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
 
   const query = useQuery({
@@ -73,6 +75,13 @@ export function ReceiptsPage() {
     retry: false,
     enabled: !urlConflict && !incompleteWindow,
   })
+
+  function applyPreset(onlyAbnormal: boolean) {
+    setFormError('')
+    setAbnormalOnly(onlyAbnormal)
+    setDisposition('')
+    apply({ ...filters, disposition: undefined, abnormalOnly: onlyAbnormal ? 'true' : undefined })
+  }
 
   function submit() {
     setFormError('')
@@ -99,17 +108,21 @@ export function ReceiptsPage() {
       <PageHeader
         eyebrow="Receipts"
         title="实收"
-        description="查询渠道实收。unreservedAmount 不是退款授权。abnormalOnly 与 disposition=NORMAL 互斥。"
+        description="查看渠道实际收款和异常分类。未占用金额用于核对资金，退款资格由退款流程判定。"
       />
       <Panel>
         <h2>筛选</h2>
+        <div className="queue-actions" role="group" aria-label="实收队列">
+          <Button aria-pressed={!filters.abnormalOnly && !filters.disposition} onClick={() => applyPreset(false)}>全部实收</Button>
+          <Button aria-pressed={Boolean(filters.abnormalOnly && !filters.disposition)} onClick={() => applyPreset(true)}>异常实收</Button>
+        </div>
         <FilterBar onSubmit={submit}>
-          <Field label="receiptNo"><input value={receiptNo} onChange={(event) => setReceiptNo(event.target.value)} /></Field>
-          <Field label="paymentNo"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
-          <Field label="orderNo"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="channelCode"><input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} /></Field>
-          <Field label="disposition"><EmptySelect value={disposition} onChange={setDisposition} options={DISPOSITIONS} /></Field>
-          <Field label="abnormalOnly" error={conflict ? '不能与 disposition=NORMAL 同时使用' : formError || undefined}>
+          <Field label="实收单号"><input value={receiptNo} onChange={(event) => setReceiptNo(event.target.value)} /></Field>
+          <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
+          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+          <Field label="渠道"><input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} /></Field>
+          <Field label="实收分类"><EmptySelect value={disposition} onChange={setDisposition} options={DISPOSITIONS} optionLabel={(value) => dispositionLabels[value as keyof typeof dispositionLabels]} /></Field>
+          <Field label="异常范围" error={conflict ? '仅异常与正常实收互斥' : formError || undefined}>
             <select value={abnormalOnly ? 'true' : ''} onChange={(event) => setAbnormalOnly(event.target.value === 'true')}>
               <option value="">否</option>
               <option value="true">仅异常</option>

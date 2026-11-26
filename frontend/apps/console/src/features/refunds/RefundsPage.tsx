@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Button, CursorPager, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type RefundQueueItem } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -11,20 +11,24 @@ import { FormValidationError, parseCurrencyCode, parseMemberId, parseTimeWindow 
 import { FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch } from '../../shared/ui/useAdminListSearch'
 import { RefundRows } from './RefundRows'
+import { refundLabels } from './refundStatus'
 
 const STATUSES = ['ALL', 'PENDING_APPROVAL', 'READY', 'SUBMITTED', 'SUCCEEDED', 'FAILED', 'REJECTED', 'EXPIRED'] as const
+const PRESETS = ['PENDING_APPROVAL', 'SUBMITTED', 'SUCCEEDED', 'EXPIRED', 'ALL'] as const
+const statusLabel = (value: typeof STATUSES[number]) => value === 'ALL' ? '全部' : refundLabels[value]
 
 export function RefundsPage() {
   const [params, setParams] = useSearchParams()
-  const status = (params.get('status') as typeof STATUSES[number] | null) || 'PENDING_APPROVAL'
+  const status = STATUSES.find((value) => value === params.get('status')) ?? 'PENDING_APPROVAL'
   const [after, setAfter] = useState(0)
   const [refundNo, setRefundNo] = useState(() => params.get('refundNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
-  const [currency, setCurrency] = useState('CNY')
-  const [limit, setLimit] = useState('')
+  const [policyOpen, setPolicyOpen] = useState(false)
+  const [currency, setCurrency] = useState<string>()
+  const [limit, setLimit] = useState<string>()
   const [formError, setFormError] = useState('')
   const [filterError, setFilterError] = useState('')
   const queryClient = useQueryClient()
@@ -42,7 +46,7 @@ export function RefundsPage() {
   })() : ''
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
 
-  const policy = useQuery({ queryKey: ['refund-policy'], queryFn: api.refundPolicy })
+  const policy = useQuery({ queryKey: ['refund-policy'], queryFn: api.refundPolicy, enabled: policyOpen, retry: false })
   const queue = useQuery({
     queryKey: ['refunds', after, filters],
     queryFn: () => api.refunds({ ...filters, after }),
@@ -51,9 +55,25 @@ export function RefundsPage() {
   })
   const update = useMutation({
     mutationFn: api.updateRefundPolicy,
-    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['refund-policy'] }) },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['refund-policy'] })
+      setCurrency(undefined)
+      setLimit(undefined)
+    },
     onError: (error) => void invalidateIfVersionConflict(queryClient, error, ['refund-policy']),
   })
+
+  const closePolicy = useCallback(() => {
+    if (!update.isPending) setPolicyOpen(false)
+  }, [update.isPending])
+
+  function openPolicy() {
+    update.reset()
+    setCurrency(undefined)
+    setLimit(undefined)
+    setFormError('')
+    setPolicyOpen(true)
+  }
 
   function submitPolicy(event: FormEvent) {
     event.preventDefault()
@@ -61,8 +81,8 @@ export function RefundsPage() {
     setFormError('')
     try {
       update.mutate({
-        currency: parseCurrencyCode(currency || policy.data.currency),
-        autoApproveLimit: parseInteger(limit || String(policy.data.autoApproveLimit), '自动批准额度', { min: 0 }),
+        currency: parseCurrencyCode(currency ?? policy.data.currency),
+        autoApproveLimit: parseInteger(limit ?? String(policy.data.autoApproveLimit), '自动批准额度', { min: 0 }),
         expectedVersion: policy.data.version,
       })
     } catch (cause) {
@@ -103,54 +123,59 @@ export function RefundsPage() {
       <PageHeader
         eyebrow="Refunds"
         title="退款"
-        description="队列只读。批准/拒绝需要 trade.refund.approval 与独立签收，本台不提供审批按钮。未配置政策时 version=0、autoApproveLimit=0，必须人工审批。查全部状态须显式选择 ALL。"
+        description="查询退款进度、审批截止时间及关联订单。"
+        actions={<Button onClick={openPolicy}>退款政策</Button>}
       />
-      <StateBanner tone="warn" title="不能在此批准退款" detail="OpenAPI 未向本控制台开放 approve/reject。展示金额为最小单位整数，不会改成可付动作。" />
-      <MutationBanner error={update.error} success={update.data ? `政策已更新，version=${update.data.version}` : undefined} />
-      <div className="page-grid">
-        <Panel>
-          <h2>退款政策</h2>
-          {policy.isLoading ? <StateBanner tone="loading" title="正在读取政策" detail="GET /admin/refund-policy" /> : null}
-          {policy.isError ? <StateBanner tone="error" title={describeProblem(policy.error).title} detail={describeProblem(policy.error).detail} /> : null}
-          {policy.data ? (
-            <StackForm onSubmit={submitPolicy} actions={<Button tone="primary" type="submit" disabled={update.isPending}>保存</Button>}>
-              <p>当前版本 {policy.data.version} · 自动批准额度 {formatMinor(policy.data.autoApproveLimit, policy.data.currency)}（展示换算，提交仍用整数）</p>
-              <Field label="币种"><input value={currency} placeholder={policy.data.currency} onChange={(event) => setCurrency(event.target.value)} /></Field>
-              <Field label="autoApproveLimit（最小单位）" error={formError}>
-                <input value={limit} placeholder={String(policy.data.autoApproveLimit)} onChange={(event) => setLimit(event.target.value)} />
-              </Field>
-            </StackForm>
-          ) : null}
-        </Panel>
+      <StateBanner tone="info" title="不能在此批准退款" detail="审批结果由独立审批流程签收，可在此查询退款进度。" />
+      <div className="section-gap">
         <Panel>
           <h2>筛选</h2>
+          <div className="queue-actions" role="group" aria-label="退款队列">
+            {PRESETS.map((value) => <Button key={value} aria-pressed={status === value} onClick={() => changeStatus(value)}>{statusLabel(value)}</Button>)}
+          </div>
           <FilterBar onSubmit={submitFilters}>
             <Field label="状态">
               <select value={status} onChange={(event) => changeStatus(event.target.value)}>
-                {STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+                {STATUSES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
               </select>
             </Field>
-            <Field label="refundNo"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
-            <Field label="orderNo"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-            <Field label="memberId"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+            <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
+            <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+            <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
             <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
           </FilterBar>
         </Panel>
+        <Panel className="table-panel">
+          {memberUrlError || incompleteWindow ? (
+            <p className="empty-state" style={{ minHeight: 120 }}>当前筛选无效，未向服务器发送请求。</p>
+          ) : (
+            <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
+              {(rows: RefundQueueItem[]) => (
+                <>
+                  <RefundRows rows={rows} />
+                  <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.cursor} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
+                </>
+              )}
+            </QueryGate>
+          )}
+        </Panel>
       </div>
-      <Panel className="table-panel">
-        {memberUrlError || incompleteWindow ? (
-          <p className="empty-state" style={{ minHeight: 120 }}>当前筛选无效，未向服务器发送请求。</p>
-        ) : (
-          <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
-            {(rows: RefundQueueItem[]) => (
-              <>
-                <RefundRows rows={rows} />
-                <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.cursor} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
-              </>
-            )}
-          </QueryGate>
-        )}
-      </Panel>
+      {policyOpen ? (
+        <Modal title="退款政策" description="设置同一订单的累计免审退款金额上限。额度为零时需审批。" onClose={closePolicy}>
+          {policy.isLoading ? <StateBanner tone="loading" title="正在读取政策" detail="请等待载入当前币种和额度。" /> : null}
+          {policy.isError ? <StateBanner tone="error" title={describeProblem(policy.error).title} detail={describeProblem(policy.error).detail} /> : null}
+          {policy.data ? (
+            <StackForm onSubmit={submitPolicy} actions={<Button tone="primary" type="submit" disabled={update.isPending || policy.isFetching}>保存政策</Button>}>
+              <MutationBanner error={update.error} success={update.data ? `政策已更新，版本 ${update.data.version}` : undefined} />
+              <p>当前版本 {policy.data.version} · 免审额度 {formatMinor(policy.data.autoApproveLimit, policy.data.currency)}</p>
+              <Field label="币种"><input value={currency ?? policy.data.currency} onChange={(event) => setCurrency(event.target.value)} /></Field>
+              <Field label="免审额度（最小单位）" error={formError}>
+                <input inputMode="numeric" value={limit ?? String(policy.data.autoApproveLimit)} onChange={(event) => setLimit(event.target.value)} />
+              </Field>
+            </StackForm>
+          ) : null}
+        </Modal>
+      ) : null}
     </div>
   )
 }

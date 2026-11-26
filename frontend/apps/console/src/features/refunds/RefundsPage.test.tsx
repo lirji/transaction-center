@@ -28,12 +28,13 @@ describe('RefundsPage', () => {
         currency: 'CNY',
         status: 'PENDING_APPROVAL',
         approvalRef: null,
-        approvalDeadline: null,
+        approvalDeadline: '2026-09-09T14:00:00Z',
         version: 1,
       }])
     })
     renderWithApp(<RefundsPage />, { route: '/refunds' })
     expect(await screen.findByText('RF-9')).toBeInTheDocument()
+    expect(screen.getByText('2026/09/09 22:00:00')).toBeInTheDocument()
     expect(screen.getByText('不能在此批准退款')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /批准|驳回|同意退款/ })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'RF-9' })).toHaveAttribute('href', '/refunds/RF-9')
@@ -53,6 +54,27 @@ describe('RefundsPage', () => {
     })
   })
 
+  it('loads the policy on demand and preserves its currency when editing the amount', async () => {
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockImplementation(async (input) => {
+      if (String(input).includes('refund-policy')) return json({ currency: 'USD', autoApproveLimit: 200, version: 1 })
+      return json([])
+    })
+    renderWithApp(<RefundsPage />, { route: '/refunds' })
+    await screen.findByText('队列为空')
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('refund-policy'))).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: '退款政策' }))
+    expect(await screen.findByLabelText('币种')).toHaveValue('USD')
+    const amount = screen.getByLabelText('免审额度（最小单位）')
+    await userEvent.clear(amount)
+    await userEvent.type(amount, '300')
+    await userEvent.click(screen.getByRole('button', { name: '保存政策' }))
+    await waitFor(() => {
+      const write = fetchMock.mock.calls.find(([, init]) => init?.method === 'PATCH')
+      expect(write?.[1]?.body).toBe(JSON.stringify({ currency: 'USD', autoApproveLimit: 300, expectedVersion: 1 }))
+    })
+  })
+
   it('shows an error when the refund policy cannot be loaded', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
       if (String(input).includes('refund-policy')) {
@@ -64,6 +86,7 @@ describe('RefundsPage', () => {
       return json([])
     })
     renderWithApp(<RefundsPage />)
+    await userEvent.click(screen.getByRole('button', { name: '退款政策' }))
     expect(await screen.findByText('入口暂不可用')).toBeInTheDocument()
     expect(screen.getByText(/政策不可用/)).toBeInTheDocument()
   })

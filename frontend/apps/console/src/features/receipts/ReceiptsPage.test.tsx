@@ -17,8 +17,8 @@ describe('ReceiptsPage', () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockResolvedValue(json(adminPage([])))
     renderWithApp(<ReceiptsPage />, { route: '/receipts' })
-    await userEvent.selectOptions(screen.getByLabelText('disposition'), 'NORMAL')
-    await userEvent.selectOptions(screen.getByLabelText('abnormalOnly'), 'true')
+    await userEvent.selectOptions(screen.getByLabelText('实收分类'), 'NORMAL')
+    await userEvent.selectOptions(screen.getByLabelText('异常范围'), 'true')
     await userEvent.click(screen.getByRole('button', { name: '查询' }))
     expect(await screen.findByText(/互斥/)).toBeInTheDocument()
     await waitFor(() => {

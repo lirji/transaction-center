@@ -48,6 +48,7 @@ export function EmptySelect({
   onChange,
   options,
   allowEmpty = true,
+  optionLabel,
   id,
   ...rest
 }: {
@@ -55,12 +56,13 @@ export function EmptySelect({
   onChange: (value: string) => void
   options: readonly string[]
   allowEmpty?: boolean
+  optionLabel?: (value: string) => string
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange' | 'value'>) {
   const items = useMemo(() => options, [options])
   return (
     <select id={id} value={value} onChange={(event) => onChange(event.target.value)} {...rest}>
       {allowEmpty ? <option value="">全部</option> : null}
-      {items.map((item) => <option key={item} value={item}>{item}</option>)}
+      {items.map((item) => <option key={item} value={item}>{optionLabel?.(item) ?? item}</option>)}
     </select>
   )
 }

@@ -120,6 +120,8 @@ main { min-width: 0; }
 .table-title { padding: 16px 18px 0; }
 .table-title + .data-table { min-width: 600px; }
 .table-title + .queue-table { min-width: 0; }
+.data-table.receipt-table { min-width: 1040px; }
+.data-table.refund-table { min-width: 820px; }
 .queue-table td { overflow-wrap: anywhere; }
 .queue-table td:last-child { white-space: nowrap; }
 .data-table { width: 100%; border-collapse: collapse; }

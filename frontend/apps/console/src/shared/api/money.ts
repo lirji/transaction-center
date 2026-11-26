@@ -23,11 +23,15 @@ export function parsePositiveId(raw: string, label: string): number {
   return parseInteger(raw, label, { min: 1, max: MAX_SAFE })
 }
 
-export function formatMinor(amount: number, currency: string): string {
-  if (!Number.isInteger(amount)) return `${currency} ${amount}`
-  const negative = amount < 0
+export function formatMinorAmount(amount: number): string {
+  if (!Number.isInteger(amount)) return String(amount)
   const abs = Math.abs(amount)
   const major = Math.trunc(abs / 100)
   const minor = String(abs % 100).padStart(2, '0')
-  return `${negative ? '-' : ''}${currency} ${major}.${minor}`
+  return `${amount < 0 ? '-' : ''}${major}.${minor}`
+}
+
+export function formatMinor(amount: number, currency: string): string {
+  if (!Number.isInteger(amount)) return `${currency} ${amount}`
+  return `${amount < 0 ? '-' : ''}${currency} ${formatMinorAmount(Math.abs(amount))}`
 }
