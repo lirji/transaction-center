@@ -745,6 +745,163 @@
         }
       }
     },
+    "/api/v1/trade/admin/products/search": {
+      "get": {
+        "operationId": "searchAdminProducts",
+        "summary": "按商品或 SKU 精确匹配后分页",
+        "responses": {
+          "200": {
+            "description": "成功；写命令重放返回同一资源引用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminProduct"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "失败，按code处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无效Bearer令牌"
+          },
+          "403": {
+            "description": "缺少管理权限或可信租户声明"
+          },
+          "404": {
+            "description": "失败，按code处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "失败，按code处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "失败，按code处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "失败，按code处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "失败，按code处理",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "管理读取繁忙，按 Retry-After 重试",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "productNo",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "skuNo",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "精确名称匹配。"
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DRAFT",
+                "PUBLISHED",
+                "OFFLINE"
+              ]
+            }
+          }
+        ],
+        "description": "当前签名租户内按条件取交集，每商品只返回一行，价格取主规格。需要 trade.admin。"
+      }
+    },
     "/api/v1/trade/admin/products": {
       "post": {
         "operationId": "createProduct",
@@ -2039,6 +2196,31 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "in": "query",
+            "name": "warehouseId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skuId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxAvailable",
+            "schema": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]{0,18})$"
+            },
+            "description": "非负整数上限，包含等于上限的记录。"
           }
         ],
         "description": "需要已验证JWT的scope包含trade.admin；tenant_id由签名声明提供，不接受调用方覆盖。"
@@ -2149,6 +2331,43 @@
               "maximum": 100,
               "default": 20
             }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "FROZEN"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "registeredFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "成对传入的会员注册时间，UTC毫秒精度，半开区间且最长90天。"
+          },
+          {
+            "in": "query",
+            "name": "registeredTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "成对传入的会员注册时间，UTC毫秒精度，半开区间且最长90天。"
           }
         ],
         "description": "需要scope包含trade.admin；租户由可信JWT确定。"
@@ -9643,6 +9862,63 @@
           "registeredAt",
           "everPaid",
           "version"
+        ],
+        "additionalProperties": false
+      },
+      "AdminProduct": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "skuId": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "PUBLISHED",
+              "OFFLINE"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unitPrice": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "publishedRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "productNo": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "productId",
+          "skuId",
+          "name",
+          "status",
+          "version",
+          "unitPrice",
+          "currency",
+          "publishedRevision",
+          "productNo"
         ],
         "additionalProperties": false
       },

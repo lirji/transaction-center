@@ -93,6 +93,40 @@ test('latest orders keep the same order across cursor pages', async ({ page }) =
   expect((await api(page, '/admin/orders?sort=member_id')).status).toBe(400)
 })
 
+test('product SKU, member registration, and available inventory filters read past the first page', async ({ page }) => {
+  await login(page, 'admin', '/products')
+  await expect(page.getByRole('cell', { name: 'INTEGRATION-P', exact: true })).toBeVisible()
+  const baseline = await api(page, '/admin/products?limit=1')
+  expect(baseline.status).toBe(200)
+  expect(baseline.body[0]).not.toHaveProperty('productNo')
+  const search = await api(page, '/admin/products/search?limit=1&skuNo=INTEGRATION-ALT-SECOND&status=DRAFT')
+  expect(search.status).toBe(200)
+  expect(search.body).toEqual([expect.objectContaining({ productId: data.alternateProduct, productNo: 'INTEGRATION-ALT', unitPrice: 900 })])
+  expect(search.body[0].productId).not.toBe(baseline.body[0].productId)
+  await page.getByLabel('按 SKU 编码').fill('INTEGRATION-ALT-SECOND')
+  await page.getByRole('button', { name: '查询', exact: true }).click()
+  await expect(page.getByRole('cell', { name: 'INTEGRATION-ALT', exact: true })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'INTEGRATION-P', exact: true })).toHaveCount(0)
+
+  const members = await api(page, `/admin/members?memberId=${data.memberId}`)
+  expect(members.status).toBe(200)
+  const registeredAt = Date.parse(members.body[0].registeredAt)
+  const at = (offset: number) => new Date(registeredAt + offset).toISOString()
+  expect((await api(page, `/admin/members?memberId=${data.memberId}&registeredFrom=${at(0)}&registeredTo=${at(1)}`)).body).toHaveLength(1)
+  expect((await api(page, `/admin/members?memberId=${data.memberId}&registeredFrom=${at(-1)}&registeredTo=${at(0)}`)).body).toEqual([])
+  expect((await api(page, `/admin/members?registeredFrom=${at(0)}`)).status).toBe(400)
+
+  const stockFilters = `warehouseId=${data.warehouseId}&skuId=${data.skuId}`
+  const stock = await api(page, `/admin/inventories?${stockFilters}`)
+  expect(stock.status).toBe(200)
+  expect(stock.body).toHaveLength(1)
+  const quantity = stock.body[0].available
+  expect(quantity).toBeGreaterThan(0)
+  expect((await api(page, `/admin/inventories?${stockFilters}&maxAvailable=${quantity}`)).body).toEqual(stock.body)
+  expect((await api(page, `/admin/inventories?${stockFilters}&maxAvailable=0`)).body).toEqual([])
+  expect((await api(page, '/admin/inventories?maxAvailable=-1')).status).toBe(400)
+})
+
 test('real member freeze/unfreeze writes and tenant-safe database reads', async ({ page }) => {
   await login(page, 'admin', '/members')
   const row = page.getByRole('row').filter({ hasText: '联调会员' })
@@ -152,7 +186,8 @@ test('ordinary admin scope denial and genuine rate-limit response', async ({ pag
   const statuses = await page.evaluate(async () => {
     const key = Object.keys(sessionStorage).find((key) => key.startsWith('oidc.user:'))!
     const token = JSON.parse(sessionStorage.getItem(key)!).access_token
-    return Promise.all(Array.from({ length: 500 }, async () => {
+    // 隔离环境每租户每秒允许 30 次读取，用短突发覆盖真实 HTTP 限流。
+    return Promise.all(Array.from({ length: 80 }, async () => {
       const response = await fetch('/api/v1/trade/admin/orders?limit=1', { headers: { Authorization: `Bearer ${token}` } })
       await response.text()
       return response.status
@@ -165,4 +200,7 @@ test('another tenant sees no seeded orders and cannot drill into them', async ({
   await login(page, 'other')
   expect((await api(page, '/admin/orders')).body.items).toEqual([])
   expect((await api(page, `/admin/orders/${data.paidOrder}`)).status).toBe(404)
+  expect((await api(page, '/admin/products/search?skuNo=INTEGRATION-ALT-SECOND')).body).toEqual([])
+  expect((await api(page, `/admin/members?memberId=${data.memberId}`)).body).toEqual([])
+  expect((await api(page, `/admin/inventories?warehouseId=${data.warehouseId}&skuId=${data.skuId}`)).body).toEqual([])
 })

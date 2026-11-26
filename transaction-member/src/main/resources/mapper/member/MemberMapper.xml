@@ -100,6 +100,16 @@
     ]]>
   </select>
 
+  <select id="listAdminMembers" resultMap="Member" useCache="false" timeout="3">
+    SELECT m.id AS memberId,m.display_name AS displayName,m.status AS status,m.registered_at AS registeredAt,f.ever_paid AS everPaid,m.version AS version
+    FROM tc_member m JOIN tc_member_trade_fact f ON f.tenant_id=m.tenant_id AND f.member_id=m.id
+    WHERE m.tenant_id=#{tenant} AND m.id &gt; #{q.after}
+    <if test="q.filters.memberId != null">AND m.id=#{q.filters.memberId}</if>
+    <if test="q.filters.status != null">AND m.status=#{q.filters.status}</if>
+    <if test="q.filters.registeredFrom != null">AND m.registered_at &gt;= #{q.filters.registeredFrom} AND m.registered_at &lt; #{q.filters.registeredTo}</if>
+    ORDER BY m.id LIMIT #{q.limit}
+  </select>
+
   <!-- 查找不可变条款版本，未发布版本返回空列表。 -->
   <select id="findConsentDocumentIds" resultType="java.lang.Long" useCache="false">
     <![CDATA[

@@ -50,7 +50,7 @@ describe('MembersPage', () => {
     renderWithApp(<MembersPage />)
     await screen.findByText('林若')
     await userEvent.click(screen.getByRole('button', { name: '冻结' }))
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: '风险核查' } })
+    fireEvent.change(screen.getByLabelText('原因'), { target: { value: '风险核查' } })
     await userEvent.click(screen.getByRole('button', { name: '提交' }))
     await waitFor(() => {
       const post = fetchMock.mock.calls.find((call) => String(call[0]).includes(':change-status'))

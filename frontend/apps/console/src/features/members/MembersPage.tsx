@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type Member } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -8,22 +8,37 @@ import { isVersionConflict } from '../../shared/api/client'
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_ADMIN_EVIDENCE_READ } from '../../shared/auth/auth-context'
 import { parseBeijingInput } from '../../shared/api/businessTime'
-import { FormValidationError, parseMemberId } from '../../shared/api/validate'
+import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
 import { dash, formatBeijingTime } from '../../shared/ui/display'
+
+import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
+import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
 
 const MEMBER_FROZEN = 'FROZEN'
 const MEMBER_ACTIVE = 'ACTIVE'
+const MEMBER_STATUS_LABELS: Record<string, string> = { [MEMBER_ACTIVE]: '正常', [MEMBER_FROZEN]: '冻结' }
 
 export function MembersPage() {
   const auth = useAuth()
   const canEvidence = auth.hasScope(TRADE_ADMIN_EVIDENCE_READ)
-  const [after, setAfter] = useState(0)
+  const { params, after, apply, setAfter } = useAdminListSearch()
+  const filters = {
+    memberId: params.get('memberId') || undefined,
+    status: params.get('status') || undefined,
+    registeredFrom: params.get('registeredFrom') || undefined,
+    registeredTo: params.get('registeredTo') || undefined,
+  }
+  const [memberFilter, setMemberFilter] = useState(filters.memberId ?? '')
+  const [statusFilter, setStatusFilter] = useState(filters.status ?? '')
+  const [registeredFrom, setRegisteredFrom] = useState(() => isoFromSearch(params, 'registeredFrom'))
+  const [registeredTo, setRegisteredTo] = useState(() => isoFromSearch(params, 'registeredTo'))
+  const [filterError, setFilterError] = useState('')
   const [evidenceMember, setEvidenceMember] = useState('')
   const [selected, setSelected] = useState<Member>()
   const [reason, setReason] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['members', after], queryFn: () => api.members(after) })
+  const query = useQuery({ queryKey: ['members', after, filters], queryFn: () => api.members({ after, ...filters }) })
   const change = useMutation({
     mutationFn: (payload: { member: Member; targetStatus: 'ACTIVE' | 'FROZEN'; reason: string }) =>
       api.changeMemberStatus(payload.member.memberId, {
@@ -47,8 +62,28 @@ export function MembersPage() {
         description="查询会员注册与支付事实，按需冻结、解冻或评估资格。"
       />
       <MutationBanner error={change.error} success={change.isSuccess ? `已提交状态变更，resourceId=${change.data?.resourceId}` : undefined} />
+      <FilterBar onSubmit={() => {
+        setFilterError('')
+        try {
+          const window = parseTimeWindow(registeredFrom, registeredTo)
+          apply({
+            memberId: memberFilter.trim() ? parseMemberId(memberFilter, '会员 ID') : undefined,
+            status: statusFilter, registeredFrom: window?.createdFrom, registeredTo: window?.createdTo,
+          })
+        } catch (cause) {
+          setFilterError(cause instanceof Error ? cause.message : '筛选无效')
+        }
+      }}>
+        <Field label="会员 ID"><input value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} inputMode="numeric" /></Field>
+        <Field label="会员状态">
+          <EmptySelect value={statusFilter} onChange={setStatusFilter} options={Object.keys(MEMBER_STATUS_LABELS)}
+            optionLabel={(value) => MEMBER_STATUS_LABELS[value]} />
+        </Field>
+        <TimeRangeFields labelPrefix="注册" from={registeredFrom} to={registeredTo} onFrom={setRegisteredFrom} onTo={setRegisteredTo} />
+      </FilterBar>
+      {filterError ? <StateBanner tone="warn" title="筛选条件无效" detail={filterError} /> : null}
       <Panel className="table-panel">
-        <QueryGate query={query} emptyTitle="没有会员" emptyDetail="当前租户没有返回会员。若你期望看到演示数据，JWT tenant_id 必须是 900001。">
+        <QueryGate query={query} emptyTitle="没有会员" emptyDetail="当前条件没有匹配的会员。">
           {(rows) => (
             <>
               <table className="data-table trade-list-table">
@@ -58,7 +93,7 @@ export function MembersPage() {
                     <tr key={row.memberId}>
                       <td>{row.displayName}</td>
                       <td className="mono">{row.memberId}</td>
-                      <td><Badge tone={row.status === MEMBER_FROZEN ? 'danger' : 'good'}>{row.status === MEMBER_FROZEN ? '冻结' : row.status === MEMBER_ACTIVE ? '正常' : row.status}</Badge></td>
+                      <td><Badge tone={row.status === MEMBER_FROZEN ? 'danger' : 'good'}>{MEMBER_STATUS_LABELS[row.status] ?? row.status}</Badge></td>
                       <td>{formatBeijingTime(row.registeredAt)}</td>
                       <td>{row.everPaid ? '是' : '否'}</td>
                       <td className="mono">{row.version}</td>
@@ -75,7 +110,7 @@ export function MembersPage() {
                   ))}
                 </tbody>
               </table>
-              <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.memberId} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
+              <PagePager after={after} nextAfter={rows.at(-1)?.memberId ?? null} hasMore={rows.length === 20} onReset={() => setAfter('0')} onNext={setAfter} />
             </>
           )}
         </QueryGate>

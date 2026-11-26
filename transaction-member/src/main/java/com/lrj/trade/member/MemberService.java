@@ -1,5 +1,6 @@
 package com.lrj.trade.member;
 
+import com.lrj.trade.core.query.AdminQuery;
 import com.lrj.trade.core.*;
 import java.util.List;
 import com.lrj.trade.member.mapper.MemberMapper;
@@ -16,6 +17,12 @@ public class MemberService implements MemberTradingPort {
     private final Outbox outbox;
     private final AuditWriter audit;
     private final java.time.Clock clock;
+    /** 管理端按已校验条件读取当前租户数据，保留原交易入口查询。 */
+    public List<Member> adminList(long tenant,AdminQuery query) {
+        Checks.positive(tenant);
+        return mapper.listAdminMembers(tenant,query);
+    }
+
     /** 注册和消费空事实使用相同事务，防止会员存在而首单判断无锁定行。 */
     public MemberService(MemberMapper mapper, Commands commands, Outbox outbox, AuditWriter audit,java.time.Clock clock) {
         this.mapper=mapper; this.commands = commands; this.outbox = outbox; this.audit=audit; this.clock=clock;

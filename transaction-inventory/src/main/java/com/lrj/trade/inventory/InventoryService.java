@@ -1,5 +1,6 @@
 package com.lrj.trade.inventory;
 
+import com.lrj.trade.core.query.AdminQuery;
 import com.lrj.trade.catalog.CatalogPort;
 import com.lrj.trade.core.*;
 import java.util.List;
@@ -17,6 +18,12 @@ public class InventoryService implements InventoryTradingPort {
     private final CatalogPort catalog;
     private final Outbox outbox;
     private final InventoryEventWriter events;
+    /** 管理端按已校验条件读取当前租户数据，保留原交易入口查询。 */
+    public List<Balance> adminList(long tenant,AdminQuery query) {
+        Checks.positive(tenant);
+        return mapper.listAdminBalances(tenant,query);
+    }
+
     /** 通过商品公开端口校验SKU，不跨领域访问商品数据表。 */
     public InventoryService(InventoryMapper mapper,Commands commands,CatalogPort catalog,Outbox outbox,InventoryEventWriter events,HotSkuAdmission admission) {
         this.mapper=mapper; this.commands=commands; this.catalog=catalog; this.outbox=outbox; this.events=events; this.admission=admission;

@@ -1,5 +1,6 @@
 package com.lrj.trade.catalog.mapper;
 
+import com.lrj.trade.core.query.AdminQuery;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -42,4 +43,7 @@ public interface CatalogMapper {
     Integer countEligibleSku(@Param("tenant") long tenant, @Param("skuId") long skuId, @Param("published") boolean published);
     /** 仅CAS失败后当前锁读，区分不存在、过期版本与状态冲突。 */
     List<Long> lockMutationVersion(@Param("tenant") long tenant,@Param("productId") long productId);
+    /** 管理查询在本租户的完整数据范围执行筛选，先过滤再按主键分页。 */
+    List<AdminProduct> listAdminProducts(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+
 }

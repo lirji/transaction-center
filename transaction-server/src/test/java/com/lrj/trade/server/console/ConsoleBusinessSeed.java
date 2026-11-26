@@ -35,6 +35,9 @@ public final class ConsoleBusinessSeed {
         bean(MerchantService.class).create(operator,"seed-merchant","INTEGRATION","隔离联调商户");
         String product=bean(CatalogService.class).create(operator,"seed-product","INTEGRATION-P","联调商品","INTEGRATION-S",10000,"CNY");
         bean(CatalogService.class).publish(operator,"seed-publish",Long.parseLong(product),0);
+        String alternate=bean(CatalogService.class).create(operator,"seed-alternate","INTEGRATION-ALT","联调副规格商品","INTEGRATION-ALT-MAIN",900,"CNY");
+        bean(SkuService.class).add(operator,"seed-secondary-sku",Long.parseLong(alternate),0,"INTEGRATION-ALT-SECOND",1100,"CNY","PHYSICAL",Map.of());
+        data.put("alternateProduct",alternate);
         String sku=bean(CatalogService.class).list(900001,0,100,true).stream().filter(p->p.productId().equals(product)).findFirst().orElseThrow().skuId();
         long warehouse=Long.parseLong(bean(InventoryService.class).warehouse(operator,"seed-warehouse","INTEGRATION-W","联调仓库"));
         bean(InventoryService.class).adjust(operator,"seed-stock",warehouse,Long.parseLong(sku),100,"联调种子库存");

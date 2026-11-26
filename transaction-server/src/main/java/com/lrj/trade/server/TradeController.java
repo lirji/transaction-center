@@ -6,6 +6,7 @@ import com.lrj.trade.inventory.model.Warehouse;
 
 import com.lrj.trade.inventory.model.Balance;
 
+import com.lrj.trade.catalog.model.AdminProduct;
 import com.lrj.trade.catalog.model.Product;
 
 import com.lrj.trade.member.model.Document;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
 /** 首批HTTP适配层；会员与租户只能来自已经验签的JWT声明。 */
@@ -92,9 +94,8 @@ public class TradeController {
     }
     /** 后台会员列表不返回认证主体详情。 */
     @GetMapping("/admin/members")
-    public List<Member> members(@AuthenticationPrincipal Jwt jwt,@RequestParam(defaultValue="0") long after,
-            @RequestParam(defaultValue="20") int limit) {
-        return member.list(actor(jwt).tenantId(),after,limit);
+    public List<Member> members(@AuthenticationPrincipal Jwt jwt,@RequestParam MultiValueMap<String,String> params) {
+        return member.adminList(actor(jwt).tenantId(),AdminQueryParameters.parse("member",params));
     }
     /** 状态操作在服务内校验租户、版本及合法状态，HTTP层另需管理作用域。 */
     @PostMapping("/admin/members/{id}:change-status")
@@ -171,6 +172,12 @@ public class TradeController {
             @RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="20") int limit) {
         return catalog.list(actor(jwt).tenantId(),after,limit,true);
     }
+    /** 管理搜索增加商品编号投影，保留原商品列表的严格响应协议。 */
+    @AdminRead
+    @GetMapping("/admin/products/search")
+    public List<AdminProduct> searchAdminProducts(@AuthenticationPrincipal Jwt jwt,@RequestParam MultiValueMap<String,String> params) {
+        return catalog.adminList(actor(jwt).tenantId(),AdminQueryParameters.parse("product",params));
+    }
     /** 仓库独立于库存余额创建，避免把库存初始化误当仓库存在。 */
     @PostMapping("/admin/warehouses")
     public Resource warehouse(@AuthenticationPrincipal Jwt jwt,@RequestHeader("Idempotency-Key") String key,@RequestBody WarehouseInput body) {
@@ -195,9 +202,8 @@ public class TradeController {
     }
     /** 查询只能展示余额，不能通过GET隐式修复或释放库存。 */
     @GetMapping("/admin/inventories")
-    public List<Balance> balances(@AuthenticationPrincipal Jwt jwt,
-            @RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="20") int limit) {
-        return inventory.balances(actor(jwt).tenantId(),after,limit);
+    public List<Balance> balances(@AuthenticationPrincipal Jwt jwt,@RequestParam MultiValueMap<String,String> params) {
+        return inventory.adminList(actor(jwt).tenantId(),AdminQueryParameters.parse("inventory",params));
     }
     /** 指定商品版本添加规格，不能编辑线上商品，也不能改变其他规格。 */
     @PostMapping("/admin/products/{id}/skus")

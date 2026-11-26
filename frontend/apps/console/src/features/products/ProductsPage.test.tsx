@@ -22,6 +22,7 @@ describe('ProductsPage', () => {
       if (String(input).includes('/admin/products') && (init as RequestInit | undefined)?.method === 'POST') {
         rows = [{
           productId: '9',
+          productNo: 'P-1',
           skuId: '1',
           name: '演示茶',
           status: 'DRAFT',

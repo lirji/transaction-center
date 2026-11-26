@@ -15,6 +15,20 @@
     </constructor>
   </resultMap>
 
+  <resultMap id="AdminProduct" type="com.lrj.trade.catalog.model.AdminProduct" autoMapping="false">
+    <constructor>
+      <arg column="productId" javaType="java.lang.String"/>
+      <arg column="skuId" javaType="java.lang.String"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="version" javaType="_long"/>
+      <arg column="unitPrice" javaType="_long"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="publishedRevision" javaType="java.lang.Long"/>
+      <arg column="productNo" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
   <!-- 新增商品草稿，商品业务编号在租户内唯一。 -->
   <insert id="insertProduct">
     <![CDATA[
@@ -85,6 +99,22 @@
       AND s.id=(SELECT MIN(s2.id) FROM tc_sku s2 WHERE s2.tenant_id=p.tenant_id AND s2.product_id=p.id)
       ORDER BY p.id LIMIT #{limit}
     ]]>
+  </select>
+
+  <!-- 规格编码匹配所有规格；列表价格仍取主规格，避免分页重复。 -->
+  <select id="listAdminProducts" resultMap="AdminProduct" useCache="false" timeout="3">
+    SELECT p.id AS productId,s.id AS skuId,p.name AS name,p.status AS status,p.version AS version,
+      s.unit_price AS unitPrice,s.currency AS currency,p.published_revision AS publishedRevision,p.product_no AS productNo
+    FROM tc_product p JOIN tc_sku s ON s.tenant_id=p.tenant_id AND s.product_id=p.id
+    WHERE p.tenant_id=#{tenant} AND p.id &gt; #{q.after}
+      AND s.id=(SELECT MIN(primary_sku.id) FROM tc_sku primary_sku WHERE primary_sku.tenant_id=p.tenant_id AND primary_sku.product_id=p.id)
+    <if test="q.filters.productNo != null">AND p.product_no=#{q.filters.productNo}</if>
+    <if test="q.filters.name != null">AND p.name=#{q.filters.name}</if>
+    <if test="q.filters.status != null">AND p.status=#{q.filters.status}</if>
+    <if test="q.filters.skuNo != null">
+      AND EXISTS (SELECT 1 FROM tc_sku match_sku WHERE match_sku.tenant_id=p.tenant_id AND match_sku.product_id=p.id AND match_sku.sku_no=#{q.filters.skuNo})
+    </if>
+    ORDER BY p.id LIMIT #{q.limit}
   </select>
 
   <!-- 读取主规格展示视图，会员只允许读取已发布商品。 -->

@@ -1,5 +1,6 @@
 package com.lrj.trade.catalog;
 
+import com.lrj.trade.core.query.AdminQuery;
 import com.lrj.trade.core.*;
 import java.util.List;
 import com.lrj.trade.catalog.mapper.CatalogMapper;
@@ -13,6 +14,12 @@ public class CatalogService implements CatalogPort {
     private final Commands commands;
     private final CatalogCachePort cache;
     private final Outbox outbox;
+    /** 管理端按已校验条件读取当前租户数据，保留原交易入口查询。 */
+    public List<AdminProduct> adminList(long tenant,AdminQuery query) {
+        Checks.positive(tenant);
+        return mapper.listAdminProducts(tenant,query);
+    }
+
     /** 商品写命令统一经过事务幂等执行器。 */
     public CatalogService(CatalogMapper mapper, Commands commands, Outbox outbox,CatalogCachePort cache) {
         this.mapper=mapper; this.commands=commands; this.outbox=outbox; this.cache=cache;

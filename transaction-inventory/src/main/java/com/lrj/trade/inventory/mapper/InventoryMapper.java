@@ -1,5 +1,6 @@
 package com.lrj.trade.inventory.mapper;
 
+import com.lrj.trade.core.query.AdminQuery;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -54,4 +55,7 @@ public interface InventoryMapper {
 
     /** 追加库存守恒流水，必须与余额修改共同提交。 */
     int insertLedger(@Param("tenant") long tenant, @Param("operationRef") String operationRef, @Param("warehouseId") long warehouseId, @Param("skuId") long skuId, @Param("operationType") String operationType, @Param("availableDelta") long availableDelta, @Param("reservedDelta") long reservedDelta, @Param("soldDelta") long soldDelta, @Param("totalDelta") long totalDelta, @Param("reason") String reason, @Param("actorKey") String actorKey);
+    /** 管理查询在本租户的完整数据范围执行筛选，先过滤再按主键分页。 */
+    List<Balance> listAdminBalances(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+
 }

@@ -7,6 +7,7 @@ import java.util.*;
 /** 解析后的不可变查询条件；SQL只消费白名单字段，绝不拼接调用方列名。 */
 public record AdminQuery(long after,int limit,Instant createdFrom,Instant createdTo,Map<String,Object> filters,int fetchLimit) {
     private static final Set<String> COMMON=Set.of("after","limit","createdFrom","createdTo");
+    private static final int MAX_QUERY_NAME=200;
     private static final Duration MAX_WINDOW=Duration.ofDays(90);
     /** 业务时间字段按资源显式传入，公共解析器不接受任意列名。 */
     public record WindowKeys(String from,String to) {
@@ -46,9 +47,10 @@ public record AdminQuery(long after,int limit,Instant createdFrom,Instant create
                     Set<String> choices=allowed.get(key);
                     if(!choices.isEmpty() && !choices.contains(value)) throw invalid();
                     if(key.endsWith("Id")) filters.put(key,number(value,false));
+                    else if(key.equals("maxAvailable")) filters.put(key,number(value,true));
                     else if(key.equals("abnormalOnly") || key.equals("leaseExpired")) {
                         if(!Set.of("true","false").contains(value)) throw invalid();filters.put(key,Boolean.valueOf(value));
-                    } else { text(value,64);filters.put(key,value); }
+                    } else { text(value,key.equals("name")?MAX_QUERY_NAME:64);filters.put(key,value); }
                 }
             }
         }

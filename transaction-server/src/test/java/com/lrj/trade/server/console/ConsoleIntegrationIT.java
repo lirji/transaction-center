@@ -41,7 +41,7 @@ class ConsoleIntegrationIT {
         r.add("trade.address.key-base64",()->Base64.getEncoder().encodeToString(new byte[32]));r.add("trade.address.key-version",()->"isolated-test");
         r.add("trade.callback.active-key-version",()->"isolated-test");r.add("trade.callback.keys",()->"isolated-test:"+Base64.getEncoder().encodeToString(new byte[32]));
         r.add("trade.admin-evidence.enabled",()->"true");r.add("trade.admin-query.concurrency",()->"8");r.add("trade.admin-query.tenant-concurrency",()->"8");
-        r.add("trade.admin-query.tenant-rate",()->"100");r.add("trade.fulfillment.enabled",()->"true");
+        r.add("trade.admin-query.tenant-rate",()->"30");r.add("trade.fulfillment.enabled",()->"true");
         r.add("trade.fulfillment.allowed-return-actor-keys",()->Checks.hash(IDENTITY.issuer(),"admin")+","+Checks.hash(IDENTITY.issuer(),"diagnostic"));
         r.add("trade.fulfillment.allowed-delivery-actor-keys",()->Checks.hash(IDENTITY.issuer(),"admin"));
         r.add("trade.fulfillment.allowed-completion-actor-keys",()->Checks.hash(IDENTITY.issuer(),"admin"));

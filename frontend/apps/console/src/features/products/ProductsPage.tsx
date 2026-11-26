@@ -1,17 +1,29 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Badge, Button, CursorPager, Field, PageHeader, Panel, StackForm } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, PagePager, Panel, StackForm } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { formatMinorAmount, parseInteger } from '../../shared/api/money'
 import { parseCurrencyCode } from '../../shared/api/validate'
 
+import { EmptySelect, FilterBar } from '../../shared/ui/FilterBar'
+import { useAdminListSearch } from '../../shared/ui/useAdminListSearch'
 import { productStatusSchema } from '../../shared/api/schemas'
 import { productStatusLabels } from './productDisplay'
 
 export function ProductsPage() {
-  const [after, setAfter] = useState(0)
+  const { params, after, apply, setAfter } = useAdminListSearch()
+  const filters = {
+    productNo: params.get('productNo') || undefined,
+    skuNo: params.get('skuNo') || undefined,
+    name: params.get('name') || undefined,
+    status: params.get('status') || undefined,
+  }
+  const [productNoFilter, setProductNoFilter] = useState(filters.productNo ?? '')
+  const [skuNoFilter, setSkuNoFilter] = useState(filters.skuNo ?? '')
+  const [nameFilter, setNameFilter] = useState(filters.name ?? '')
+  const [statusFilter, setStatusFilter] = useState(filters.status ?? '')
   const [productNo, setProductNo] = useState('')
   const [name, setName] = useState('')
   const [skuNo, setSkuNo] = useState('')
@@ -19,11 +31,11 @@ export function ProductsPage() {
   const [currency, setCurrency] = useState('CNY')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['products', after], queryFn: () => api.products(after) })
+  const query = useQuery({ queryKey: ['products', after, filters], queryFn: () => api.searchProducts({ after, ...filters }) })
   const create = useMutation({
     mutationFn: api.createProduct,
     onSuccess: async () => {
-      setAfter(0)
+      setAfter('0')
       setProductNo('')
       setName('')
       setSkuNo('')
@@ -55,19 +67,31 @@ export function ProductsPage() {
         title="商品"
         description="查询商品目录价和发布状态。在商品详情查看 SKU、草稿及发布修订。"
       />
+      <FilterBar onSubmit={() => apply({
+        productNo: productNoFilter.trim(), skuNo: skuNoFilter.trim(), name: nameFilter.trim(), status: statusFilter,
+      })}>
+        <Field label="按商品编号"><input value={productNoFilter} onChange={(event) => setProductNoFilter(event.target.value)} maxLength={64} /></Field>
+        <Field label="按 SKU 编码"><input value={skuNoFilter} onChange={(event) => setSkuNoFilter(event.target.value)} maxLength={64} /></Field>
+        <Field label="按商品名称（精确）"><input value={nameFilter} onChange={(event) => setNameFilter(event.target.value)} maxLength={200} /></Field>
+        <Field label="发布状态">
+          <EmptySelect value={statusFilter} onChange={setStatusFilter} options={productStatusSchema.options}
+            optionLabel={(value) => productStatusLabels[productStatusSchema.parse(value)]} />
+        </Field>
+      </FilterBar>
       <div className="section-gap">
         <Panel className="table-panel">
-          <QueryGate query={query} emptyTitle="没有商品" emptyDetail="当前租户没有商品草稿或已发布记录。">
+          <QueryGate query={query} emptyTitle="没有商品" emptyDetail="当前条件没有匹配的商品。">
             {(rows) => (
               <>
                 <table className="data-table trade-list-table">
-                  <thead><tr><th>商品名称</th><th>商品 ID</th><th>主 SKU ID</th><th>发布状态</th><th>目录价</th><th>币种</th><th>发布修订</th><th>版本</th></tr></thead>
+                  <thead><tr><th>商品名称</th><th>商品编号</th><th>商品 ID</th><th>主 SKU ID</th><th>发布状态</th><th>目录价</th><th>币种</th><th>发布修订</th><th>版本</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.productId}>
                         <td>
                           <Link to={`/products/${row.productId}`}><strong>{row.name}</strong></Link>
                         </td>
+                        <td className="mono">{row.productNo}</td>
                         <td className="mono">{row.productId}</td>
                         <td className="mono">{row.skuId}</td>
                         <td><Badge tone={row.status === productStatusSchema.enum.PUBLISHED ? 'good' : row.status === productStatusSchema.enum.OFFLINE ? 'neutral' : 'warn'}>{productStatusLabels[row.status]}</Badge></td>
@@ -79,7 +103,7 @@ export function ProductsPage() {
                     ))}
                   </tbody>
                 </table>
-                <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.productId} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
+                <PagePager after={after} nextAfter={rows.at(-1)?.productId ?? null} hasMore={rows.length === 20} onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}
           </QueryGate>

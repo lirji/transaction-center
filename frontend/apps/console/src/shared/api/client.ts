@@ -32,6 +32,7 @@ import {
   parseArray,
   parsePage,
   parseWith,
+  adminProductSchema,
   productSchema,
   reconciliationCaseSchema,
   reconciliationOperationSchema,
@@ -233,8 +234,8 @@ export function describeProblem(error: unknown): { title: string; detail: string
 const admin = '/api/v1/trade/admin'
 
 export const api = {
-  members: (after = 0, limit = 20) =>
-    request(`${admin}/members${cursorQuery(after, limit)}`, undefined, (value) => parseArray(memberSchema, value)),
+  members: (query: { after?: string; limit?: number; memberId?: string; status?: string; registeredFrom?: string; registeredTo?: string } = {}) =>
+    request(`${admin}/members${pageQuery(query)}`, undefined, (value) => parseArray(memberSchema, value)),
   changeMemberStatus: (id: string, body: { expectedVersion: number; targetStatus: 'ACTIVE' | 'FROZEN'; reason: string }) =>
     request(`${admin}/members/${encodeURIComponent(id)}:change-status`, {
       method: 'POST',
@@ -265,8 +266,8 @@ export const api = {
       body: JSON.stringify(body),
     }, (value) => parseWith(resourceSchema, value)),
 
-  products: (after = 0, limit = 20) =>
-    request(`${admin}/products${cursorQuery(after, limit)}`, undefined, (value) => parseArray(productSchema, value)),
+  searchProducts: (query: { after?: string; limit?: number; productNo?: string; skuNo?: string; name?: string; status?: string } = {}) =>
+    request(`${admin}/products/search${pageQuery(query)}`, undefined, (value) => parseArray(adminProductSchema, value)),
   product: (id: string) =>
     request(`${admin}/products/${encodeURIComponent(id)}`, undefined, (value) => parseWith(productSchema, value)),
   createProduct: (body: { productNo: string; name: string; skuNo: string; unitPrice: number; currency: string }) =>
@@ -316,8 +317,8 @@ export const api = {
       headers: commandHeaders(`warehouse:${body.warehouseNo}`, body),
       body: JSON.stringify(body),
     }, (value) => parseWith(resourceSchema, value)),
-  inventories: (after = 0, limit = 20) =>
-    request(`${admin}/inventories${cursorQuery(after, limit)}`, undefined, (value) => parseArray(balanceSchema, value)),
+  inventories: (query: { after?: string; limit?: number; warehouseId?: string; skuId?: string; maxAvailable?: string } = {}) =>
+    request(`${admin}/inventories${pageQuery(query)}`, undefined, (value) => parseArray(balanceSchema, value)),
   inventoryLedgers: (warehouseId: number, skuId: number, after = 0, limit = 20) =>
     request(`${admin}/inventory-ledgers${cursorQuery(after, limit)}&warehouseId=${warehouseId}&skuId=${skuId}`, undefined, (value) => parseArray(ledgerEntrySchema, value)),
   adjustInventory: (body: { warehouseId: number; skuId: number; delta: number; reason: string }) =>

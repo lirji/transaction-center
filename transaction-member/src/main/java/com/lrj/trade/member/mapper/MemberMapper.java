@@ -1,5 +1,6 @@
 package com.lrj.trade.member.mapper;
 
+import com.lrj.trade.core.query.AdminQuery;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -52,4 +53,7 @@ public interface MemberMapper {
 
     /** 锁定可信身份所属会员，避免冻结与新交易并发穿透。 */
     List<LockedMember> lockOwn(@Param("tenant") long tenant, @Param("identityHash") String identityHash, @Param("issuer") String issuer, @Param("subject") String subject);
+    /** 管理查询在本租户的完整数据范围执行筛选，先过滤再按主键分页。 */
+    List<Member> listAdminMembers(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+
 }

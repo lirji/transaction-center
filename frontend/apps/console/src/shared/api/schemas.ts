@@ -59,6 +59,7 @@ export const productSchema = z.object({
   publishedRevision: z.number().int().nullable(),
 })
 export type Product = z.infer<typeof productSchema>
+export const adminProductSchema = productSchema.extend({ productNo: z.string() })
 
 export const stockTypeSchema = z.enum(['PHYSICAL', 'SERVICE'])
 export const specificationSchema = z.record(z.string(), z.string())

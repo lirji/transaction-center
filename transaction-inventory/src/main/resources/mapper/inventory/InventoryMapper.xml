@@ -133,6 +133,15 @@
     ]]>
   </select>
 
+  <select id="listAdminBalances" resultMap="Balance" useCache="false" timeout="3">
+    SELECT id AS id,warehouse_id AS warehouseId,sku_id AS skuId,stock_total AS stockTotal,available AS available,reserved AS reserved,sold AS sold,version AS version
+    FROM tc_inventory_balance WHERE tenant_id=#{tenant} AND id &gt; #{q.after}
+    <if test="q.filters.warehouseId != null">AND warehouse_id=#{q.filters.warehouseId}</if>
+    <if test="q.filters.skuId != null">AND sku_id=#{q.filters.skuId}</if>
+    <if test="q.filters.maxAvailable != null">AND available &lt;= #{q.filters.maxAvailable}</if>
+    ORDER BY id LIMIT #{q.limit}
+  </select>
+
   <!-- 租户内有界分页仓库，前端无需硬编码编号。 -->
   <select id="listWarehouses" resultMap="Warehouse" useCache="false">
     <![CDATA[

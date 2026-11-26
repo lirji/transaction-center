@@ -1,14 +1,26 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, CursorPager, Field, PageHeader, Panel, StackForm } from '../../components/ui'
+import { Button, ConfirmDialog, CursorPager, Field, PageHeader, PagePager, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseInteger, parsePositiveId } from '../../shared/api/money'
+import { parseMemberId } from '../../shared/api/validate'
+import { FilterBar } from '../../shared/ui/FilterBar'
+import { useAdminListSearch } from '../../shared/ui/useAdminListSearch'
 import { formatBeijingTime } from '../../shared/ui/display'
 
 export function InventoryPage() {
   const [whAfter, setWhAfter] = useState(0)
-  const [balAfter, setBalAfter] = useState(0)
+  const { params, after: balAfter, apply, setAfter: setBalAfter } = useAdminListSearch()
+  const balanceFilters = {
+    warehouseId: params.get('warehouseId') || undefined,
+    skuId: params.get('skuId') || undefined,
+    maxAvailable: params.get('maxAvailable') || undefined,
+  }
+  const [warehouseFilter, setWarehouseFilter] = useState(balanceFilters.warehouseId ?? '')
+  const [skuFilter, setSkuFilter] = useState(balanceFilters.skuId ?? '')
+  const [availableFilter, setAvailableFilter] = useState(balanceFilters.maxAvailable ?? '')
+  const [balanceError, setBalanceError] = useState('')
   const [warehouseNo, setWarehouseNo] = useState('')
   const [warehouseName, setWarehouseName] = useState('')
   const [adjWarehouse, setAdjWarehouse] = useState('')
@@ -24,7 +36,7 @@ export function InventoryPage() {
   const [confirmAdjust, setConfirmAdjust] = useState(false)
   const queryClient = useQueryClient()
   const warehouses = useQuery({ queryKey: ['warehouses', whAfter], queryFn: () => api.warehouses(whAfter) })
-  const balances = useQuery({ queryKey: ['inventories', balAfter], queryFn: () => api.inventories(balAfter) })
+  const balances = useQuery({ queryKey: ['inventories', balAfter, balanceFilters], queryFn: () => api.inventories({ after: balAfter, ...balanceFilters }) })
   const ledgers = useQuery({
     queryKey: ['ledgers', ledgerSelection, ledgerAfter],
     queryFn: () => ledgerSelection
@@ -110,10 +122,28 @@ export function InventoryPage() {
         description="先核对库存余额和预占，再按仓库与 SKU 查看流水或登记盘点调整。"
       />
       <MutationBanner error={createWh.error ?? adjust.error} success={createWh.data || adjust.data ? `resourceId=${(createWh.data ?? adjust.data)?.resourceId}` : undefined} />
+      <FilterBar onSubmit={() => {
+        setBalanceError('')
+        try {
+          const available = availableFilter.trim()
+          apply({
+            warehouseId: warehouseFilter.trim() ? parseMemberId(warehouseFilter, '仓库 ID') : undefined,
+            skuId: skuFilter.trim() ? parseMemberId(skuFilter, 'SKU ID') : undefined,
+            maxAvailable: available ? String(parseInteger(available, '可售数量上限', { min: 0 })) : undefined,
+          })
+        } catch (cause) {
+          setBalanceError(cause instanceof Error ? cause.message : '筛选无效')
+        }
+      }}>
+        <Field label="按仓库 ID"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} inputMode="numeric" /></Field>
+        <Field label="按 SKU ID"><input value={skuFilter} onChange={(event) => setSkuFilter(event.target.value)} inputMode="numeric" /></Field>
+        <Field label="可售数量上限"><input value={availableFilter} onChange={(event) => setAvailableFilter(event.target.value)} inputMode="numeric" /></Field>
+      </FilterBar>
+      {balanceError ? <StateBanner tone="warn" title="筛选条件无效" detail={balanceError} /> : null}
       <div className="section-gap">
         <Panel className="table-panel">
           <h2 className="table-title">库存余额</h2>
-          <QueryGate query={balances} emptyTitle="没有余额行" emptyDetail="余额在盘点或出入库后才会出现。">
+          <QueryGate query={balances} emptyTitle="没有余额行" emptyDetail="当前条件没有匹配的库存余额。">
             {(rows) => (
               <>
                 <table className="data-table">
@@ -135,7 +165,7 @@ export function InventoryPage() {
                     ))}
                   </tbody>
                 </table>
-                <CursorPager after={balAfter} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setBalAfter(0)} onNext={setBalAfter} />
+                <PagePager after={balAfter} nextAfter={rows.at(-1)?.id ?? null} hasMore={rows.length === 20} onReset={() => setBalAfter('0')} onNext={setBalAfter} />
               </>
             )}
           </QueryGate>
