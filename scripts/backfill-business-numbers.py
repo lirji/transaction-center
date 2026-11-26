@@ -20,6 +20,10 @@ class Dataset:
     iso_timestamp: bool = False
     partition_column: Optional[str] = None
     numeric_primary_key: Optional[bool] = None
+    number_column: str = "business_no"
+    condition: Optional[str] = None
+    skip_unknown_date: bool = False
+    max_key_length: int = 64
 
     @property
     def key_is_numeric(self):
@@ -60,8 +64,37 @@ DATASETS = {
     "marketing-referral-rewards": Dataset("mk_referral_reward", "reward_id", "MKT-RWD", False),
     "marketing-funding": Dataset("mk_promotion_application", "application_id", "MKT-FAP", False, iso_timestamp=True),
     "marketing-ledger": Dataset("mk_funding_ledger", "ledger_id", "MKT-LED", False, "occurred_at", True),
+    "trade-payment-callbacks": Dataset("tc_payment_callback", "id", "TRD-PCB", True),
+    "trade-refund-callbacks": Dataset("tc_refund_callback", "id", "TRD-RCB", True),
+    "trade-refund-approvals": Dataset("tc_refund", "id", "TRD-APR", True,
+                                     number_column="approval_business_no", condition="approval_ref IS NOT NULL"),
+    "commerce-budgets": Dataset("marketing_budget", "budget_id", "COM-BGT", False,
+                                """COALESCE(business_created_at,(SELECT c.created_at FROM marketing_campaign c
+                                   WHERE c.tenant_id=marketing_budget.tenant_id
+                                     AND c.campaign_id=marketing_budget.campaign_id AND c.version=marketing_budget.version))""",
+                                skip_unknown_date=True),
+    "commerce-segment-runs": Dataset("marketing_segment_run", "run_id", "COM-SRN", False, "started_at"),
+    "commerce-journey-instances": Dataset("journey_instance", "instance_id", "COM-JIN", False,
+                                """COALESCE(business_created_at,(SELECT e.created_at FROM journey_effect e
+                                   WHERE e.tenant_id=journey_instance.tenant_id AND e.kind='ENROLLED'
+                                     AND e.effect_id=SHA2(CONCAT('entry/',journey_instance.journey_id,'/',
+                                         journey_instance.journey_version,'/',journey_instance.event_key),256)))""",
+                                skip_unknown_date=True),
+    "marketing-segments": Dataset("mk_segment_definition", "segment_id", "MKT-SEG", False,
+                                  iso_timestamp=True, condition="version_no=1", max_key_length=128),
+    "marketing-event-receipts": Dataset("mk_event_receipt", "receipt_id", "MKT-EVT", False, "ingested_at", True),
+    "marketing-quarantine": Dataset("mk_quarantine", "quarantine_id", "MKT-QTN", False, iso_timestamp=True),
+    "marketing-contacts": Dataset("mk_contact_attempt", "contact_id", "MKT-CNT", False,
+                                  """COALESCE(created_at,(SELECT MIN(o.created_at) FROM mk_engagement_outbox o
+                                     WHERE o.tenant_id=mk_contact_attempt.tenant_id AND o.contact_id=mk_contact_attempt.contact_id
+                                       AND o.event_type='ContactRequested'))""", True, skip_unknown_date=True),
+    "marketing-release-manifests": Dataset("mk_release_manifest", "manifest_id", "MKT-MNF", False, iso_timestamp=True),
+    "marketing-quotes": Dataset("mk_decision_command", "idempotency_key", "MKT-QTE", False,
+                               "JSON_UNQUOTE(JSON_EXTRACT(trace_json,'$.createdAt'))", True,
+                               condition="quote_ref IS NOT NULL AND expires_at>DATE_FORMAT(UTC_TIMESTAMP(6),'%Y-%m-%dT%H:%i:%s.%fZ')",
+                               skip_unknown_date=True, max_key_length=128),
 }
-IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]+")
 POSITIVE_ID = re.compile(r"[1-9][0-9]{0,19}")
 BUSINESS_DAY = re.compile(r"[0-9]{6}")
 SUFFIX_SPACE = 10_000_000_000
@@ -77,13 +110,13 @@ class MysqlError(RuntimeError):
         super().__init__(f"MySQL operation failed ({self.number or 'connection or client error'})")
 
 
-def sql_identifier(value, numeric=False):
+def sql_identifier(value, numeric=False, max_length=64):
     """编号来自已验证的主键和租户，文本输入禁止引号与转义字符。"""
     if numeric:
         if not POSITIVE_ID.fullmatch(value) or int(value) > 2**64 - 1:
             raise ValueError("numeric ID is outside the unsigned database range")
         return value
-    if not IDENTIFIER.fullmatch(value):
+    if len(value) > max_length or not IDENTIFIER.fullmatch(value):
         raise ValueError("text ID has an invalid format")
     return f"'{value}'"
 
@@ -101,18 +134,19 @@ def mysql(args, query):
 
 def read_batch(args, dataset, scope, after):
     """按租户和原生主键游标分页，重跑时已编号记录自然退出。"""
-    lower = f" AND {dataset.primary_key}>{sql_identifier(after, dataset.key_is_numeric)}" if after else ""
+    lower = f" AND {dataset.primary_key}>{sql_identifier(after, dataset.key_is_numeric, dataset.max_key_length)}" if after else ""
     timestamp = dataset.timestamp_column
     if dataset.iso_timestamp:
         # 营销表保存 ISO-8601 UTC 字符串，解析秒及之前的信息足以计算业务日。
         timestamp = f"CAST(REPLACE(LEFT({timestamp},19),'T',' ') AS DATETIME)"
+    known_date = f" AND {timestamp} IS NOT NULL" if dataset.skip_unknown_date else ""
     query = (f"SELECT {dataset.primary_key}, DATE_FORMAT({timestamp} + INTERVAL 8 HOUR, '%y%m%d') "
-             f"FROM {dataset.table} WHERE {scope}{lower} AND business_no IS NULL "
+             f"FROM {dataset.table} WHERE {scope}{lower} AND {dataset.number_column} IS NULL{known_date} "
              f"ORDER BY {dataset.primary_key} LIMIT {args.batch_size};")
     rows = []
     for line in mysql(args, query):
         identifier, date = line.split("\t")
-        sql_identifier(identifier, dataset.key_is_numeric)
+        sql_identifier(identifier, dataset.key_is_numeric, dataset.max_key_length)
         if not BUSINESS_DAY.fullmatch(date):
             raise ValueError("one stored record has an invalid business day")
         rows.append((identifier, date))
@@ -122,14 +156,14 @@ def read_batch(args, dataset, scope, after):
 def fill_batch(args, dataset, scope, rows):
     """只有一次原子 UPDATE，唯一号碰撞回滚这一批后重新选号。"""
     key = dataset.primary_key
-    identifiers = [sql_identifier(identifier, dataset.key_is_numeric) for identifier, _ in rows]
+    identifiers = [sql_identifier(identifier, dataset.key_is_numeric, dataset.max_key_length) for identifier, _ in rows]
     for attempt in range(COLLISION_RETRIES):
         mappings = [
             f"WHEN {identifier} THEN '{dataset.prefix}-{date}-{secrets.randbelow(SUFFIX_SPACE):010d}'"
             for identifier, (_, date) in zip(identifiers, rows)
         ]
-        query = (f"UPDATE {dataset.table} SET business_no=CASE {key} {' '.join(mappings)} END "
-                 f"WHERE {scope} AND {key} IN ({','.join(identifiers)}) AND business_no IS NULL; "
+        query = (f"UPDATE {dataset.table} SET {dataset.number_column}=CASE {key} {' '.join(mappings)} END "
+                 f"WHERE {scope} AND {key} IN ({','.join(identifiers)}) AND {dataset.number_column} IS NULL; "
                  "SELECT ROW_COUNT();")
         try:
             return int(mysql(args, query)[0])
@@ -169,6 +203,8 @@ def main():
             scope += f" AND {dataset.partition_column}={sql_identifier(args.partition)}"
         elif args.partition:
             parser.error("--partition is only supported by partitioned datasets")
+        if dataset.condition:
+            scope += f" AND ({dataset.condition})"
         after = args.after
         for _ in range(args.max_batches if args.apply else 1):
             rows = read_batch(args, dataset, scope, after)
