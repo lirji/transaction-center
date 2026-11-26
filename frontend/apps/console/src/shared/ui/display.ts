@@ -8,3 +8,13 @@ export function statusTone(status: string): 'good' | 'warn' | 'danger' | 'neutra
   if (['PENDING_PAYMENT', 'CLOSING', 'PENDING', 'PENDING_APPROVAL', 'REVIEW', 'UNKNOWN', 'READY', 'OPEN', 'RUNNING'].includes(status)) return 'warn'
   return 'neutral'
 }
+
+const beijingTime = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+})
+
+export function formatBeijingTime(value: string | null | undefined) {
+  const timestamp = value ? Date.parse(value) : Number.NaN
+  return Number.isNaN(timestamp) ? '—' : beijingTime.format(timestamp)
+}

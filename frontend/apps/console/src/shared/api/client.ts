@@ -98,7 +98,7 @@ export class ApiProblem extends Error {
   readonly retryable?: boolean
   readonly traceId?: string
 
-  constructor(readonly failure: Failure, status: number) {
+  constructor(readonly failure: Failure, status: number, readonly retryAfterSeconds?: number) {
     super(failure.message)
     this.name = 'ApiProblem'
     this.status = status
@@ -152,7 +152,9 @@ async function request<T>(path: string, init: RequestInit | undefined, parse: (v
     if (!response.ok) {
       const raw = await response.json().catch(() => undefined)
       const parsed = failureSchema.safeParse(raw)
-      throw new ApiProblem(parsed.success ? parsed.data : fallbackFailure(response.status, response.statusText), response.status)
+      const retryAfter = response.headers.get('Retry-After')
+      const retryAfterSeconds = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : undefined
+      throw new ApiProblem(parsed.success ? parsed.data : fallbackFailure(response.status, response.statusText), response.status, retryAfterSeconds)
     }
     if (response.status === 204) return undefined as T
     const text = await response.text()
@@ -187,7 +189,7 @@ export function describeProblem(error: unknown): { title: string; detail: string
   }
   if (error.status === 429) {
     const trace = error.traceId ? ` traceId=${error.traceId}` : ''
-    return { title: '管理查询繁忙', detail: `${error.message} 约 1 秒后重试，不要自动连打。${trace}` }
+    return { title: '管理查询繁忙', detail: `${error.message} 请在 ${error.retryAfterSeconds ?? 1} 秒后重试。${trace}` }
   }
   if (error.status === 503 && error.code === 'EVIDENCE_DISABLED') {
     const trace = error.traceId ? ` traceId=${error.traceId}` : ''
@@ -332,8 +334,8 @@ export const api = {
       headers: commandHeaders(`refund-policy:${body.expectedVersion}`, body, body.expectedVersion),
       body: JSON.stringify(body),
     }, (value) => parseWith(refundPolicySchema, value)),
-  refunds: (query: RefundQueueQuery = {}) =>
-    request(`${admin}/refunds${refundQueueQuery(query)}`, undefined, (value) => parseArray(refundQueueItemSchema, value)),
+  refunds: (query: RefundQueueQuery = {}, signal?: AbortSignal) =>
+    request(`${admin}/refunds${refundQueueQuery(query)}`, { signal }, (value) => parseArray(refundQueueItemSchema, value)),
   refund: (refundNo: string) =>
     request(`${admin}/refunds/${encodeURIComponent(refundNo)}`, undefined, (value) => parseWith(adminRefundDetailSchema, value)),
 
@@ -353,8 +355,8 @@ export const api = {
       body: JSON.stringify(body),
     }, (value) => parseWith(resourceSchema, value)),
 
-  returns: (query: Record<string, QueryScalar> = {}) =>
-    request(`${admin}/returns${pageQuery(query)}`, undefined, (value) => parsePage(adminReturnViewSchema, value)),
+  returns: (query: Record<string, QueryScalar> = {}, signal?: AbortSignal) =>
+    request(`${admin}/returns${pageQuery(query)}`, { signal }, (value) => parsePage(adminReturnViewSchema, value)),
   returnByNo: (returnNo: string) =>
     request(`${admin}/returns/${encodeURIComponent(returnNo)}`, undefined, (value) => parseWith(adminReturnDetailSchema, value)),
   createReturn: (body: { orderItemId: string; warehouseId: string; quantity: number }) =>
@@ -403,14 +405,14 @@ export const api = {
     request(`${admin}/orders${pageQuery(query)}`, undefined, (value) => parsePage(adminOrderViewSchema, value)),
   order: (orderNo: string) =>
     request(`${admin}/orders/${encodeURIComponent(orderNo)}`, undefined, (value) => parseWith(adminOrderDetailSchema, value)),
-  payments: (query: Record<string, QueryScalar> = {}) =>
-    request(`${admin}/payments${pageQuery(query)}`, undefined, (value) => parsePage(adminPaymentViewSchema, value)),
+  payments: (query: Record<string, QueryScalar> = {}, signal?: AbortSignal) =>
+    request(`${admin}/payments${pageQuery(query)}`, { signal }, (value) => parsePage(adminPaymentViewSchema, value)),
   payment: (paymentNo: string) =>
     request(`${admin}/payments/${encodeURIComponent(paymentNo)}`, undefined, (value) => parseWith(adminPaymentDetailSchema, value)),
   paymentAttempts: (paymentNo: string, query: Record<string, QueryScalar> = {}) =>
     request(`${admin}/payments/${encodeURIComponent(paymentNo)}/attempts${pageQuery(query)}`, undefined, (value) => parsePage(adminAttemptViewSchema, value)),
-  paymentReceipts: (query: Record<string, QueryScalar> = {}) =>
-    request(`${admin}/payment-receipts${pageQuery(query)}`, undefined, (value) => parsePage(adminReceiptViewSchema, value)),
+  paymentReceipts: (query: Record<string, QueryScalar> = {}, signal?: AbortSignal) =>
+    request(`${admin}/payment-receipts${pageQuery(query)}`, { signal }, (value) => parsePage(adminReceiptViewSchema, value)),
   paymentReceipt: (receiptNo: string) =>
     request(`${admin}/payment-receipts/${encodeURIComponent(receiptNo)}`, undefined, (value) => parseWith(adminReceiptDetailSchema, value)),
   quotes: (query: Record<string, QueryScalar> = {}) =>
@@ -421,8 +423,8 @@ export const api = {
     request(`${admin}/jobs${pageQuery(query)}`, undefined, (value) => parsePage(adminJobViewSchema, value)),
   job: (jobId: string) =>
     request(`${admin}/jobs/${encodeURIComponent(jobId)}`, undefined, (value) => parseWith(adminJobDetailSchema, value)),
-  orderReferralEvidence: (orderNo: string) =>
-    request(`${admin}/orders/${encodeURIComponent(orderNo)}/referral-evidence`, undefined, (value) => parseWith(adminOrderEvidenceSchema, value)),
+  orderReferralEvidence: (orderNo: string, signal?: AbortSignal) =>
+    request(`${admin}/orders/${encodeURIComponent(orderNo)}/referral-evidence`, { signal }, (value) => parseWith(adminOrderEvidenceSchema, value)),
   queryMemberEligibility: (memberId: string, body: { policyVersion: 'REGISTERED_DURING_CAMPAIGN_V1' | 'NEVER_CONFIRMED_PAID_V1'; campaignStartAt?: string; evaluatedAt?: string }) =>
     request(`${admin}/members/${encodeURIComponent(memberId)}/eligibility:query`, {
       method: 'POST',

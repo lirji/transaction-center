@@ -3,13 +3,13 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { Button, EmptyState, StateBanner } from '../../components/ui'
 import { ApiProblem, describeProblem, isVersionConflict } from '../api/client'
 
-function QueryError({ query }: { query: UseQueryResult<unknown> }) {
+export function QueryError({ query }: { query: UseQueryResult<unknown> }) {
   const problem = describeProblem(query.error)
-  const retryable = query.error instanceof ApiProblem && query.error.status === 429
+  const retryable = query.error instanceof ApiProblem && query.error.retryable
   return (
     <>
       <StateBanner tone="error" title={problem.title} detail={problem.detail} />
-      {retryable ? <div className="pager"><Button onClick={() => void query.refetch()}>重试</Button></div> : null}
+      {retryable ? <div className="pager"><Button disabled={query.isFetching} onClick={() => void query.refetch()}>重试</Button></div> : null}
     </>
   )
 }

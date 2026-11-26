@@ -1,5 +1,26 @@
 import { test, expect } from '@playwright/test'
 
+const order = {
+  orderId: '1',
+  orderNo: 'ORD-1',
+  memberId: '11',
+  quoteId: 'Q-1',
+  merchantNo: 'M-1',
+  warehouseId: null,
+  status: 'PAID',
+  financialStatus: 'PAID',
+  payableAmount: 199,
+  currency: 'CNY',
+  expiresAt: '2026-09-09T00:00:00Z',
+  paidAt: '2026-09-08T01:00:00Z',
+  completedAt: null,
+  createdAt: '2026-09-08T00:00:00Z',
+  version: 1,
+  paymentStartedAt: '2026-09-08T00:30:00Z',
+  cancelledAt: null,
+  updatedAt: '2026-09-08T01:00:00Z',
+}
+
 test.describe('transaction console', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/v1/trade/**', async (route) => {
@@ -44,26 +65,7 @@ test.describe('transaction console', () => {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            items: url.match(/\/admin\/orders(\?|$)/) ? [{
-              orderId: '1',
-              orderNo: 'ORD-1',
-              memberId: '11',
-              quoteId: 'Q-1',
-              merchantNo: 'M-1',
-              warehouseId: null,
-              status: 'PAID',
-              financialStatus: 'PAID',
-              payableAmount: 199,
-              currency: 'CNY',
-              expiresAt: '2026-09-09T00:00:00Z',
-              paidAt: '2026-09-08T01:00:00Z',
-              completedAt: null,
-              createdAt: '2026-09-08T00:00:00Z',
-              version: 1,
-              paymentStartedAt: '2026-09-08T00:30:00Z',
-              cancelledAt: null,
-              updatedAt: '2026-09-08T01:00:00Z',
-            }] : [],
+            items: url.match(/\/admin\/orders(\?|$)/) ? [order] : [],
             nextAfter: null,
             hasMore: false,
             observedAt: '2026-09-08T12:00:00Z',
@@ -95,4 +97,37 @@ test.describe('transaction console', () => {
     await expect(page.getByRole('heading', { name: '订单' })).toBeVisible()
     await expect(page.getByText('ORD-1')).toBeVisible()
   })
+
+  test('loads only the active order section and keeps the list query after a retry', async ({ page }) => {
+    const requests: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname.includes('/admin/')) requests.push(url.pathname.split('/admin/')[1])
+    })
+    await page.route('**/api/v1/trade/admin/orders/ORD-1', (route) => route.fulfill({
+      json: { ...order, observedAt: order.updatedAt, items: [], fulfillment: null },
+    }))
+    let refuseRefundRead = true
+    await page.route('**/api/v1/trade/admin/refunds?*', async (route) => {
+      await route.fulfill(refuseRefundRead ? {
+        status: 429,
+        headers: { 'Retry-After': '3' },
+        json: { code: 'ADMIN_QUERY_BUSY', message: '管理查询繁忙', traceId: 't', retryable: true },
+      } : { json: [] })
+    })
+    await page.goto('/orders?status=PAID&after=10')
+    await page.getByRole('link', { name: 'ORD-1', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '冻结商品' })).toBeVisible()
+    expect(requests).toEqual(['orders', 'orders/ORD-1'])
+    await page.getByRole('button', { name: '退款', exact: true }).click()
+    await expect(page.getByText(/3 秒后重试/)).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'ORD-1', exact: true })).toBeVisible()
+    refuseRefundRead = false
+    await page.getByRole('button', { name: '重试', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '本单无退款' })).toBeVisible()
+    expect([...new Set(requests)]).toEqual(['orders', 'orders/ORD-1', 'refunds'])
+    await page.getByRole('link', { name: '返回订单列表' }).click()
+    await expect(page).toHaveURL(/\/orders\?status=PAID&after=10$/)
+  })
+
 })

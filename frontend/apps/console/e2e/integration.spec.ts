@@ -30,6 +30,7 @@ test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ p
   await expect(page.getByRole('link', { name: data.paidOrder, exact: true })).toBeVisible()
   await page.getByRole('link', { name: data.paidOrder, exact: true }).click()
   await expect(page.getByRole('heading', { name: data.paidOrder, exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '支付意图', exact: true }).click()
   await page.getByRole('link', { name: data.paymentNo, exact: true }).first().click()
   await expect(page.getByRole('heading', { name: data.paymentNo, exact: true })).toBeVisible()
   await page.goto(`/refunds/${data.refundNo}`)

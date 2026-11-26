@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Badge, Field, PageHeader, PagePager, Panel } from '../../components/ui'
 import { api, type AdminOrderView } from '../../shared/api/client'
@@ -15,6 +15,12 @@ const ORDER_STATUSES = orderStatusSchema.options
 const FINANCIAL_STATUSES = financialStatusSchema.options
 
 export function OrderRows({ rows }: { rows: AdminOrderView[] }) {
+  const location = useLocation()
+  const returnedOrder = location.state?.returnedOrder as string | undefined
+  useEffect(() => {
+    if (returnedOrder) document.getElementById(`order-row-${returnedOrder}`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [returnedOrder, rows])
+
   return (
     <table className="data-table">
       <thead>
@@ -24,9 +30,9 @@ export function OrderRows({ rows }: { rows: AdminOrderView[] }) {
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.orderNo}>
+          <tr key={row.orderNo} id={`order-row-${row.orderNo}`}>
             <td>
-              <Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link>
+              <Link to={`/orders/${encodeURIComponent(row.orderNo)}`} state={{ ordersSearch: location.search }} className="mono">{row.orderNo}</Link>
               <small className="mono">{row.orderId}</small>
             </td>
             <td className="mono">{row.memberId}</td>
