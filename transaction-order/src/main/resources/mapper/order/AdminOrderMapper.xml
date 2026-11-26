@@ -81,8 +81,9 @@
     <arg column="deliveredAt" javaType="java.time.Instant"/>
     <arg column="completedAt" javaType="java.time.Instant"/>
     <arg column="version" javaType="_long"/>
+    <arg column="businessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
   <select id="fulfillment" resultMap="AdminFulfillmentView" useCache="false" timeout="3">
-    SELECT f.fulfillment_no AS fulfillmentNo, f.delivered_at AS deliveredAt, f.completed_at AS completedAt, f.version AS version FROM tc_order_fulfillment f WHERE f.tenant_id=#{tenant} AND f.order_id=#{number}
+    SELECT f.fulfillment_no AS fulfillmentNo, f.delivered_at AS deliveredAt, f.completed_at AS completedAt, f.version AS version,f.business_no AS businessNo FROM tc_order_fulfillment f WHERE f.tenant_id=#{tenant} AND f.order_id=#{number}
   </select>
 </mapper>

@@ -39,21 +39,33 @@ public class FulfillmentIngressService {
         return run(actor,key,"RETURN_CREATE",key,Checks.hash(item,warehouse,quantity),row->{
             var target=mapper.target(actor.tenantId(),item).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","已交付实物明细不存在"));
             if(!target.stockType().equals("PHYSICAL") || quantity>target.quantity()) throw new TradeException("RETURN_INVALID","申请必须是已交付实物且不超原明细数量");
-            inventory.requireWarehouse(actor.tenantId(),warehouse);String number="RMA-"+UUID.randomUUID();
-            mapper.createReturn(actor.tenantId(),number,target.orderId(),item,warehouse,quantity);return new Result(number,"OPEN",0);
+            inventory.requireWarehouse(actor.tenantId(),warehouse);
+            for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
+                String number=BusinessNumber.next(BusinessNumber.Type.RETURN_REQUEST,row.observedAt());
+                try {
+                    mapper.createReturn(actor.tenantId(),number,target.orderId(),item,warehouse,quantity,row.observedAt());
+                    return new Result(number,"OPEN",0);
+                } catch (org.springframework.dao.DuplicateKeyException duplicate) {
+                    if (attempt==BusinessNumber.MAX_ISSUE_ATTEMPTS-1 || mapper.lockReturnBusinessNumber(number)==null) throw duplicate;
+                }
+            }
+            throw new IllegalStateException("return number allocation exhausted");
         });
     }
     /** PARTIAL仅指整批实际收到后部分可售，原验收端口负责累计预算与唯一回库。 */
     public Result inspect(Actor actor,String key,String number,long version,String result,long saleable,String evidence) {
         Checks.text(number,64);Checks.text(evidence,255);if(version<0 || saleable<0) throw new TradeException("INVALID_ARGUMENT","验收版本或可售数量无效");
-        return run(actor,key,"RETURN_INSPECT",number,Checks.hash(number,version,result,saleable,evidence),row->{
-            var request=mapper.lockReturn(actor.tenantId(),number).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","退货申请不存在"));
+        // 查询号先解析成原申请号，使新旧查询号重放同一份验收回执。
+        String originalNo=BusinessNumber.matches(BusinessNumber.Type.RETURN_REQUEST,number)
+            ? readReturn(actor.tenantId(),number).returnNo() : number;
+        return run(actor,key,"RETURN_INSPECT",originalNo,Checks.hash(originalNo,version,result,saleable,evidence),row->{
+            var request=mapper.lockReturn(actor.tenantId(),originalNo).stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","退货申请不存在"));
             if(request.version()!=version) throw new TradeException("PRECONDITION_FAILED","退货申请版本已变化");
             if(!request.status().equals("OPEN")) throw new TradeException("RETURN_CONFLICT","退货申请已验收");
             boolean valid="ACCEPTED".equals(result)?saleable==request.quantity():"PARTIAL".equals(result)?saleable>0 && saleable<request.quantity():"REJECTED".equals(result) && saleable==0;
             if(!valid) throw new TradeException("INVALID_ARGUMENT","验收结论与整批可售数量不一致");
-            String receipt=returns.inspect(actor,"rma:"+number,request.orderNo(),Long.parseLong(request.orderItemId()),Long.parseLong(request.warehouseId()),request.quantity(),saleable,evidence);
-            if(mapper.finishReturn(actor.tenantId(),number,version,receipt)!=1) throw new TradeException("STATE_CONFLICT","退货申请已变化");
+            String receipt=returns.inspect(actor,"rma:"+originalNo,request.orderNo(),Long.parseLong(request.orderItemId()),Long.parseLong(request.warehouseId()),request.quantity(),saleable,evidence);
+            if(mapper.finishReturn(actor.tenantId(),originalNo,version,receipt)!=1) throw new TradeException("STATE_CONFLICT","退货申请已变化");
             return new Result(receipt,"INSPECTED",version+1);
         });
     }

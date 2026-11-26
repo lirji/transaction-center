@@ -11,9 +11,12 @@
     <arg column="version" javaType="_long"/>
   </constructor></resultMap>
   <!-- 缺失永久键只以INSERT串行化，不先对索引间隙加锁。 -->
+  <select id="lockBusinessNumber" resultType="string" useCache="false">
+    SELECT business_no FROM tc_order_fulfillment WHERE business_no=#{number} FOR UPDATE
+  </select>
   <insert id="insertDelivery">
-    INSERT INTO tc_order_fulfillment(tenant_id,order_id,fulfillment_no,source_actor_key,source_request_id,delivery_ref,delivered_at,delivery_hash,created_at)
-    VALUES(#{tenant},#{order},#{number},#{actor},#{event},#{evidence},#{at},#{hash},#{now}) ON DUPLICATE KEY UPDATE id=tc_order_fulfillment.id
+    INSERT INTO tc_order_fulfillment(tenant_id,order_id,fulfillment_no,business_no,source_actor_key,source_request_id,delivery_ref,delivered_at,delivery_hash,created_at)
+    VALUES(#{tenant},#{order},#{number},#{number},#{actor},#{event},#{evidence},#{at},#{hash},#{now}) ON DUPLICATE KEY UPDATE id=tc_order_fulfillment.id
   </insert>
   <!-- 订单锁保证当前聚合归属，源事件跨订单冲突不得返回另一订单事实。 -->
   <select id="lockByOrder" resultMap="FulfillmentRecord" useCache="false">

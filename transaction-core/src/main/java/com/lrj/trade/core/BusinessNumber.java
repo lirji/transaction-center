@@ -20,7 +20,7 @@ public final class BusinessNumber {
 
     /** 每个前缀由单一业务对象拥有，从已签收的注册表分配。 */
     public enum Type {
-        ORDER("ORD"), PAYMENT("PAY"), REFUND("RFD");
+        ORDER("ORD"), PAYMENT("PAY"), REFUND("RFD"), FULFILLMENT("FUL"), RETURN_REQUEST("RTN"), RETURN_RECEIPT("RMA");
 
         private final String prefix;
         private final Pattern pattern;

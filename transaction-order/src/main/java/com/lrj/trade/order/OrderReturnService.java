@@ -2,6 +2,9 @@ package com.lrj.trade.order;
 import com.lrj.trade.core.*;
 import com.lrj.trade.order.mapper.*;
 import com.lrj.trade.inventory.InventoryReturnPort;
+import com.lrj.trade.order.model.ReturnReceipt;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 /** 可信仓储验收核心，与退款独立；授权仓储HTTP入口通过来源校验后调用。 */
@@ -14,9 +17,10 @@ public class OrderReturnService {
     private final Commands commands;
     private final AuditWriter audit;
     private final Outbox outbox;
+    private final Clock clock;
     /** 订单事实、数量预算、库存及事件通过同数据源事务提交。 */
-    public OrderReturnService(OrderMapper orders,FulfillmentMapper fulfillment,ReturnReceiptMapper mapper,InventoryReturnPort inventory,Commands commands,AuditWriter audit,Outbox outbox) {
-        this.orders=orders; this.fulfillment=fulfillment; this.mapper=mapper; this.inventory=inventory; this.commands=commands; this.audit=audit; this.outbox=outbox;
+    public OrderReturnService(OrderMapper orders,FulfillmentMapper fulfillment,ReturnReceiptMapper mapper,InventoryReturnPort inventory,Commands commands,AuditWriter audit,Outbox outbox,Clock clock) {
+        this.orders=orders; this.fulfillment=fulfillment; this.mapper=mapper; this.inventory=inventory; this.commands=commands; this.audit=audit; this.outbox=outbox; this.clock=clock;
     }
     /** 记录已经完成检验的实物接收，部分可售或全部不合格均永久占用实收预算。 */
     public String inspect(Actor source,String event,String orderNo,long itemId,long warehouse,long received,long saleable,String evidence) {
@@ -31,8 +35,16 @@ public class OrderReturnService {
             if(!item.stockType().equals("PHYSICAL") || item.reservationKey()==null) throw invalid();
             inventory.requireWarehouse(source.tenantId(),warehouse);
             String number="RT-"+UUID.randomUUID();
-            mapper.insert(source.tenantId(),number,id,itemId,source.key(),event,warehouse,received,saleable,evidence,hash);
-            var found=mapper.lockEvent(source.tenantId(),source.key(),event);
+            var createdAt=clock.instant().truncatedTo(ChronoUnit.MILLIS);
+            ReturnReceipt found=null;
+            for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
+                String businessNo=BusinessNumber.next(BusinessNumber.Type.RETURN_RECEIPT,createdAt);
+                mapper.insert(source.tenantId(),number,businessNo,id,itemId,source.key(),event,
+                    warehouse,received,saleable,evidence,hash,createdAt);
+                found=mapper.lockEvent(source.tenantId(),source.key(),event);
+                // 原验收号继续作为回库关联；只为不存在的来源事件处理候选号碰撞。
+                if (found!=null || mapper.lockBusinessNumber(businessNo)==null) break;
+            }
             if(found==null || !found.requestHash().equals(hash)) throw new TradeException("RETURN_CONFLICT","验收来源事件已经绑定其他内容");
             if(!found.returnNo().equals(number)) return found.returnNo();
             if(mapper.consumeBudget(source.tenantId(),id,itemId,received)!=1) throw invalid();

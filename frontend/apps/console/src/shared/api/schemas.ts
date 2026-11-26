@@ -148,6 +148,7 @@ export const channelViewSchema = z.object({
 export type ChannelView = z.infer<typeof channelViewSchema>
 
 export const adminInspectionViewSchema = z.object({
+  businessNo: z.string().nullish(),
   receiptNo: z.string(),
   receivedQuantity: z.number().int().min(0),
   restockQuantity: z.number().int().min(0),
@@ -156,6 +157,7 @@ export const adminInspectionViewSchema = z.object({
 export type AdminInspectionView = z.infer<typeof adminInspectionViewSchema>
 
 export const adminReturnViewSchema = z.object({
+  businessNo: z.string().nullish(),
   returnId: z.string(),
   returnNo: z.string(),
   orderNo: z.string(),
@@ -319,6 +321,7 @@ export const adminOrderItemSchema = z.object({
 export type AdminOrderItem = z.infer<typeof adminOrderItemSchema>
 
 export const adminFulfillmentViewSchema = z.object({
+  businessNo: z.string().nullish(),
   fulfillmentNo: z.string(),
   deliveredAt: isoDateTime,
   completedAt: isoDateTime.nullable(),

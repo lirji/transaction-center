@@ -121,7 +121,7 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
             <h2>履约摘要</h2>
             {order.fulfillment ? (
               <dl className="kv">
-                <dt>履约单</dt><dd className="mono">{order.fulfillment.fulfillmentNo}</dd>
+                <dt>履约单</dt><dd className="mono">{order.fulfillment.businessNo ?? order.fulfillment.fulfillmentNo}</dd>
                 <dt>交付时间（北京时间）</dt><dd>{formatBeijingTime(order.fulfillment.deliveredAt)}</dd>
                 <dt>完成时间（北京时间）</dt><dd>{formatBeijingTime(order.fulfillment.completedAt)}</dd>
                 <dt>版本</dt><dd className="mono">{order.fulfillment.version}</dd>

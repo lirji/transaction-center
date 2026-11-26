@@ -492,11 +492,15 @@ class FoundationTest {
         jwt("warehouse-admin","trade.admin",f.actor().tenantId());assertEquals(403,request("POST","/api/v1/trade/admin/returns","warehouse-admin",body,"rma").statusCode());
         jwt("untrusted","trade.admin trade.return.write",f.actor().tenantId());assertEquals(403,request("POST","/api/v1/trade/admin/returns","untrusted",body,"rma").statusCode());
         jwt("warehouse-admin","trade.admin trade.return.write",f.actor().tenantId());var created=request("POST","/api/v1/trade/admin/returns","warehouse-admin",body,"rma");assertEquals(201,created.statusCode(),created.body());var json=tools.jackson.databind.json.JsonMapper.builder().build();String number=json.readTree(created.body()).path("resourceNo").asText();
+        assertTrue(number.matches("TRD-RTN-[0-9]{6}-[0-9]{10}"));
         String inspection="{\"result\":\"ACCEPTED\",\"restockQuantity\":1,\"evidenceRef\":\"proof\"}";
         var detail=request("GET","/api/v1/trade/admin/returns/"+number,"warehouse-admin",null);assertEquals("\"0\"",detail.headers().firstValue("ETag").orElseThrow());
         assertEquals(428,fulfillmentInspectHttp(number,inspection,null,"inspect").statusCode());assertEquals(412,fulfillmentInspectHttp(number,inspection,"\"9\"","stale").statusCode());
         var inspected=fulfillmentInspectHttp(number,inspection,"\"0\"","inspect");assertEquals(200,inspected.statusCode(),inspected.body());var result=json.readTree(inspected.body());assertEquals(number,result.path("returnNo").asText());assertTrue(result.path("receiptNo").asText().startsWith("RT-"));assertEquals(1,result.path("version").asLong());
         assertEquals(inspected.body(),fulfillmentInspectHttp(number,inspection,"\"0\"","inspect").body());
+        var inspectedDetail=request("GET","/api/v1/trade/admin/returns/"+number,"warehouse-admin",null);
+        assertTrue(json.readTree(inspectedDetail.body()).path("inspection").path("businessNo").asText()
+            .matches("TRD-RMA-[0-9]{6}-[0-9]{10}"));
         jwt("warehouse-admin","trade.admin trade.return.write",f.actor().tenantId()+10000);assertEquals(404,request("GET","/api/v1/trade/admin/returns/"+number,"warehouse-admin",null).statusCode());
     }
     private HttpResponse<String> fulfillmentInspectHttp(String number,String body,String version,String key) throws Exception {
@@ -1260,7 +1264,7 @@ class FoundationTest {
         var port=new com.lrj.trade.inventory.InventoryReturnService(inventoryMapper,application.getBean(com.lrj.trade.inventory.mapper.InventoryReturnMapper.class),application.getBean(Outbox.class),writer);
         var service=new com.lrj.trade.order.OrderReturnService(application.getBean(com.lrj.trade.order.mapper.OrderMapper.class),
             application.getBean(com.lrj.trade.order.mapper.FulfillmentMapper.class),application.getBean(com.lrj.trade.order.mapper.ReturnReceiptMapper.class),
-            port,application.getBean(Commands.class),auditWriter,application.getBean(Outbox.class));
+            port,application.getBean(Commands.class),auditWriter,application.getBean(Outbox.class),clock);
         assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->service.inspect(source,"return",order.orderNo(),Long.parseLong(order.items().getFirst().itemId()),target,1,1,"proof"));
         assertEquals(before,balance(f)); assertEquals(0,count("SELECT COUNT(*) FROM tc_inventory_balance WHERE tenant_id=? AND warehouse_id=?",tenant,target));
         assertEquals(0,count("SELECT COUNT(*) FROM tc_return_receipt WHERE tenant_id=?",tenant));

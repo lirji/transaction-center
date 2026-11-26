@@ -186,20 +186,20 @@ export function ReturnsPage() {
           {detail.isError ? <StateBanner tone="error" title={describeProblem(detail.error).title} detail={describeProblem(detail.error).detail} /> : null}
           {detail.data ? (
             <dl className="kv">
-              <dt>申请</dt><dd className="mono">{detail.data.returnNo}</dd>
+              <dt>申请</dt><dd className="mono">{detail.data.businessNo ?? detail.data.returnNo}</dd>
               <dt>订单</dt><dd className="mono">{detail.data.orderNo}</dd>
               <dt>会员</dt><dd className="mono">{detail.data.memberId}</dd>
               <dt>订单明细 ID</dt><dd className="mono">{detail.data.orderItemId}</dd><dt>仓库 ID</dt><dd className="mono">{detail.data.warehouseId}</dd>
               <dt>数量</dt><dd>{detail.data.quantity}</dd>
               <dt>状态</dt><dd><Badge>{detail.data.status}</Badge></dd>
               <dt>版本</dt><dd className="mono">{detail.data.version}</dd>
-              <dt>实收号</dt><dd>{detail.data.receiptNo ?? '尚未验收'}</dd>
+              <dt>实收号</dt><dd>{detail.data.inspection?.businessNo ?? detail.data.receiptNo ?? '尚未验收'}</dd>
               <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(detail.data.observedAt)}</dd>
               {detail.data.inspection ? (
                 <>
                   <dt>验收数量</dt><dd>{detail.data.inspection.receivedQuantity}</dd><dt>回库数量</dt><dd>{detail.data.inspection.restockQuantity}</dd>
                   <dt>登记时间（北京时间）</dt><dd className="mono">{formatBeijingTime(detail.data.inspection.recordedAt)}</dd>
-                  <dt>验收实收</dt><dd className="mono">{detail.data.inspection.receiptNo}</dd>
+                  <dt>验收实收</dt><dd className="mono">{detail.data.inspection.businessNo ?? detail.data.inspection.receiptNo}</dd>
                 </>
               ) : <><dt>验收</dt><dd>{dash(null)}</dd></>}
             </dl>
@@ -233,7 +233,7 @@ export function ReturnsPage() {
       {confirmInspect && detail.data ? (
         <ConfirmDialog
           title="确认验收"
-          description={`returnNo=${detail.data.returnNo} · expectedVersion=${detail.data.version}。验收才会产生实收事实。`}
+          description={`returnNo=${detail.data.businessNo ?? detail.data.returnNo} · expectedVersion=${detail.data.version}。验收才会产生实收事实。`}
           confirmLabel="确认验收"
           tone="primary"
           pending={inspect.isPending}

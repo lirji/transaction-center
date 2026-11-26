@@ -12,7 +12,7 @@ export function ReturnRows({ rows, onSelect }: { rows: AdminReturnView[]; onSele
       <tbody>
         {rows.map((row) => (
           <tr key={row.returnNo}>
-            <td className="mono">{onSelect ? row.returnNo : <Link to={`/returns?returnNo=${encodeURIComponent(row.returnNo)}`}>{row.returnNo}</Link>}</td>
+            <td className="mono">{onSelect ? row.businessNo ?? row.returnNo : <Link to={`/returns?returnNo=${encodeURIComponent(row.returnNo)}`}>{row.businessNo ?? row.returnNo}</Link>}</td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderNo}</Link></td>
             <td className="mono">{row.orderItemId}</td>
             <td className="mono">{row.warehouseId}</td>

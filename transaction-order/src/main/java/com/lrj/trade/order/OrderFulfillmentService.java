@@ -3,6 +3,7 @@ package com.lrj.trade.order;
 import com.lrj.trade.core.*;
 import com.lrj.trade.order.mapper.*;
 import com.lrj.trade.order.model.OrderHeader;
+import com.lrj.trade.order.model.FulfillmentRecord;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -30,9 +31,16 @@ public class OrderFulfillmentService {
             if(at.isBefore(order.createdAt()) || at.isAfter(now)) throw invalid();
             if(!Set.of("PAID","FULFILLING","COMPLETED").contains(order.status())
                 || (!order.financialStatus().equals("NO_PAYMENT_REQUIRED") && order.paidAt()==null)) throw invalid();
-            String number="FF-"+UUID.randomUUID(); long id=Long.parseLong(order.orderId());
-            mapper.insertDelivery(source.tenantId(),id,number,source.key(),event,evidence,at,hash,now);
-            var found=mapper.lockByOrder(source.tenantId(),id);
+            long id=Long.parseLong(order.orderId());
+            String number=null;
+            List<FulfillmentRecord> found=List.of();
+            for (int attempt=0; attempt<BusinessNumber.MAX_ISSUE_ATTEMPTS; attempt++) {
+                number=BusinessNumber.next(BusinessNumber.Type.FULFILLMENT,now);
+                mapper.insertDelivery(source.tenantId(),id,number,source.key(),event,evidence,at,hash,now);
+                found=mapper.lockByOrder(source.tenantId(),id);
+                // 交付来源与订单仍是原业务幂等键，仅在候选号确实被占用时重试。
+                if (!found.isEmpty() || mapper.lockBusinessNumber(number)==null) break;
+            }
             if(found.isEmpty() || !found.getFirst().deliveryHash().equals(hash))
                 throw new TradeException("FULFILLMENT_CONFLICT","订单或来源交付事件已经绑定其他内容");
             var row=found.getFirst(); if(!row.fulfillmentNo().equals(number)) return row.fulfillmentNo();

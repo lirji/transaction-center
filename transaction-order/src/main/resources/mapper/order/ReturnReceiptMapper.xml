@@ -4,8 +4,11 @@
  <resultMap id="Receipt" type="com.lrj.trade.order.model.ReturnReceipt"><constructor>
   <arg column="return_no" javaType="java.lang.String"/><arg column="request_hash" javaType="java.lang.String"/>
  </constructor></resultMap>
- <insert id="insert">INSERT INTO tc_return_receipt(tenant_id,return_no,order_id,order_item_id,source_actor_key,source_request_id,warehouse_id,received_quantity,restock_quantity,inspection_ref,request_hash)
- VALUES(#{tenant},#{number},#{order},#{item},#{actor},#{event},#{warehouse},#{received},#{saleable},#{evidence},#{hash}) ON DUPLICATE KEY UPDATE id=id</insert>
+ <select id="lockBusinessNumber" resultType="string" useCache="false">
+   SELECT business_no FROM tc_return_receipt WHERE business_no=#{number} FOR UPDATE
+ </select>
+ <insert id="insert">INSERT INTO tc_return_receipt(tenant_id,return_no,business_no,order_id,order_item_id,source_actor_key,source_request_id,warehouse_id,received_quantity,restock_quantity,inspection_ref,request_hash,created_at)
+ VALUES(#{tenant},#{number},#{businessNo},#{order},#{item},#{actor},#{event},#{warehouse},#{received},#{saleable},#{evidence},#{hash},#{createdAt}) ON DUPLICATE KEY UPDATE id=id</insert>
  <select id="lockEvent" resultMap="Receipt" useCache="false">SELECT return_no,request_hash FROM tc_return_receipt
  WHERE tenant_id=#{tenant} AND source_actor_key=#{actor} AND source_request_id=#{event} FOR UPDATE</select>
  <update id="consumeBudget"><![CDATA[UPDATE tc_order_item SET returned_quantity=returned_quantity+#{received},version=version+1
