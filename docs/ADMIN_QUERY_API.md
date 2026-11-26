@@ -10,7 +10,7 @@
 
 | 方法／路径 | 用途及下钻 |
 |---|---|
-| GET /orders | 按 orderNo/memberId/status/financialStatus/warehouseId 搜单 |
+| GET /orders | 按 orderNo/memberId/status/financialStatus/warehouseId 搜单，支持完整号、原号及 `YYMMDD-尾号四位` |
 | GET /orders/{orderNo} | 冻结商品、returnedQuantity、履约摘要、独立财务状态 |
 | GET /payments | 按 paymentNo/orderNo/memberId/status 查支付意图 |
 | GET /payments/{paymentNo} | 当前尝试、正常成功收款编号及关闭屏障 |

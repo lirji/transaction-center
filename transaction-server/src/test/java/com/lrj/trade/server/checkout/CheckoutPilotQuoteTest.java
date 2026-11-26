@@ -282,6 +282,9 @@ class CheckoutPilotQuoteTest {
         assertFalse(facts.has("ownerRef"));
 
         String no = nativeOrder.path("orderNo").asString();
+        assertTrue(no.matches("TRD-ORD-[0-9]{6}-[0-9]{10}"));
+        assertEquals(no, facts.path("orderNo").asString());
+        assertEquals(no, facts.path("businessNo").asString());
         var duplicate = post("buyer", "/api/v1/trade/orders", "regular-order", Map.of("quoteId",
             nativeOrder.path("quoteId").asString(), "warehouseId", Long.toString(warehouse)));
         assertEquals(409, http.send(duplicate, HttpResponse.BodyHandlers.ofString()).statusCode());

@@ -19,6 +19,8 @@ public interface OrderMapper {
     int markPaid(@Param("tenant") long tenant,@Param("order") long order,@Param("version") long version,@Param("now") Instant now);
     /** 可靠关单结束才转换已取消；保留支付许可和审计历史。 */
     int finishClose(@Param("tenant") long tenant,@Param("order") long order,@Param("version") long version,@Param("now") Instant now);
+    /** 全局编号索引的当前读只用于判定候选号碰撞。 */
+    String lockBusinessNumber(@Param("number") String number);
     /** 同报价唯一键阻止换幂等键重复下单，商户和金额来自服务端。 */
     int insertOrder(@Param("tenant") long tenant,@Param("number") String number,@Param("member") long member,
         @Param("quote") long quote,@Param("merchantId") long merchantId,@Param("merchantNo") String merchantNo,
@@ -26,7 +28,8 @@ public interface OrderMapper {
         @Param("gross") long gross,@Param("discount") long discount,@Param("amount") long amount,
         @Param("currency") String currency,@Param("created") Instant created,@Param("expires") Instant expires);
     /** 读取当前会员订单，不能以知道订单编号绕过归属。 */
-    List<OrderHeader> findOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("number") String number);
+    List<OrderHeader> findOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("number") String number,
+        @Param("businessNumber") boolean businessNumber);
     /** 在支付许可或取消前锁定同一订单行，阻止跨终态并发更新。 */
     List<OrderHeader> lockOwn(@Param("tenant") long tenant,@Param("member") long member,@Param("number") String number);
     /** 有界主键游标查询本人订单主表，不产生支付或库存副作用。 */

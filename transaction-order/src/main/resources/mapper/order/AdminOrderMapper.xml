@@ -21,8 +21,9 @@
       <arg column="paymentStartedAt" javaType="java.time.Instant"/>
       <arg column="cancelledAt" javaType="java.time.Instant"/>
       <arg column="updatedAt" javaType="java.time.Instant"/>
+      <arg column="businessNo" javaType="java.lang.String"/>
   </constructor></resultMap>
-  <sql id="columns">r.id AS `cursor`, r.id AS orderId, r.order_no AS orderNo, r.member_id AS memberId, r.quote_id AS quoteId, r.merchant_no AS merchantNo, r.warehouse_id AS warehouseId, r.status AS status, r.financial_status AS financialStatus, r.payable_amount AS payableAmount, r.currency AS currency, r.expires_at AS expiresAt, r.paid_at AS paidAt, r.completed_at AS completedAt, r.created_at AS createdAt, r.version AS version, r.payment_started_at AS paymentStartedAt, r.cancelled_at AS cancelledAt, r.updated_at AS updatedAt</sql>
+  <sql id="columns">r.id AS `cursor`, r.id AS orderId, r.order_no AS orderNo, r.member_id AS memberId, r.quote_id AS quoteId, r.merchant_no AS merchantNo, r.warehouse_id AS warehouseId, r.status AS status, r.financial_status AS financialStatus, r.payable_amount AS payableAmount, r.currency AS currency, r.expires_at AS expiresAt, r.paid_at AS paidAt, r.completed_at AS completedAt, r.created_at AS createdAt, r.version AS version, r.payment_started_at AS paymentStartedAt, r.cancelled_at AS cancelledAt, r.updated_at AS updatedAt, r.business_no AS businessNo</sql>
   <sql id="source">FROM tc_order r </sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">
@@ -40,6 +41,10 @@
       <otherwise>AND r.id &gt; #{q.after}</otherwise>
     </choose>
     <if test="q.filters.orderNo != null">AND r.order_no=#{q.filters.orderNo}</if>
+    <if test="q.filters.businessNo != null">AND r.business_no=#{q.filters.businessNo}</if>
+    <if test="q.filters.businessDate != null">
+      AND r.business_date=#{q.filters.businessDate} AND r.no_tail=#{q.filters.numberTail}
+    </if>
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
     <if test="q.filters.financialStatus != null">AND r.financial_status=#{q.filters.financialStatus}</if>
@@ -54,7 +59,7 @@
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.order_no=#{number}
+    WHERE r.tenant_id=#{tenant} AND <choose><when test="businessNumber">r.business_no=#{number}</when><otherwise>r.order_no=#{number}</otherwise></choose>
   </select>
   <resultMap id="AdminOrderItem" type="com.lrj.trade.order.model.AdminOrderItem"><constructor>
     <arg column="itemId" javaType="java.lang.String"/>

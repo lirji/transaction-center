@@ -43,7 +43,8 @@
             q.price_proof_hash AS proofHash, o.currency AS currency, CAST(o.gross_amount AS CHAR) AS grossMinor,
             CAST(o.discount_amount AS CHAR) AS discountMinor, CAST(o.payable_amount AS CHAR) AS payableMinor,
             o.status AS orderStatus, o.expires_at AS orderExpiresAt, o.financial_status AS financialStatus,
-            o.paid_at AS paidAt, q.funding_receipt_hash AS fundingReceiptHash
+            o.paid_at AS paidAt, q.funding_receipt_hash AS fundingReceiptHash,
+            o.business_no AS businessNo
         FROM tc_checkout_pilot_quote_ref q JOIN tc_order o ON o.tenant_id=q.tenant_id AND o.id=q.native_order_id
         WHERE q.tenant_id=#{tenant} AND q.quote_ref=#{reference}
     </select>

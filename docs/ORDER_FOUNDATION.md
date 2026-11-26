@@ -62,3 +62,16 @@ AES-256-GCM每字段独立随机12字节Nonce，密文包含Nonce及认证标签
 V005新增tc_merchant、tc_order、tc_order_item、tc_order_address，全部字段及表有中文注释，外键限定租户。订单保存商户与商品金额快照，取消记录原因和版本；SQL均在Mapper XML。
 
 不修改V001～V004，不删除历史报价／订单。共享迁移必须以全量测试成功为前提，实际结果见[验证记录](VERIFICATION.md)。当前内部v0 Outbox不是正式营销V1事件，不会直接投递到现有奖励消费方。
+
+## 可读业务订单号
+
+新建普通订单及试点订单由交易中心发出 `TRD-ORD-YYMMDD-NNNNNNNNNN`。业务日取持久化创建时刻的北京时间。新单的 `orderNo` 与 `businessNo` 相同。系统按随机尾段和唯一索引发号。同一个幂等请求返回已提交的原记录。历史单以新增的 `businessNo` 提供可读查询号，原 `orderNo` 继续关联地址密文、库存、支付退款和已发事件。
+
+Flyway V044 建立空字段、唯一号索引及业务日与尾号组合索引。历史补录按租户和主键扫描，旧写实例退出后再从起始位置追平一次。使用受控的 MySQL 连接选项文件。先运行预览，再在已批准的库与租户上追加 `--apply`。每次只补空值，打印成功批次的主键游标供 `--after` 续跑。
+
+```sh
+python3 scripts/backfill-business-numbers.py --dataset trade-orders \
+  --database transaction_center_dev --tenant 1 --defaults-file /path/to/mysql-client.cnf
+```
+
+商城独立运行的本地订单选择 `--dataset commerce-orders`，并提供对应商城数据库及租户。历史试点资金申请的营销展示号可由原结算机器根据现有报价引用通过 `reconcile?refreshOrderNumber=true` 从交易原生证据补录。先核对目标租户和待补数量，再核验原号、新号、支付及退款关联。

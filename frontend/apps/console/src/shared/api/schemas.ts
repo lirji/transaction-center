@@ -283,6 +283,7 @@ export const refundQueueStatusSchema = z.enum(['ALL', ...refundStatusSchema.opti
 export const adminOrderViewSchema = z.object({
   orderId: z.string(),
   orderNo: z.string(),
+  businessNo: z.string().nullish(),
   memberId: z.string(),
   quoteId: z.string(),
   merchantNo: z.string(),

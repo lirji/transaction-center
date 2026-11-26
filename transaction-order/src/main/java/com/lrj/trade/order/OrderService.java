@@ -14,6 +14,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -23,6 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class OrderService implements OrderPaymentPort {
     public static final String CHECKOUT_FUNDING_PENDING = "CHECKOUT_PILOT_FUNDING_PENDING";
+    private static final int ORDER_NUMBER_ATTEMPTS = 4;
     private static final JsonMapper JSON=JsonMapper.builder().build();
     private final OrderMapper mapper;
     private final com.lrj.trade.order.mapper.OrderAttributionMapper attributions;
@@ -114,17 +116,34 @@ public class OrderService implements OrderPaymentPort {
         boolean physical=quote.items().stream().anyMatch(item->item.stockType().equals("PHYSICAL"));
         if(physical && (warehouse==null || address==null)) throw new TradeException("INVALID_ARGUMENT","实物订单必须指定仓库和收货地址");
         if(!physical && (warehouse!=null || address!=null)) throw new TradeException("INVALID_ARGUMENT","纯服务订单不能附带仓库或收货个人信息");
-        String no="ORD-"+UUID.randomUUID();
-        EncryptedAddress encrypted=physical?addresses.encrypt(actor.tenantId(),no,address):null;
         var now=clock.instant().truncatedTo(ChronoUnit.MILLIS);
-        // 商户锁等待或加密耗时之后再验证，避免用刚刚过期的报价创建订单。
+        // 商户锁等待之后再验证，避免用刚刚过期的报价创建订单。
         if(!now.isBefore(quote.expiresAt())) throw new TradeException("QUOTE_EXPIRED","报价已过期");
         boolean free=quote.payableAmount()==0;
         long gross=quote.items().stream().mapToLong(item -> Math.multiplyExact(item.unitPrice(), item.quantity())).reduce(0, Math::addExact);
-        if(verified!=null) verified.requireUsable(actor,member,quoteId,now);
-        mapper.insertOrder(actor.tenantId(),no,member,quoteId,Long.parseLong(merchant.merchantId()),merchant.merchantNo(),
-            warehouse,free?"PAID":"PENDING_PAYMENT",free?"NO_PAYMENT_REQUIRED":"UNPAID",
-            gross,gross-quote.payableAmount(),quote.payableAmount(),quote.currency(),now,now.plusSeconds(ttl));
+        String no = null;
+        EncryptedAddress encrypted = null;
+        for (int attempt = 0; attempt < ORDER_NUMBER_ATTEMPTS; attempt++) {
+            String candidate = BusinessNumber.next(BusinessNumber.Type.ORDER, now);
+            EncryptedAddress candidateAddress = physical ? addresses.encrypt(actor.tenantId(), candidate, address) : null;
+            var checkedAt = clock.instant().truncatedTo(ChronoUnit.MILLIS);
+            // 加密可能跨越报价或归因有效期，必须在本次插入和任何关联写入前统一再校验。
+            if (!checkedAt.isBefore(quote.expiresAt())) throw new TradeException("QUOTE_EXPIRED","报价已过期");
+            if (verified != null) verified.requireUsable(actor, member, quoteId, checkedAt);
+            try {
+                mapper.insertOrder(actor.tenantId(),candidate,member,quoteId,Long.parseLong(merchant.merchantId()),merchant.merchantNo(),
+                    warehouse,free?"PAID":"PENDING_PAYMENT",free?"NO_PAYMENT_REQUIRED":"UNPAID",
+                    gross,gross-quote.payableAmount(),quote.payableAmount(),quote.currency(),now,now.plusSeconds(ttl));
+                no = candidate;
+                encrypted = candidateAddress;
+                break;
+            } catch (DuplicateKeyException duplicate) {
+                // 仅重试已被占用的编号，同报价重复下单等业务冲突仍由原约束裁决。
+                if (attempt == ORDER_NUMBER_ATTEMPTS - 1 || mapper.lockBusinessNumber(candidate) == null) {
+                    throw duplicate;
+                }
+            }
+        }
         long order=Long.parseLong(own(actor,member,no,false).orderId());
         if(verified!=null) {
             try { attributions.insert(actor.tenantId(),order,no,actor.key(),"order.create",key,hash,verified,now); }
@@ -272,7 +291,7 @@ public class OrderService implements OrderPaymentPort {
     }
     private OrderHeader own(Actor actor,long member,String number,boolean lock) {
         Checks.text(number,64);
-        return (lock?mapper.lockOwn(actor.tenantId(),member,number):mapper.findOwn(actor.tenantId(),member,number))
+        return (lock?mapper.lockOwn(actor.tenantId(),member,number):mapper.findOwn(actor.tenantId(),member,number,BusinessNumber.matches(BusinessNumber.Type.ORDER,number)))
             .stream().findFirst().orElseThrow(()->new TradeException("NOT_FOUND","订单不存在"));
     }
     private OrderView view(long tenant,OrderHeader row) {
@@ -281,6 +300,6 @@ public class OrderService implements OrderPaymentPort {
             Map.copyOf(JSON.readValue(item.specification(),new TypeReference<Map<String,String>>() {})),
             item.stockType(),item.quantity(),item.unitPrice(),item.payableAmount())).toList();
         return new OrderView(row.orderId(),row.orderNo(),row.quoteId(),row.merchantNo(),row.warehouseId(),row.status(),
-            row.financialStatus(),row.payableAmount(),row.currency(),row.expiresAt(),row.paidAt(),row.completedAt(),row.createdAt(),row.version(),lines);
+            row.financialStatus(),row.payableAmount(),row.currency(),row.expiresAt(),row.paidAt(),row.completedAt(),row.createdAt(),row.version(),lines,row.businessNo());
     }
 }

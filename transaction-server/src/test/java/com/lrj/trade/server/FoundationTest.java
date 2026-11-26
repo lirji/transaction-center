@@ -5528,6 +5528,17 @@ class FoundationTest {
         assertEquals(two.orderNo(),json.readTree(next.body()).path("items").get(0).path("orderNo").asText());assertFalse(json.readTree(next.body()).path("hasMore").asBoolean());
         var detail=request("GET","/api/v1/trade/admin/orders/"+one.orderNo(),"query-admin",null);assertEquals(200,detail.statusCode(),detail.body());
         var orderJson=json.readTree(detail.body());assertEquals(one.orderNo(),orderJson.path("orderNo").asText());assertFalse(orderJson.has("summary"));assertTrue(orderJson.path("items").get(0).path("specification").isObject());
+        assertTrue(one.orderNo().matches("TRD-ORD-[0-9]{6}-[0-9]{10}"));
+        assertEquals(one.orderNo(),orderJson.path("businessNo").asString());
+        String[] segments=one.orderNo().split("-");
+        String tailQuery=segments[2]+"-"+segments[3].substring(6);
+        var tailPage=request("GET","/api/v1/trade/admin/orders?orderNo="+tailQuery,"query-admin",null);
+        assertEquals(200,tailPage.statusCode(),tailPage.body());
+        assertTrue(json.readTree(tailPage.body()).path("items").valueStream()
+            .anyMatch(item->one.orderNo().equals(item.path("orderNo").asString())));
+        assertEquals(0,json.readTree(request("GET","/api/v1/trade/admin/orders?orderNo="+tailQuery,
+            "query-other",null).body()).path("items").size());
+        assertEquals(400,request("GET","/api/v1/trade/admin/orders?orderNo=261332-0001","query-admin",null).statusCode());
         assertFalse(detail.body().contains("reservationKey"));assertFalse(detail.body().contains("address"));
         assertEquals("no-store",detail.headers().firstValue("Cache-Control").orElseThrow());
         assertEquals(403,request("GET","/api/v1/trade/admin/orders","query-member",null).statusCode());

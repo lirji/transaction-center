@@ -52,7 +52,7 @@ public interface CheckoutPilotQuoteMapper {
     record BoundOrder(String orderId, String orderNo, String nativeQuoteId, String requestHash, String scopeVersion,
                       String storeId, String proofHash, String currency, String grossMinor, String discountMinor,
                       String payableMinor, String orderStatus, Instant orderExpiresAt, String financialStatus,
-                      Instant paidAt, String fundingReceiptHash) { }
+                      Instant paidAt, String fundingReceiptHash, String businessNo) { }
 
     /** 已核验预算回执只写入与原生订单同一行的交易证据。 */
     record FundingBinding(String reference, long orderId, String applicationId, String receiptHash, Instant validUntil) { }

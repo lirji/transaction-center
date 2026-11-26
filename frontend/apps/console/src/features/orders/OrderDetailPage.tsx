@@ -31,6 +31,7 @@ export function OrderDetailPage() {
 }
 
 function OrderDetail({ orderNo }: { orderNo: string }) {
+  const [copyResult, setCopyResult] = useState('')
   const auth = useAuth()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
@@ -61,13 +62,22 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
     <div className="workspace">
       <PageHeader
         eyebrow="Order"
-        title={order.orderNo}
+        title={order.businessNo ?? order.orderNo}
         description="查看订单状态、冻结商品与关联交易记录。"
         actions={<>
-          <Link className="button secondary" to={{ pathname: '/orders', search: listSearch }} state={{ returnedOrder: orderNo }}>返回订单列表</Link>
+          <button type="button" className="button secondary" onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(order.businessNo ?? order.orderNo)
+              setCopyResult('已复制订单号')
+            } catch {
+              setCopyResult('复制失败，可选中订单号手动复制')
+            }
+          }}>复制订单号</button>
+          <Link className="button secondary" to={{ pathname: '/orders', search: listSearch }} state={{ returnedOrder: order.orderNo }}>返回订单列表</Link>
           {showFulfill ? <Link className="button primary" to={`/fulfillment?orderNo=${encodeURIComponent(order.orderNo)}`}>声明履约</Link> : null}
         </>}
       />
+      <div role="status" aria-live="polite">{copyResult}</div>
       <div className="section-gap">
         <Panel>
           <h2>订单摘要</h2>
@@ -85,6 +95,8 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
           <details className="order-metadata">
             <summary>更多订单信息</summary>
             <dl className="kv">
+              {order.businessNo && order.businessNo !== order.orderNo
+                ? <><dt>原订单号</dt><dd className="mono">{order.orderNo}</dd></> : null}
               <dt>内部订单编号</dt><dd className="mono">{order.orderId}</dd>
               <dt>商户号</dt><dd className="mono">{order.merchantNo}</dd>
               <dt>完成时间（北京时间）</dt><dd>{formatBeijingTime(order.completedAt)}</dd>
@@ -138,22 +150,22 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
           </table>
         </Panel> : null}
         {active === 'payments' && !detail.isFetching ? (
-          <OrderRecords key="payments" orderNo={orderNo} resource="admin-payments" title="支付意图" emptyTitle="本单无支付意图" read={api.payments}>
+          <OrderRecords key="payments" orderNo={order.orderNo} resource="admin-payments" title="支付意图" emptyTitle="本单无支付意图" read={api.payments}>
             {(rows) => <PaymentRows rows={rows} />}
           </OrderRecords>
         ) : null}
         {active === 'receipts' && !detail.isFetching ? (
-          <OrderRecords key="receipts" orderNo={orderNo} resource="admin-receipts" title="实收" emptyTitle="本单无实收" read={api.paymentReceipts}>
+          <OrderRecords key="receipts" orderNo={order.orderNo} resource="admin-receipts" title="实收" emptyTitle="本单无实收" read={api.paymentReceipts}>
             {(rows) => <ReceiptRows rows={rows} />}
           </OrderRecords>
         ) : null}
-        {active === 'refunds' && !detail.isFetching ? <OrderRefunds orderNo={orderNo} /> : null}
+        {active === 'refunds' && !detail.isFetching ? <OrderRefunds orderNo={order.orderNo} /> : null}
         {active === 'returns' && !detail.isFetching ? (
-          <OrderRecords key="returns" orderNo={orderNo} resource="admin-returns" title="退货" emptyTitle="本单无退货" read={api.returns}>
+          <OrderRecords key="returns" orderNo={order.orderNo} resource="admin-returns" title="退货" emptyTitle="本单无退货" read={api.returns}>
             {(rows) => <ReturnRows rows={rows} />}
           </OrderRecords>
         ) : null}
-        {active === 'evidence' && !detail.isFetching ? <OrderEvidence orderNo={orderNo} /> : null}
+        {active === 'evidence' && !detail.isFetching ? <OrderEvidence orderNo={order.orderNo} /> : null}
       </div>
     </div>
   )

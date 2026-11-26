@@ -167,7 +167,7 @@ public class CheckoutPilotQuoteService {
             .orElseThrow(() -> new TradeException("NOT_FOUND", "试点报价尚未关联订单"));
         return new OrderEvidence(Long.toString(caller.tenantId()), reference, sealed.orderId(), sealed.orderNo(), sealed.nativeQuoteId(),
             sealed.scopeVersion(), sealed.storeId(), sealed.proofHash(), sealed.currency(), sealed.grossMinor(), sealed.discountMinor(),
-            sealed.payableMinor(), sealed.orderStatus(), sealed.orderExpiresAt(), sealed.financialStatus(), sealed.paidAt());
+            sealed.payableMinor(), sealed.orderStatus(), sealed.orderExpiresAt(), sealed.financialStatus(), sealed.paidAt(), sealed.businessNo());
     }
 
     /** 冻结前重新查询商城活动范围和商品版本；远程请求留在交易写入前。 */
@@ -221,7 +221,7 @@ public class CheckoutPilotQuoteService {
     public record OrderEvidence(String tradeTenantId, String tradeQuoteRef, String orderId, String orderNo, String nativeQuoteId,
                                 String scopeVersion, String storeId, String priceProofHash, String currency, String grossMinor,
                                 String discountMinor, String payableMinor, String orderStatus, Instant orderExpiresAt,
-                                String financialStatus, Instant paidAt) { }
+                                String financialStatus, Instant paidAt, String businessNo) { }
 
     /** 与商城受限读取契约一致，保留报价形成时的金额及版本证据。 */
     record SourceEvidence(String scopeVersion, String tradeTenantId, String commerceTenantId, String merchantId,

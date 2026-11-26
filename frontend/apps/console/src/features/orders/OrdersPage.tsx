@@ -34,7 +34,7 @@ export function OrderRows({ rows }: { rows: AdminOrderView[] }) {
         {rows.map((row) => (
           <tr key={row.orderNo} id={`order-row-${row.orderNo}`}>
             <td>
-              <Link to={`/orders/${encodeURIComponent(row.orderNo)}`} state={{ ordersSearch: location.search }} className="mono">{row.orderNo}</Link>
+              <Link to={`/orders/${encodeURIComponent(row.orderNo)}`} state={{ ordersSearch: location.search }} className="mono">{row.businessNo ?? row.orderNo}</Link>
             </td>
             <td className="mono">{row.memberId}</td>
             <td><Badge tone={statusTone(row.status)}>{orderLabels[row.status]}</Badge></td>
@@ -130,7 +130,7 @@ export function OrdersPage() {
           ))}
         </div>
         <FilterBar onSubmit={submit}>
-          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+          <Field label="订单号" hint="完整订单号、旧编号或日期加四位尾号，例如 261126-1634"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
           <Field label="会员 ID" error={memberDraftError || undefined}><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
           <Field label="订单状态"><EmptySelect value={status} onChange={setStatus} options={ORDER_STATUSES} optionLabel={(value) => orderLabels[value as keyof typeof orderLabels]} /></Field>
           <Field label="资金状态"><EmptySelect value={financialStatus} onChange={setFinancialStatus} options={FINANCIAL_STATUSES} optionLabel={(value) => financialLabels[value as keyof typeof financialLabels]} /></Field>

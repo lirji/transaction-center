@@ -10,7 +10,7 @@ public interface AdminOrderMapper {
     /** 租户限定的根记录分页，多读一条用于判断末页。 */
     List<AdminOrderView> page(@Param("tenant") long tenant,@Param("q") AdminQuery q);
     /** 精确查询仍必须限定租户，外租户与不存在相同。 */
-    List<AdminOrderView> find(@Param("tenant") long tenant,@Param("number") String number);
+    List<AdminOrderView> find(@Param("tenant") long tenant,@Param("number") String number,@Param("businessNumber") boolean businessNumber);
     /** 同租户已验证父资源的只读明细。 */
     List<AdminOrderItem> items(@Param("tenant") long tenant,@Param("number") String number);
     /** 同租户已验证父资源的只读明细。 */
