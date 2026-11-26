@@ -21,7 +21,7 @@ describe('FulfillmentPage', () => {
 
   it('prefills orderNo from the query string', () => {
     renderWithApp(<FulfillmentPage />, { route: '/fulfillment?orderNo=ORD-88' })
-    expect(screen.getByLabelText('orderNo')).toHaveValue('ORD-88')
+    expect(screen.getByLabelText('订单号')).toHaveValue('ORD-88')
   })
 
   it('asks for confirmation before calling the fulfillment API', async () => {
@@ -31,9 +31,9 @@ describe('FulfillmentPage', () => {
     }))
     vi.mocked(fetch).mockImplementation(fetchMock)
     renderWithApp(<FulfillmentPage />)
-    await userEvent.type(screen.getByLabelText('orderNo'), 'ORD-1')
-    await userEvent.type(screen.getByLabelText('sourceRequestId'), 'src-1')
-    await userEvent.type(screen.getByLabelText('deliveryRef'), 'del-1')
+    await userEvent.type(screen.getByLabelText('订单号'), 'ORD-1')
+    await userEvent.type(screen.getByLabelText('来源请求号'), 'src-1')
+    await userEvent.type(screen.getByLabelText('交付凭证引用'), 'del-1')
     await userEvent.click(screen.getByRole('button', { name: '声明已交付' }))
     expect(screen.getByText('确认整单已交付')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()

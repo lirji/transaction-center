@@ -4,8 +4,11 @@ import { Link } from 'react-router-dom'
 import { Badge, Button, CursorPager, Field, PageHeader, Panel, StackForm } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
-import { formatMinor, parseInteger } from '../../shared/api/money'
+import { formatMinorAmount, parseInteger } from '../../shared/api/money'
 import { parseCurrencyCode } from '../../shared/api/validate'
+
+import { productStatusSchema } from '../../shared/api/schemas'
+import { productStatusLabels } from './productDisplay'
 
 export function ProductsPage() {
   const [after, setAfter] = useState(0)
@@ -50,24 +53,27 @@ export function ProductsPage() {
       <PageHeader
         eyebrow="Catalog"
         title="商品"
-        description="列表价格是目录标价，不是可付金额。下单金额只能来自服务端报价。发布后快照不可改。"
+        description="查询商品目录价和发布状态。在商品详情查看 SKU、草稿及发布修订。"
       />
-      <div className="page-grid">
+      <div className="section-gap">
         <Panel className="table-panel">
           <QueryGate query={query} emptyTitle="没有商品" emptyDetail="当前租户没有商品草稿或已发布记录。">
             {(rows) => (
               <>
-                <table className="data-table">
-                  <thead><tr><th>商品</th><th>状态</th><th>目录价</th><th>版本</th></tr></thead>
+                <table className="data-table trade-list-table">
+                  <thead><tr><th>商品名称</th><th>商品 ID</th><th>主 SKU ID</th><th>发布状态</th><th>目录价</th><th>币种</th><th>发布修订</th><th>版本</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.productId}>
                         <td>
                           <Link to={`/products/${row.productId}`}><strong>{row.name}</strong></Link>
-                          <small className="mono">{row.productId} / sku {row.skuId}</small>
                         </td>
-                        <td><Badge tone={row.status === 'PUBLISHED' ? 'good' : row.status === 'OFFLINE' ? 'neutral' : 'warn'}>{row.status}</Badge></td>
-                        <td>{formatMinor(row.unitPrice, row.currency)}<small className="mono">{row.currency} {row.unitPrice}</small></td>
+                        <td className="mono">{row.productId}</td>
+                        <td className="mono">{row.skuId}</td>
+                        <td><Badge tone={row.status === productStatusSchema.enum.PUBLISHED ? 'good' : row.status === productStatusSchema.enum.OFFLINE ? 'neutral' : 'warn'}>{productStatusLabels[row.status]}</Badge></td>
+                        <td>{formatMinorAmount(row.unitPrice)}</td>
+                        <td>{row.currency}</td>
+                        <td>{row.publishedRevision ?? '—'}</td>
                         <td className="mono">{row.version}</td>
                       </tr>
                     ))}
@@ -82,9 +88,9 @@ export function ProductsPage() {
           <h2>创建草稿</h2>
           <MutationBanner error={create.error} success={create.data ? `已创建 resourceId=${create.data.resourceId}` : undefined} />
           <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={create.isPending}>创建</Button>}>
-            <Field label="productNo"><input value={productNo} onChange={(event) => setProductNo(event.target.value)} maxLength={64} required /></Field>
-            <Field label="名称"><input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} required /></Field>
-            <Field label="首个 skuNo"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} maxLength={64} required /></Field>
+            <Field label="商品编号"><input value={productNo} onChange={(event) => setProductNo(event.target.value)} maxLength={64} required /></Field>
+            <Field label="商品名称"><input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} required /></Field>
+            <Field label="主 SKU 编码"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} maxLength={64} required /></Field>
             <Field label="单价（最小单位整数）" error={formError} hint="提交值不会被展示层改写。">
               <input value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} inputMode="numeric" required />
             </Field>

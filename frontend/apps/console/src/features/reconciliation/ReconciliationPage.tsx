@@ -7,6 +7,7 @@ import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_RECONCILIATION_QUERY } from '../../shared/auth/auth-context'
+import { formatBeijingTime } from '../../shared/ui/display'
 
 const queueStates = ['OPEN', 'PROCESSING', 'CLOSED'] as const
 
@@ -58,12 +59,12 @@ export function ReconciliationPage() {
         <QueryGate query={cases} emptyTitle="没有差异" emptyDetail="当前状态下没有对账差异。">
           {(rows) => (
             <>
-              <table className="data-table">
-                <thead><tr><th>差异</th><th>渠道</th><th>状态</th><th>类型</th><th /></tr></thead>
+              <table className="data-table trade-list-table">
+                <thead><tr><th>差异编号</th><th>账单日期</th><th>渠道 ID</th><th>状态</th><th>差异类型</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td className="mono">{row.caseNo}<small>{row.statementDate}</small></td>
+                      <td className="mono">{row.caseNo}</td><td>{row.statementDate}</td>
                       <td className="mono">{row.channelId}</td>
                       <td><Badge>{row.status}</Badge></td>
                       <td><Badge>{row.differenceType}</Badge></td>
@@ -80,7 +81,7 @@ export function ReconciliationPage() {
         </QueryGate>
       </Panel>
       <Panel className="table-panel">
-        <h2 style={{ padding: '16px 18px 0' }}>查单作业</h2>
+        <h2 className="table-title">查单作业</h2>
         <div style={{ padding: '0 18px 8px' }}>
           <select value={opState} onChange={(event) => { setOpState(event.target.value as typeof opState); setOpAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
@@ -93,14 +94,14 @@ export function ReconciliationPage() {
           {(rows) => (
             <>
               <table className="data-table">
-                <thead><tr><th>作业</th><th>动作</th><th>状态</th><th>代码</th></tr></thead>
+                <thead><tr><th>作业编号</th><th>差异编号</th><th>查单动作</th><th>状态</th><th>受理时间（北京时间）</th><th>结果代码</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td className="mono">{row.operationNo}<small>{row.caseNo}</small></td>
+                      <td className="mono">{row.operationNo}</td><td className="mono">{row.caseNo}</td>
                       <td>{row.action}</td>
                       <td><Badge>{row.status}</Badge></td>
-                      <td>{row.lastCode ?? '—'}</td>
+                      <td>{formatBeijingTime(row.acceptedAt)}</td><td>{row.lastCode ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -122,14 +123,14 @@ export function ReconciliationPage() {
               ticketRef: ticketRef.trim(),
             })
           }}>
-            <Field label="action">
+            <Field label="查单动作">
               <select value={action} onChange={(event) => setAction(event.target.value as typeof action)}>
                 <option value="QUERY_PAYMENT">QUERY_PAYMENT</option>
                 <option value="QUERY_REFUND">QUERY_REFUND</option>
               </select>
             </Field>
             <Field label="原因"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
-            <Field label="ticketRef"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
+            <Field label="工单引用"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
             <div className="modal-actions">
               <Button onClick={() => setSelected(undefined)}>取消</Button>
               <Button tone="primary" type="submit" disabled={queryCase.isPending}>排队查单</Button>

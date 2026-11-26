@@ -4,7 +4,7 @@ import { Badge, PageHeader, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
-import { dash, statusTone } from '../../shared/ui/display'
+import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
 
 export function RefundDetailPage() {
   const { refundNo = '' } = useParams()
@@ -40,11 +40,11 @@ export function RefundDetailPage() {
             <dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{row.status}</Badge></dd>
             <dt>金额</dt><dd>{formatMinor(row.amount, row.currency)} <small className="mono">{row.currency} {row.amount}</small></dd>
             <dt>审批引用</dt><dd>{dash(row.approvalRef)}</dd>
-            <dt>审批截止</dt><dd className="mono">{dash(row.approvalDeadline)}</dd>
+            <dt>审批截止（北京时间）</dt><dd className="mono">{formatBeijingTime(row.approvalDeadline)}</dd>
             <dt>政策版本</dt><dd className="mono">{row.policyVersion}</dd>
             <dt>版本</dt><dd className="mono">{row.version}</dd>
             <dt>处理分类</dt><dd className="mono">{dash(row.processingReasonCode)}</dd>
-            <dt>观察时刻</dt><dd className="mono">{row.observedAt}</dd>
+            <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.observedAt)}</dd>
           </dl>
         </Panel>
         <Panel className="table-panel">

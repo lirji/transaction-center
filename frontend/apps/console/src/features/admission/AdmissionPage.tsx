@@ -66,14 +66,18 @@ export function AdmissionPage() {
         {query.isError ? <StateBanner tone="error" title={describeProblem(query.error).title} detail={describeProblem(query.error).detail} /> : null}
         {query.data ? (
           <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={!canWrite || update.isPending || !reason.trim()}>保存</Button>}>
-            <p>当前版本 {query.data.version} · 下单 {query.data.orderEnabled ? '允许' : '关闭'} · 支付 {query.data.paymentEnabled ? '允许' : '关闭'}</p>
-            <Field label="orderEnabled">
+            <dl className="summary-fields">
+              <div><dt>当前新订单受理</dt><dd>{query.data.orderEnabled ? '开放' : '暂停'}</dd></div>
+              <div><dt>当前新支付受理</dt><dd>{query.data.paymentEnabled ? '开放' : '暂停'}</dd></div>
+              <div><dt>策略版本</dt><dd>{query.data.version}</dd></div>
+            </dl>
+            <Field label="新订单受理">
               <select value={String(orderEnabled ?? query.data.orderEnabled)} onChange={(event) => setOrderEnabled(event.target.value === 'true')}>
                 <option value="true">允许新订单</option>
                 <option value="false">关闭新订单</option>
               </select>
             </Field>
-            <Field label="paymentEnabled">
+            <Field label="新支付受理">
               <select value={String(paymentEnabled ?? query.data.paymentEnabled)} onChange={(event) => setPaymentEnabled(event.target.value === 'true')}>
                 <option value="true">允许新支付</option>
                 <option value="false">关闭新支付</option>

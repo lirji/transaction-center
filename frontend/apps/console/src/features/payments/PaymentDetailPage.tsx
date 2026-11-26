@@ -6,7 +6,7 @@ import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
-import { dash, statusTone } from '../../shared/ui/display'
+import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
 
 export function PaymentDetailPage() {
   const { paymentNo = '' } = useParams()
@@ -53,9 +53,9 @@ export function PaymentDetailPage() {
             <dd>{payment.succeededReceiptNo
               ? <Link className="mono" to={`/receipts/${encodeURIComponent(payment.succeededReceiptNo)}`}>{payment.succeededReceiptNo}</Link>
               : '—'}</dd>
-            <dt>closeFenceAt</dt><dd className="mono">{dash(payment.closeFenceAt)}</dd>
+            <dt>关闭屏障（北京时间）</dt><dd className="mono">{formatBeijingTime(payment.closeFenceAt)}</dd>
             <dt>版本</dt><dd className="mono">{payment.version}</dd>
-            <dt>观察时刻</dt><dd className="mono">{payment.observedAt}</dd>
+            <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(payment.observedAt)}</dd>
           </dl>
         </Panel>
         <Panel className="table-panel">
@@ -75,15 +75,15 @@ export function PaymentDetailPage() {
             {(page) => (
               <>
                 <table className="data-table">
-                  <thead><tr><th>尝试</th><th>渠道</th><th>状态</th><th>提交</th><th>关闭</th><th>关闭证据</th></tr></thead>
+                  <thead><tr><th>尝试编号</th><th>尝试 ID</th><th>渠道</th><th>状态</th><th>提交时间（北京时间）</th><th>关闭时间（北京时间）</th><th>关闭证据</th></tr></thead>
                   <tbody>
                     {page.items.map((row) => (
                       <tr key={row.attemptId}>
-                        <td className="mono">{row.attemptNo}<small>{row.attemptId}</small></td>
+                        <td className="mono">{row.attemptNo}</td><td className="mono">{row.attemptId}</td>
                         <td className="mono">{row.channelCode}</td>
                         <td><Badge tone={row.status === 'UNKNOWN' ? 'warn' : statusTone(row.status)}>{row.status}</Badge></td>
-                        <td className="mono">{dash(row.submittedAt)}</td>
-                        <td className="mono">{dash(row.closedAt)}</td>
+                        <td className="mono">{formatBeijingTime(row.submittedAt)}</td>
+                        <td className="mono">{formatBeijingTime(row.closedAt)}</td>
                         <td>{row.hasCloseEvidence ? '有' : '无'}</td>
                       </tr>
                     ))}

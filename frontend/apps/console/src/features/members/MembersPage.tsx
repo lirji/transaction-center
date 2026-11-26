@@ -7,13 +7,18 @@ import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersion
 import { isVersionConflict } from '../../shared/api/client'
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_ADMIN_EVIDENCE_READ } from '../../shared/auth/auth-context'
+import { parseBeijingInput } from '../../shared/api/businessTime'
 import { FormValidationError, parseMemberId } from '../../shared/api/validate'
-import { dash } from '../../shared/ui/display'
+import { dash, formatBeijingTime } from '../../shared/ui/display'
+
+const MEMBER_FROZEN = 'FROZEN'
+const MEMBER_ACTIVE = 'ACTIVE'
 
 export function MembersPage() {
   const auth = useAuth()
   const canEvidence = auth.hasScope(TRADE_ADMIN_EVIDENCE_READ)
   const [after, setAfter] = useState(0)
+  const [evidenceMember, setEvidenceMember] = useState('')
   const [selected, setSelected] = useState<Member>()
   const [reason, setReason] = useState('')
   const [formError, setFormError] = useState('')
@@ -39,26 +44,32 @@ export function MembersPage() {
       <PageHeader
         eyebrow="Members"
         title="会员"
-        description="列表不含认证主体。冻结不阻止合法退款入账，也不会改 everPaid。冻结后改资料或新增同意会返回 422 MEMBER_FROZEN。"
+        description="查询会员注册与支付事实，按需冻结、解冻或评估资格。"
       />
       <MutationBanner error={change.error} success={change.isSuccess ? `已提交状态变更，resourceId=${change.data?.resourceId}` : undefined} />
       <Panel className="table-panel">
         <QueryGate query={query} emptyTitle="没有会员" emptyDetail="当前租户没有返回会员。若你期望看到演示数据，JWT tenant_id 必须是 900001。">
           {(rows) => (
             <>
-              <table className="data-table">
-                <thead><tr><th>会员</th><th>状态</th><th>曾支付</th><th>版本</th><th /></tr></thead>
+              <table className="data-table trade-list-table">
+                <thead><tr><th>会员名称</th><th>会员 ID</th><th>会员状态</th><th>注册时间（北京时间）</th><th>曾确认支付</th><th>版本</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.memberId}>
-                      <td><strong>{row.displayName}</strong><small className="mono">{row.memberId}</small></td>
-                      <td><Badge tone={row.status === 'FROZEN' ? 'danger' : 'good'}>{row.status}</Badge></td>
+                      <td>{row.displayName}</td>
+                      <td className="mono">{row.memberId}</td>
+                      <td><Badge tone={row.status === MEMBER_FROZEN ? 'danger' : 'good'}>{row.status === MEMBER_FROZEN ? '冻结' : row.status === MEMBER_ACTIVE ? '正常' : row.status}</Badge></td>
+                      <td>{formatBeijingTime(row.registeredAt)}</td>
                       <td>{row.everPaid ? '是' : '否'}</td>
                       <td className="mono">{row.version}</td>
                       <td>
                         <Button tone="ghost" onClick={() => { setSelected(row); setReason(''); setFormError(''); change.reset() }}>
-                          {row.status === 'FROZEN' ? '解冻' : '冻结'}
+                          {row.status === MEMBER_FROZEN ? '解冻' : '冻结'}
                         </Button>
+                        {canEvidence ? <Button tone="ghost" onClick={() => {
+                          setEvidenceMember(row.memberId)
+                          document.getElementById('member-eligibility')?.scrollIntoView({ block: 'start' })
+                        }}>评估资格</Button> : null}
                       </td>
                     </tr>
                   ))}
@@ -71,7 +82,7 @@ export function MembersPage() {
       </Panel>
       {selected && (
         <Modal
-          title={selected.status === 'FROZEN' ? '解冻会员' : '冻结会员'}
+          title={selected.status === MEMBER_FROZEN ? '解冻会员' : '冻结会员'}
           description={`将提交 expectedVersion=${selected.version} 与 If-Match。冲突时请关闭后重新读取，不要换键盲重试。`}
           onClose={() => setSelected(undefined)}
         >
@@ -82,7 +93,7 @@ export function MembersPage() {
               setFormError('必须填写原因')
               return
             }
-            const targetStatus = selected.status === 'FROZEN' ? 'ACTIVE' : 'FROZEN'
+            const targetStatus = selected.status === MEMBER_FROZEN ? 'ACTIVE' : 'FROZEN'
             change.mutate({ member: selected, targetStatus, reason: reason.trim() })
           }}>
             {isVersionConflict(change.error) ? <StateBanner tone="warn" title="请重新读取" detail="版本已变化。关闭对话框并刷新列表后再提交新动作。" /> : null}
@@ -96,13 +107,13 @@ export function MembersPage() {
           </form>
         </Modal>
       )}
-      {canEvidence ? <EligibilityPanel /> : null}
+      {canEvidence ? <section id="member-eligibility" className="section-gap"><EligibilityPanel key={evidenceMember} initialMemberId={evidenceMember} /></section> : null}
     </div>
   )
 }
 
-function EligibilityPanel() {
-  const [memberId, setMemberId] = useState('')
+function EligibilityPanel({ initialMemberId }: { initialMemberId: string }) {
+  const [memberId, setMemberId] = useState(initialMemberId)
   const [policyVersion, setPolicyVersion] = useState<'REGISTERED_DURING_CAMPAIGN_V1' | 'NEVER_CONFIRMED_PAID_V1'>('NEVER_CONFIRMED_PAID_V1')
   const [campaignStartAt, setCampaignStartAt] = useState('')
   const [evaluatedAt, setEvaluatedAt] = useState('')
@@ -122,8 +133,8 @@ function EligibilityPanel() {
       if (policyVersion === 'REGISTERED_DURING_CAMPAIGN_V1' && !campaignStartAt.trim()) {
         throw new FormValidationError('REGISTERED_DURING_CAMPAIGN_V1 必须填写 campaignStartAt')
       }
-      const campaign = campaignStartAt.trim() ? new Date(campaignStartAt) : undefined
-      const evaluated = evaluatedAt.trim() ? new Date(evaluatedAt) : undefined
+      const campaign = campaignStartAt.trim() ? new Date(parseBeijingInput(campaignStartAt)) : undefined
+      const evaluated = evaluatedAt.trim() ? new Date(parseBeijingInput(evaluatedAt)) : undefined
       if (campaign && Number.isNaN(campaign.getTime())) throw new FormValidationError('campaignStartAt 无效')
       if (evaluated && Number.isNaN(evaluated.getTime())) throw new FormValidationError('evaluatedAt 无效')
       query.mutate({
@@ -156,10 +167,10 @@ function EligibilityPanel() {
             <option value="REGISTERED_DURING_CAMPAIGN_V1">REGISTERED_DURING_CAMPAIGN_V1</option>
           </select>
         </Field>
-        <Field label="campaignStartAt">
+        <Field label="活动开始时间（北京时间）">
           <input type="datetime-local" value={campaignStartAt} onChange={(event) => setCampaignStartAt(event.target.value)} />
         </Field>
-        <Field label="evaluatedAt">
+        <Field label="评估时间（北京时间）">
           <input type="datetime-local" value={evaluatedAt} onChange={(event) => setEvaluatedAt(event.target.value)} />
         </Field>
       </StackForm>
@@ -169,7 +180,7 @@ function EligibilityPanel() {
           <dt>eligible</dt><dd>{query.data.evidence ? (query.data.evidence.eligible ? '是' : '否') : '—'}</dd>
           <dt>原因</dt><dd className="mono">{query.data.evidence?.reasonCodes.join(', ') || '—'}</dd>
           <dt>首笔支付单</dt><dd className="mono">{dash(query.data.evidence?.firstPaidOrderNo)}</dd>
-          <dt>评估时刻</dt><dd className="mono">{dash(query.data.evidence?.evaluatedAt)}</dd>
+          <dt>评估时刻（北京时间）</dt><dd>{formatBeijingTime(query.data.evidence?.evaluatedAt)}</dd>
         </dl>
       ) : null}
     </Panel>

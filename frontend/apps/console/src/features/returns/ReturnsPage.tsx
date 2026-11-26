@@ -11,7 +11,7 @@ import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_RETURN_WRITE } from '../../shared/auth/auth-context'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
-import { dash } from '../../shared/ui/display'
+import { dash, formatBeijingTime } from '../../shared/ui/display'
 import { ReturnRows } from './ReturnRows'
 
 export function ReturnsPage() {
@@ -176,7 +176,7 @@ export function ReturnsPage() {
           </PageQueryGate>
         )}
       </Panel>
-      <div className="page-grid">
+      <div className="section-gap">
         <Panel>
           <h2>按单号查询</h2>
           <StackForm onSubmit={submitLookup} actions={<Button tone="primary" type="submit">读取</Button>}>
@@ -189,16 +189,16 @@ export function ReturnsPage() {
               <dt>申请</dt><dd className="mono">{detail.data.returnNo}</dd>
               <dt>订单</dt><dd className="mono">{detail.data.orderNo}</dd>
               <dt>会员</dt><dd className="mono">{detail.data.memberId}</dd>
-              <dt>明细 / 仓</dt><dd className="mono">{detail.data.orderItemId} / {detail.data.warehouseId}</dd>
+              <dt>订单明细 ID</dt><dd className="mono">{detail.data.orderItemId}</dd><dt>仓库 ID</dt><dd className="mono">{detail.data.warehouseId}</dd>
               <dt>数量</dt><dd>{detail.data.quantity}</dd>
               <dt>状态</dt><dd><Badge>{detail.data.status}</Badge></dd>
               <dt>版本</dt><dd className="mono">{detail.data.version}</dd>
               <dt>实收号</dt><dd>{detail.data.receiptNo ?? '尚未验收'}</dd>
-              <dt>观察时刻</dt><dd className="mono">{detail.data.observedAt}</dd>
+              <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(detail.data.observedAt)}</dd>
               {detail.data.inspection ? (
                 <>
-                  <dt>验收数量</dt><dd>{detail.data.inspection.receivedQuantity} / 回库 {detail.data.inspection.restockQuantity}</dd>
-                  <dt>登记时间</dt><dd className="mono">{detail.data.inspection.recordedAt}</dd>
+                  <dt>验收数量</dt><dd>{detail.data.inspection.receivedQuantity}</dd><dt>回库数量</dt><dd>{detail.data.inspection.restockQuantity}</dd>
+                  <dt>登记时间（北京时间）</dt><dd className="mono">{formatBeijingTime(detail.data.inspection.recordedAt)}</dd>
                   <dt>验收实收</dt><dd className="mono">{detail.data.inspection.receiptNo}</dd>
                 </>
               ) : <><dt>验收</dt><dd>{dash(null)}</dd></>}

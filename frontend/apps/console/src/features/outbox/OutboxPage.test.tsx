@@ -57,7 +57,7 @@ describe('OutboxPage', () => {
     expect(await screen.findByText('order.paid.v1')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '重放' }))
     await userEvent.type(screen.getByLabelText('原因'), '人工核对')
-    await userEvent.type(screen.getByLabelText('ticketRef'), 'T-1')
+    await userEvent.type(screen.getByLabelText('工单引用'), 'T-1')
     await userEvent.click(screen.getByRole('button', { name: '确认重放' }))
     await waitFor(() => {
       const taskGets = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/tasks'))

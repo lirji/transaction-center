@@ -52,19 +52,21 @@ export function ConsentsPage() {
         title="条款文档"
         description="后台发布不可变版本后再给会员展示。服务端不抓取远端正文，也不把列表中的任一版本暗中当成已同意。注册不会自动勾选营销条款。"
       />
-      <div className="page-grid">
+      <div className="section-gap">
         <Panel className="table-panel">
           <QueryGate query={query} emptyTitle="尚未发布条款" emptyDetail="发布后会出现在本租户列表。不要按 documentVersion 字符串排序当最新。">
             {(rows) => (
               <>
-                <table className="data-table">
-                  <thead><tr><th>用途 / 版本</th><th>标题</th><th>摘要</th></tr></thead>
+                <table className="data-table trade-list-table">
+                  <thead><tr><th>用途</th><th>版本</th><th>标题</th><th>正文</th><th>SHA-256 摘要</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.id}>
-                        <td><strong>{row.purpose}</strong><small className="mono">{row.documentVersion}</small></td>
-                        <td>{row.title}<small><a href={row.contentUrl} target="_blank" rel="noreferrer">{row.contentUrl}</a></small></td>
-                        <td className="mono">{row.contentHash.slice(0, 12)}…</td>
+                        <td>{row.purpose}</td>
+                        <td className="mono">{row.documentVersion}</td>
+                        <td>{row.title}</td>
+                        <td><a href={row.contentUrl} target="_blank" rel="noreferrer">查看正文</a></td>
+                        <td className="mono">{row.contentHash}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -78,13 +80,13 @@ export function ConsentsPage() {
           <h2>发布新版本</h2>
           <MutationBanner error={publish.error} success={publish.data ? `已发布 resourceId=${publish.data.resourceId}` : undefined} />
           <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={publish.isPending}>发布</Button>}>
-            <Field label="purpose"><input value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={64} /></Field>
-            <Field label="documentVersion"><input value={documentVersion} onChange={(event) => setDocumentVersion(event.target.value)} maxLength={64} /></Field>
+            <Field label="用途"><input value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={64} /></Field>
+            <Field label="版本"><input value={documentVersion} onChange={(event) => setDocumentVersion(event.target.value)} maxLength={64} /></Field>
             <Field label="标题"><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} /></Field>
-            <Field label="contentUrl" hint="必须 HTTPS，页面应展示与 contentHash 对应的内容。">
+            <Field label="正文 HTTPS 地址" hint="必须 HTTPS，页面应展示与 contentHash 对应的内容。">
               <input value={contentUrl} onChange={(event) => setContentUrl(event.target.value)} maxLength={1000} />
             </Field>
-            <Field label="contentHash" error={formError}>
+            <Field label="正文 SHA-256 摘要" error={formError}>
               <input value={contentHash} onChange={(event) => setContentHash(event.target.value)} className="mono" />
             </Field>
           </StackForm>

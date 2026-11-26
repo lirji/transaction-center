@@ -7,6 +7,7 @@ import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_EVENTS_REPLAY } from '../../shared/auth/auth-context'
+import { formatBeijingTime } from '../../shared/ui/display'
 
 const queueStates = ['REVIEW', 'PENDING', 'SENT'] as const
 
@@ -57,14 +58,15 @@ export function OutboxPage() {
         <QueryGate query={publications} emptyTitle="没有发布记录" emptyDetail="当前状态下没有 Outbox 元数据。">
           {(rows) => (
             <>
-              <table className="data-table">
-                <thead><tr><th>事件</th><th>状态</th><th>失败</th><th /></tr></thead>
+              <table className="data-table trade-list-table">
+                <thead><tr><th>事件编号</th><th>事件类型</th><th>业务对象 ID</th><th>发布状态</th><th>失败次数</th><th>最近失败（北京时间）</th><th>最近错误</th><th>重放次数</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td><strong>{row.eventType}</strong><small className="mono">{row.eventId}</small></td>
+                      <td className="mono">{row.eventId}</td>
+                      <td>{row.eventType}</td><td className="mono">{row.aggregateId}</td>
                       <td><Badge tone={row.status === 'REVIEW' ? 'warn' : 'neutral'}>{row.status}</Badge></td>
-                      <td>{row.lastError ?? '—'}<small>replay {row.replayCount}</small></td>
+                      <td>{row.failureCount}</td><td>{formatBeijingTime(row.lastFailureAt)}</td><td>{row.lastError ?? '—'}</td><td>{row.replayCount}</td>
                       <td>
                         <Button
                           tone="ghost"
@@ -84,7 +86,7 @@ export function OutboxPage() {
         </QueryGate>
       </Panel>
       <Panel className="table-panel">
-        <h2 style={{ padding: '16px 18px 0' }}>任务</h2>
+        <h2 className="table-title">维护任务</h2>
         <div style={{ padding: '0 18px' }}>
           <select value={taskState} onChange={(event) => { setTaskState(event.target.value as typeof taskState); setTaskAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
@@ -97,13 +99,13 @@ export function OutboxPage() {
           {(rows) => (
             <>
               <table className="data-table">
-                <thead><tr><th>任务</th><th>状态</th><th>尝试</th><th>错误</th></tr></thead>
+                <thead><tr><th>任务编号</th><th>事件编号</th><th>引用摘要</th><th>状态</th><th>尝试次数</th><th>下次运行（北京时间）</th><th>最近错误</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td className="mono">{row.eventId ?? row.referenceHash}</td>
+                      <td className="mono">{row.id}</td><td>{row.eventId ?? '—'}</td><td className="mono">{row.referenceHash}</td>
                       <td><Badge>{row.status}</Badge></td>
-                      <td>{row.attempts}</td>
+                      <td>{row.attempts}</td><td>{formatBeijingTime(row.nextRunAt)}</td>
                       <td>{row.lastError ?? '—'}</td>
                     </tr>
                   ))}
@@ -121,7 +123,7 @@ export function OutboxPage() {
             replay.mutate({ eventId: selected.eventId, expectedVersion: selected.version, reason: reason.trim(), ticketRef: ticketRef.trim() })
           }}>
             <Field label="原因"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
-            <Field label="ticketRef"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
+            <Field label="工单引用"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
             <div className="modal-actions">
               <Button onClick={() => setSelected(undefined)}>取消</Button>
               <Button tone="primary" type="submit" disabled={replay.isPending}>确认重放</Button>

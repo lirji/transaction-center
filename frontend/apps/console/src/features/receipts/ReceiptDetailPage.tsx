@@ -4,6 +4,7 @@ import { Badge, PageHeader, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
+import { formatBeijingTime } from '../../shared/ui/display'
 
 export function ReceiptDetailPage() {
   const { receiptNo = '' } = useParams()
@@ -41,10 +42,10 @@ export function ReceiptDetailPage() {
           <dt>已退</dt><dd>{formatMinor(row.refundedAmount, row.currency)}</dd>
           <dt>退款预占</dt><dd>{formatMinor(row.refundReservedAmount, row.currency)}</dd>
           <dt>未占用</dt><dd>{formatMinor(row.unreservedAmount, row.currency)}</dd>
-          <dt>渠道支付时间</dt><dd className="mono">{row.providerPaidAt}</dd>
-          <dt>确认时间</dt><dd className="mono">{row.confirmedAt}</dd>
+          <dt>渠道支付时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.providerPaidAt)}</dd>
+          <dt>确认时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.confirmedAt)}</dd>
           <dt>版本</dt><dd className="mono">{row.version}</dd>
-          <dt>观察时刻</dt><dd className="mono">{row.observedAt}</dd>
+          <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.observedAt)}</dd>
         </dl>
       </Panel>
     </div>

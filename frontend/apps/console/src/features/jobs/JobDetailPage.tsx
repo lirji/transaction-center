@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Badge, PageHeader, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
-import { dash, statusTone } from '../../shared/ui/display'
+import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
 
 function referencePath(resourceType: string, resourceNo: string) {
   if (resourceType === 'ORDER') return `/orders/${encodeURIComponent(resourceNo)}`
@@ -43,10 +43,12 @@ export function JobDetailPage() {
           <dt>类型</dt><dd className="mono">{row.jobType}</dd>
           <dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{row.status}</Badge></dd>
           <dt>尝试</dt><dd>{row.attempts}</dd>
-          <dt>下次运行</dt><dd className="mono">{row.nextRunAt}</dd>
-          <dt>租约至</dt><dd className="mono">{dash(row.leaseUntil)}</dd>
+          <dt>下次运行（北京时间）</dt><dd className="mono">{formatBeijingTime(row.nextRunAt)}</dd>
+          <dt>租约到期（北京时间）</dt><dd className="mono">{formatBeijingTime(row.leaseUntil)}</dd>
           <dt>租约过期</dt><dd>{row.leaseExpired ? '是（观察值）' : '否'}</dd>
           <dt>最近错误</dt><dd>{dash(row.lastError)}</dd>
+          <dt>创建时间（北京时间）</dt><dd>{formatBeijingTime(row.createdAt)}</dd>
+          <dt>更新时间（北京时间）</dt><dd>{formatBeijingTime(row.updatedAt)}</dd>
           <dt>业务引用</dt>
           <dd>{row.businessReference
             ? href
@@ -54,7 +56,7 @@ export function JobDetailPage() {
               : <span className="mono">{row.businessReference.resourceType} {row.businessReference.resourceNo}</span>
             : '—'}</dd>
           <dt>版本</dt><dd className="mono">{row.version}</dd>
-          <dt>观察时刻</dt><dd className="mono">{row.observedAt}</dd>
+          <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.observedAt)}</dd>
         </dl>
       </Panel>
     </div>

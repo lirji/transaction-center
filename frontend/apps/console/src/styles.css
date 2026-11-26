@@ -123,6 +123,8 @@ main { min-width: 0; }
 .data-table.receipt-table { min-width: 1040px; }
 .data-table.refund-table { min-width: 820px; }
 .data-table.trade-list-table { min-width: 880px; }
+.table-scroll { max-width: 100%; overflow-x: auto; }
+.row-action-cell { white-space: nowrap; }
 .queue-table td { overflow-wrap: anywhere; }
 .queue-table td:last-child { white-space: nowrap; }
 .data-table { width: 100%; border-collapse: collapse; }
@@ -152,7 +154,7 @@ main { min-width: 0; }
 .kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px; font-size: 13px; }
 .kv dt { color: var(--ink-400); }
 .kv dd { margin: 0; }
-.section-gap { display: grid; gap: 16px; }
+.section-gap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .queue-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .queue-actions + .filter-bar { margin-top: 12px; }
 .queue-actions .button.secondary[aria-pressed="true"] { color: var(--teal); border-color: var(--teal); background: #edf9f6; }

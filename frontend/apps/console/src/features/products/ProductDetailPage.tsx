@@ -1,25 +1,32 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { Badge, Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, ConfirmDialog, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type Sku } from '../../shared/api/client'
 import { MutationBanner } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
-import { formatMinor, parseInteger } from '../../shared/api/money'
+import { formatMinor, formatMinorAmount, parseInteger } from '../../shared/api/money'
 import { describeProblem } from '../../shared/api/client'
 import { parseCurrencyCode } from '../../shared/api/validate'
+import { productStatusSchema } from '../../shared/api/schemas'
+import { productStatusLabels, stockTypeLabels } from './productDisplay'
 
 export function ProductDetailPage() {
   const { id = '' } = useParams()
+  return <ProductDetail key={id} id={id} />
+}
+
+function ProductDetail({ id }: { id: string }) {
   const queryClient = useQueryClient()
   const product = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) })
-  const skus = useQuery({ queryKey: ['product-skus', id], queryFn: () => api.productSkus(id), enabled: Boolean(id) })
+  const [skuAfter, setSkuAfter] = useState(0)
+  const skus = useQuery({ queryKey: ['product-skus', id, skuAfter], queryFn: () => api.productSkus(id, skuAfter), enabled: Boolean(id) })
   const [name, setName] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
-  const [currency, setCurrency] = useState('CNY')
+  const [currency, setCurrency] = useState('')
   const [skuNo, setSkuNo] = useState('')
   const [skuPrice, setSkuPrice] = useState('')
-  const [skuCurrency, setSkuCurrency] = useState('CNY')
+  const [skuCurrency, setSkuCurrency] = useState('')
   const [stockType, setStockType] = useState<'PHYSICAL' | 'SERVICE'>('PHYSICAL')
   const [specKey, setSpecKey] = useState('color')
   const [specValue, setSpecValue] = useState('')
@@ -77,7 +84,7 @@ export function ProductDetailPage() {
     return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to="/products">返回列表</Link></div>
   }
   const current = product.data
-  const draft = current.status === 'DRAFT'
+  const draft = current.status === productStatusSchema.enum.DRAFT
   const draftName = name || current.name
   const draftPrice = unitPrice || String(current.unitPrice)
   const draftCurrency = currency || current.currency
@@ -107,7 +114,7 @@ export function ProductDetailPage() {
         expectedVersion: current.version,
         skuNo: skuNo.trim(),
         unitPrice: parseInteger(skuPrice, 'SKU 单价', { min: 0 }),
-        currency: parseCurrencyCode(skuCurrency),
+        currency: parseCurrencyCode(skuCurrency || current.currency),
         stockType,
         specification,
       })
@@ -141,44 +148,49 @@ export function ProductDetailPage() {
       <PageHeader
         eyebrow="Catalog"
         title={current.name}
-        description={`状态 ${current.status} · 版本 ${current.version}。目录价不是下单应付额。`}
+        description={`状态 ${productStatusLabels[current.status]} · 版本 ${current.version}。目录价不是下单应付额。`}
         actions={<Link className="button secondary" to="/products">返回列表</Link>}
       />
       <MutationBanner
         error={edit.error ?? publish.error ?? unpublish.error ?? addSku.error ?? saveSku.error}
         success={edit.data || publish.data || unpublish.data || addSku.data || saveSku.data ? `resourceId=${(edit.data ?? publish.data ?? unpublish.data ?? addSku.data ?? saveSku.data)?.resourceId}` : undefined}
       />
-      <div className="page-grid">
+      <div className="section-gap">
         <div className="section-gap">
           <Panel>
             <dl className="kv">
               <dt>商品 ID</dt><dd className="mono">{current.productId}</dd>
               <dt>主 SKU</dt><dd className="mono">{current.skuId}</dd>
-              <dt>状态</dt><dd><Badge tone={current.status === 'PUBLISHED' ? 'good' : 'warn'}>{current.status}</Badge></dd>
+              <dt>状态</dt><dd><Badge tone={current.status === productStatusSchema.enum.PUBLISHED ? 'good' : 'warn'}>{productStatusLabels[current.status]}</Badge></dd>
               <dt>发布修订</dt><dd className="mono">{current.publishedRevision ?? '无'}</dd>
-              <dt>目录价</dt><dd>{formatMinor(current.unitPrice, current.currency)}<small className="mono">{current.currency} {current.unitPrice}</small></dd>
+              <dt>目录价</dt><dd>{formatMinor(current.unitPrice, current.currency)}</dd>
             </dl>
             {draft ? (
               <div className="heading-actions">
                 <Button tone="primary" disabled={publish.isPending} onClick={() => setConfirm('publish')}>发布</Button>
               </div>
-            ) : current.status === 'PUBLISHED' ? (
+            ) : current.status === productStatusSchema.enum.PUBLISHED ? (
               <Button disabled={unpublish.isPending} onClick={() => setConfirm('unpublish')}>下架</Button>
             ) : null}
           </Panel>
           <Panel className="table-panel">
-            <h2 style={{ padding: '16px 18px 0' }}>SKU</h2>
+            <h2 className="table-title">SKU</h2>
             {skus.isLoading ? <StateBanner tone="loading" title="正在读取 SKU" detail="GET /admin/products/{id}/skus" /> : null}
             {skus.isError ? <StateBanner tone="error" title={describeProblem(skus.error).title} detail={describeProblem(skus.error).detail} /> : null}
             {skus.data && skus.data.length > 0 ? (
-              <table className="data-table">
-                <thead><tr><th>SKU</th><th>库存类型</th><th>单价</th><th>修订</th>{draft ? <th /> : null}</tr></thead>
+              <>
+              <table className="data-table trade-list-table">
+                <thead><tr><th>SKU 标题</th><th>SKU 编码</th><th>SKU ID</th><th>规格</th><th>库存类型</th><th>单价</th><th>币种</th><th>修订</th>{draft ? <th>操作</th> : null}</tr></thead>
                 <tbody>
                   {skus.data.map((row) => (
                     <tr key={row.skuId}>
-                      <td><strong>{row.title}</strong><small className="mono">{row.skuNo} / {row.skuId}</small></td>
-                      <td>{row.stockType}</td>
-                      <td>{formatMinor(row.unitPrice, row.currency)}<small className="mono">{row.currency} {row.unitPrice}</small></td>
+                      <td>{row.title}</td>
+                      <td className="mono">{row.skuNo}</td>
+                      <td className="mono">{row.skuId}</td>
+                      <td>{Object.entries(row.specification).map(([key, value]) => `${key} ${value}`).join('、') || '—'}</td>
+                      <td>{stockTypeLabels[row.stockType]}</td>
+                      <td>{formatMinorAmount(row.unitPrice)}</td>
+                      <td>{row.currency}</td>
                       <td className="mono">{row.revision}</td>
                       {draft ? (
                         <td>
@@ -198,6 +210,8 @@ export function ProductDetailPage() {
                   ))}
                 </tbody>
               </table>
+              <CursorPager after={skuAfter} pageSize={20} lastId={skus.data.at(-1)?.skuId} length={skus.data.length} onReset={() => setSkuAfter(0)} onNext={setSkuAfter} />
+              </>
             ) : skus.data ? <div style={{ padding: '16px 18px' }}><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
           </Panel>
         </div>
@@ -220,11 +234,11 @@ export function ProductDetailPage() {
               <StackForm onSubmit={submitSku} actions={<Button tone="primary" type="submit" disabled={addSku.isPending}>追加</Button>}>
                 <Field label="skuNo"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} required /></Field>
                 <Field label="单价"><input value={skuPrice} onChange={(event) => setSkuPrice(event.target.value)} required /></Field>
-                <Field label="币种"><input value={skuCurrency} onChange={(event) => setSkuCurrency(event.target.value)} /></Field>
-                <Field label="stockType">
+                <Field label="币种"><input value={skuCurrency} placeholder={current.currency} onChange={(event) => setSkuCurrency(event.target.value)} /></Field>
+                <Field label="库存类型">
                   <select value={stockType} onChange={(event) => setStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
-                    <option value="PHYSICAL">PHYSICAL</option>
-                    <option value="SERVICE">SERVICE</option>
+                    <option value="PHYSICAL">实物</option>
+                    <option value="SERVICE">服务</option>
                   </select>
                 </Field>
                 <Field label="规格键"><input value={specKey} onChange={(event) => setSpecKey(event.target.value)} /></Field>
@@ -243,10 +257,10 @@ export function ProductDetailPage() {
               }>
                 <Field label="单价" error={formError}><input value={editPrice} onChange={(event) => setEditPrice(event.target.value)} required /></Field>
                 <Field label="币种"><input value={editCurrency} onChange={(event) => setEditCurrency(event.target.value)} /></Field>
-                <Field label="stockType">
+                <Field label="库存类型">
                   <select value={editStockType} onChange={(event) => setEditStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
-                    <option value="PHYSICAL">PHYSICAL</option>
-                    <option value="SERVICE">SERVICE</option>
+                    <option value="PHYSICAL">实物</option>
+                    <option value="SERVICE">服务</option>
                   </select>
                 </Field>
                 <Field label="规格键"><input value={editSpecKey} onChange={(event) => setEditSpecKey(event.target.value)} /></Field>

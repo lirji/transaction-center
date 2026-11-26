@@ -7,7 +7,7 @@ import { FormValidationError, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
-import { statusTone } from '../../shared/ui/display'
+import { statusTone, formatBeijingTime } from '../../shared/ui/display'
 import { jobStatusSchema, jobTypeSchema } from '../../shared/api/schemas'
 
 const JOB_TYPES = jobTypeSchema.options
@@ -15,8 +15,8 @@ const JOB_STATUSES = jobStatusSchema.options
 
 export function JobRows({ rows }: { rows: AdminJobView[] }) {
   return (
-    <table className="data-table">
-      <thead><tr><th>任务</th><th>类型</th><th>状态</th><th>尝试</th><th>租约过期</th><th>下次运行</th></tr></thead>
+    <table className="data-table trade-list-table">
+      <thead><tr><th>任务编号</th><th>任务类型</th><th>状态</th><th>尝试次数</th><th>租约过期</th><th>下次运行（北京时间）</th><th>最近错误</th><th>更新时间（北京时间）</th></tr></thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.jobId}>
@@ -25,7 +25,7 @@ export function JobRows({ rows }: { rows: AdminJobView[] }) {
             <td><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>
             <td>{row.attempts}</td>
             <td>{row.leaseExpired ? '是' : '否'}</td>
-            <td className="mono">{row.nextRunAt}</td>
+            <td>{formatBeijingTime(row.nextRunAt)}</td><td>{row.lastError ?? '—'}</td><td>{formatBeijingTime(row.updatedAt)}</td>
           </tr>
         ))}
       </tbody>
@@ -82,9 +82,9 @@ export function JobsPage() {
       <Panel>
         <h2>筛选</h2>
         <FilterBar onSubmit={submit}>
-          <Field label="jobType"><EmptySelect value={jobType} onChange={setJobType} options={JOB_TYPES} /></Field>
-          <Field label="status"><EmptySelect value={status} onChange={setStatus} options={JOB_STATUSES} /></Field>
-          <Field label="leaseExpired">
+          <Field label="任务类型"><EmptySelect value={jobType} onChange={setJobType} options={JOB_TYPES} /></Field>
+          <Field label="状态"><EmptySelect value={status} onChange={setStatus} options={JOB_STATUSES} /></Field>
+          <Field label="租约过期">
             <select value={leaseExpired} onChange={(event) => setLeaseExpired(event.target.value)}>
               <option value="">全部</option>
               <option value="true">已过期</option>
