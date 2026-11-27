@@ -27,6 +27,7 @@ import {
   memberSchema,
   merchantSchema,
   operationAuditPageSchema,
+  numberedOrderPageSchema,
   operationsFinancialFactSchema,
   operationsSummarySchema,
   type OperationsScope,
@@ -85,7 +86,10 @@ import {
   type Sku,
   type Warehouse,
 } from './schemas'
-import { bodyHash, cursorQuery, pageQuery, refundQueueQuery, rememberIdempotencyKey, strongEtag, type QueryScalar, type RefundQueueQuery } from './keys'
+import { bodyHash, cursorQuery, numberedPageQuery, pageQuery, refundQueueQuery, rememberIdempotencyKey, strongEtag, type QueryScalar, type RefundQueueQuery } from './keys'
+
+const HTTP_NOT_FOUND = 404
+const HTTP_METHOD_NOT_ALLOWED = 405
 
 let accessTokenProvider: () => string | undefined = () => undefined
 let unauthorizedHandler: () => void = () => undefined
@@ -354,9 +358,13 @@ export const api = {
     return request(`${admin}/operation-audits${search.size ? '?' + search.toString() : ''}`,
       { signal }, (value) => parseWith(operationAuditPageSchema, value))
   },
-  refundAudit: (refundNo: string, cursor?: string, signal?: AbortSignal) =>
-    request(`${admin}/refunds/${encodeURIComponent(refundNo)}/operation-audits${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`,
-      { signal }, (value) => parseWith(refundAuditHistorySchema, value)),
+  refundAudit: (refundNo: string, { cursor, limit }: { cursor?: string; limit?: number }, signal?: AbortSignal) => {
+    const search = new URLSearchParams()
+    if (cursor) search.set('cursor', cursor)
+    if (limit !== undefined) search.set('limit', String(limit))
+    return request(`${admin}/refunds/${encodeURIComponent(refundNo)}/operation-audits${search.size ? '?' + search.toString() : ''}`,
+      { signal }, (value) => parseWith(refundAuditHistorySchema, value))
+  },
 
   paymentChannels: (after = 0, limit = 20) =>
     request(`${admin}/payment-channels${cursorQuery(after, limit)}`, undefined, (value) => parseArray(channelViewSchema, value)),
@@ -426,6 +434,16 @@ export const api = {
     request(`${admin}/operations/financial-facts${pageQuery(query)}`, { signal }, (value) => parsePage(operationsFinancialFactSchema, value)),
   orders: (query: Record<string, QueryScalar> = {}) =>
     request(`${admin}/orders${pageQuery(query)}`, undefined, (value) => parsePage(adminOrderViewSchema, value)),
+  numberedOrders: async (page: number, limit: number, filters: Record<string, QueryScalar>, signal?: AbortSignal) => {
+    try {
+      return await request(`${admin}/order-pages${numberedPageQuery(page, limit, filters)}`,
+        { signal }, (value) => parseWith(numberedOrderPageSchema, value))
+    } catch (cause) {
+      // 仅在路由明确不可用时回退。权限和暂时故障仍按原错误处理。
+      if (cause instanceof ApiProblem && (cause.status === HTTP_NOT_FOUND || cause.status === HTTP_METHOD_NOT_ALLOWED)) return undefined
+      throw cause
+    }
+  },
   order: (orderNo: string) =>
     request(`${admin}/orders/${encodeURIComponent(orderNo)}`, undefined, (value) => parseWith(adminOrderDetailSchema, value)),
   payments: (query: Record<string, QueryScalar> = {}, signal?: AbortSignal) =>

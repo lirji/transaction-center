@@ -7,15 +7,20 @@ import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
 import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
 import { refundAuditActions, refundAuditResults } from '../../shared/ui/refundAuditLabels'
+import { usePageSize } from '../../shared/ui/usePageSize'
 import { refundLabels } from './refundStatus'
 
 /** 按已授权的原退款读取独立操作流水，部分日志故障不影响退款详情。 */
 function RefundAuditHistory({ refundNo }: { refundNo: string }) {
   const [shown, setShown] = useState(false)
   const [cursor, setCursor] = useState('0')
+  const [pageSize, setPageSize] = usePageSize('refund-operation-audits', 50, () => setCursor('0'))
   const history = useQuery({
-    queryKey: ['refund-operation-audits', refundNo, cursor],
-    queryFn: ({ signal }) => api.refundAudit(refundNo, cursor === '0' ? undefined : cursor, signal),
+    queryKey: ['refund-operation-audits', refundNo, cursor, pageSize],
+    queryFn: ({ signal }) => api.refundAudit(refundNo, {
+      cursor: cursor === '0' ? undefined : cursor,
+      limit: pageSize === 50 ? undefined : pageSize,
+    }, signal),
     enabled: shown,
     retry: false,
   })
@@ -54,7 +59,7 @@ function RefundAuditHistory({ refundNo }: { refundNo: string }) {
           <Button onClick={() => void history.refetch()}>重试</Button>
         </div>
       )}
-      {shown && <PagePager scope={['refund-operation-audits', refundNo]} after={cursor} onPage={setCursor}
+      {shown && <PagePager scope={['refund-operation-audits', refundNo]} after={cursor} onPage={setCursor} pageSize={pageSize} onPageSize={setPageSize}
         result={history.isSuccess ? history.data : undefined} />}
     </Panel>
   )

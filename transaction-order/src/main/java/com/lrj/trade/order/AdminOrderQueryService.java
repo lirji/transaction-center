@@ -22,6 +22,19 @@ public class AdminOrderQueryService {
         Checks.positive(tenant);Instant at=clock.instant();
         return AdminPage.of(mapper.page(tenant,orderNumberSearch(query)),query.limit(),at);
     }
+    /** 计数和按页读取使用同一 RR 快照，避免并发写入导致本次结果与总量不一致。 */
+    public AdminNumberedPage<AdminOrderView> numberedPage(long tenant, AdminQuery query, long page) {
+        Checks.positive(tenant);
+        if (query.after() != 0 || page < 1 || page > AdminNumbers.MAX_SAFE_INTEGER) {
+            throw AdminQuery.invalid();
+        }
+        AdminQuery filters = orderNumberSearch(query);
+        Instant observedAt = clock.instant();
+        long count = mapper.count(tenant, filters);
+        return AdminNumberedPage.of(page, filters.limit(), count, observedAt,
+                offset -> mapper.numberedPage(tenant, filters, offset));
+    }
+
     /** 仅接受业务日与四位尾号，固定前缀用于索引且不开放输入通配符。 */
     private static AdminQuery orderNumberSearch(AdminQuery query) {
         if (!(query.filters().get("orderNo") instanceof String orderNo)) return query;

@@ -53,6 +53,14 @@ public class AdminQueryController {
     public AdminPage<com.lrj.trade.order.model.AdminOrderView> orderList(@AuthenticationPrincipal Jwt jwt,@RequestParam MultiValueMap<String,String> params) {
         return order.page(actor(jwt).tenantId(),AdminQueryParameters.parse("order",params));
     }
+    /** 管理台按指定页定位，旧游标客户端继续使用原列表入口。 */
+    @GetMapping("/order-pages")
+    public AdminNumberedPage<com.lrj.trade.order.model.AdminOrderView> numberedOrders(
+            @AuthenticationPrincipal Jwt jwt, @RequestParam MultiValueMap<String, String> params) {
+        var request = AdminQueryParameters.orderPage(params);
+        return order.numberedPage(actor(jwt).tenantId(), request.query(), request.page());
+    }
+
     /** 详情只返回安全投影，不解密地址或渠道凭据。 */
     @GetMapping("/orders/{orderNo}")
     public AdminOrderQueryService.Detail orderDetail(@AuthenticationPrincipal Jwt jwt,@PathVariable String orderNo,@RequestParam MultiValueMap<String,String> params) {
@@ -142,12 +150,17 @@ public class AdminQueryController {
     public AuditWriter.History refundAudit(@AuthenticationPrincipal Jwt jwt,@PathVariable String refundNo,
                                           @RequestParam MultiValueMap<String,String> params) {
         AdminQuery.text(refundNo,64);
-        var cursors=params.get("cursor");
-        if(params.size()!=(cursors==null?0:1) || cursors!=null && cursors.size()!=1)
-            throw new TradeException("INVALID_ARGUMENT","审计查询参数无效");
-        Actor actor=actor(jwt);
-        var owned=refund.read(actor.tenantId(),refundNo);
-        return operationAudit.refundHistory(actor,owned.refundNo(),cursors==null?null:cursors.getFirst());
+        if (params.entrySet().stream().anyMatch(entry ->
+                !Set.of("cursor", "limit").contains(entry.getKey()) || entry.getValue().size() != 1)) {
+            throw new TradeException("INVALID_ARGUMENT", "审计查询参数无效");
+        }
+        Integer limit = params.containsKey("limit")
+                ? AdminQuery.parse(Map.of("limit", params.get("limit")), Map.of(), false).limit() : null;
+        Actor actor = actor(jwt);
+        var owned = refund.read(actor.tenantId(), refundNo);
+        String cursor = params.getFirst("cursor");
+        return limit == null ? operationAudit.refundHistory(actor, owned.refundNo(), cursor)
+                : operationAudit.refundHistory(actor, owned.refundNo(), cursor, limit);
     }
     /** 同单读取复用已授权的订单、收款和退款查询，以已持久化的报价绑定标记商城来源。 */
     @GetMapping("/orders/{orderNo}/operation-evidence")

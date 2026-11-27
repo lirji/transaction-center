@@ -42,6 +42,18 @@ test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ p
   const auditRequests = page.getByRole('row').filter({ hasText: '申请退款' })
   await expect(auditRequests.getByText('已提交', { exact: true })).toBeVisible()
   await expect(auditRequests.getByText('重复请求', { exact: true })).toBeVisible()
+  const auditPath = `/admin/refunds/${data.refundNo}/operation-audits`
+  const history = await api(page, auditPath)
+  const auditFirst = await api(page, auditPath + '?limit=1')
+  expect(auditFirst.status).toBe(200)
+  expect(auditFirst.body.items).toEqual(history.body.items.slice(0, 1))
+  const auditNext = await api(page, auditPath + '?' + new URLSearchParams({ limit: '1', cursor: auditFirst.body.nextCursor }))
+  expect(auditNext.body.items).toEqual(history.body.items.slice(1, 2))
+  expect((await api(page, auditPath + '?limit=101')).status).toBe(400)
+  expect((await api(page, auditPath + '?limit=1&limit=2')).status).toBe(400)
+  await page.getByRole('combobox', { name: '每页条数' }).click()
+  await page.getByRole('option', { name: '10 条 / 页' }).click()
+  await expect(auditRequests.getByText('重复请求', { exact: true })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('refund-operation-audit.png'), fullPage: true })
 
   await expect(page.getByRole('button', { name: /批准|驳回/ })).toHaveCount(0)
@@ -106,6 +118,32 @@ test('latest orders keep the same order across cursor pages', async ({ page }) =
   }
   expect(after).toBeNull()
   expect((await api(page, '/admin/orders?sort=member_id')).status).toBe(400)
+})
+
+test('numbered order pages count the filtered tenant and jump directly with stable sorting', async ({ page }) => {
+  await login(page)
+  const filter = 'currency=CNY&sort=CREATED_DESC'
+  const legacy = await api(page, `/admin/orders?limit=100&${filter}`)
+  expect(legacy.status).toBe(200)
+  const rows = legacy.body.items
+  expect(rows.length).toBeGreaterThan(2)
+
+  const third = await api(page, `/admin/order-pages?page=3&limit=1&${filter}`)
+  expect(third.status).toBe(200)
+  expect(third.body).toMatchObject({ page: 3, pageSize: 1, totalCount: rows.length, totalPages: rows.length })
+  expect(third.body.items).toEqual([rows[2]])
+  expect(Date.parse(third.body.observedAt)).toBeGreaterThan(0)
+
+  const last = await api(page, `/admin/order-pages?page=9007199254740991&limit=2&${filter}`)
+  const lastPage = Math.ceil(rows.length / 2)
+  expect(last.body).toMatchObject({ page: lastPage, totalPages: lastPage, items: rows.slice((lastPage - 1) * 2) })
+  const exact = await api(page, `/admin/order-pages?orderNo=${encodeURIComponent(rows[2].orderNo)}`)
+  expect(exact.body).toMatchObject({ page: 1, totalCount: 1, totalPages: 1, items: [rows[2]] })
+  const empty = await api(page, '/admin/order-pages?page=7&currency=XXX')
+  expect(empty.body).toMatchObject({ page: 1, totalCount: 0, totalPages: 0, items: [] })
+  for (const invalid of ['page=0', 'page=9007199254740992', 'page=1&page=2', 'page=2&after=0', 'limit=101']) {
+    expect((await api(page, `/admin/order-pages?${invalid}`)).status).toBe(400)
+  }
 })
 
 test('product SKU, member registration, and available inventory filters read past the first page', async ({ page }) => {
@@ -286,6 +324,7 @@ test('another tenant sees no seeded orders and cannot drill into them', async ({
   expect((await api(page, `/admin/operations/financial-facts?${range}&scope=NET`)).body.items).toEqual([])
   expect((await api(page, `/admin/orders/${data.paidOrder}`)).status).toBe(404)
   expect((await api(page, '/admin/products/search?skuNo=INTEGRATION-ALT-SECOND')).body).toEqual([])
+  expect((await api(page, '/admin/order-pages?page=2')).body).toMatchObject({ page: 1, totalCount: 0, totalPages: 0, items: [] })
   expect((await api(page, `/admin/members?memberId=${data.memberId}`)).body).toEqual([])
   expect((await api(page, `/admin/inventories?warehouseId=${data.warehouseId}&skuId=${data.skuId}`)).body).toEqual([])
 })

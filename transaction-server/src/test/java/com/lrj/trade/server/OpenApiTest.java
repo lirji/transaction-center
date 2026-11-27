@@ -29,6 +29,6 @@ class OpenApiTest {
         for(var path:paths.properties()) for(var operation:path.getValue().properties())
             documented.add(operation.getKey()+" "+path.getKey());
         assertEquals(actual,documented);
-        assertEquals(89,actual.size());
+        assertEquals(90,actual.size());
     }
 }

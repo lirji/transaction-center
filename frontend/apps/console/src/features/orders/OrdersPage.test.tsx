@@ -15,7 +15,9 @@ describe('OrdersPage', () => {
 
   it('pages with nextAfter and resets after when filters change', async () => {
     const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue(json(adminPage([adminOrder()], '15', true)))
+    fetchMock.mockImplementation(async (url) => String(url).includes('/order-pages?')
+      ? json({}, 404)
+      : json(adminPage([adminOrder()], '15', true)))
     renderWithApp(<OrdersPage />, { route: '/orders' })
     expect(await screen.findByText('ORD-1')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: '下一页' }))

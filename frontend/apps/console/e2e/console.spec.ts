@@ -1,5 +1,10 @@
 import { test, expect, type Locator } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  // 其余契约用例继续覆盖旧服务、旧链接和已知游标。
+  await page.route('**/api/v1/trade/admin/order-pages?**', (route) => route.fulfill({ status: 404 }))
+})
+
 async function choose(control: Locator, label: string) {
   await control.click()
   await control.page().getByRole('option', { name: label, exact: true }).click()
@@ -380,6 +385,48 @@ test('uses known cursors for previous page and jumps, restores them after refres
   await expect(page).toHaveURL(/orderNo=ORD-0$/)
   await expect(previous).toBeDisabled()
   await expect(jump).toHaveCount(0)
+})
+
+test('shows the true order total and jumps to a page that has never been visited', async ({ page }) => {
+  const requests: URLSearchParams[] = []
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/api/v1/trade/admin/order-pages?**', (route) => {
+    const params = new URL(route.request().url()).searchParams
+    requests.push(params)
+    const pageNumber = Number(params.get('page'))
+    const pageSize = Number(params.get('limit'))
+    return route.fulfill({ json: {
+      items: [{ ...order, orderId: String(pageNumber), orderNo: `ORD-PAGE-${pageNumber}` }],
+      page: pageNumber, pageSize, totalCount: 500, totalPages: 500 / pageSize,
+      observedAt: '2026-09-08T12:00:00Z',
+    } })
+  })
+
+  await page.goto('/orders?status=PAID&size=10&page=9')
+  const pager = page.getByRole('navigation', { name: '结果分页' })
+  await expect(pager.getByText('共 500 条')).toBeVisible()
+  await expect(pager.getByText('第 9 / 50 页')).toBeVisible()
+  await pager.getByLabel('指定页码').fill('51')
+  await pager.getByRole('button', { name: '跳转', exact: true }).click()
+  await expect(pager.getByRole('alert')).toHaveText('请输入 1 至 50 的页码')
+  await pager.getByLabel('指定页码').fill('42')
+  await pager.getByLabel('指定页码').press('Enter')
+  await expect(pager.getByText('第 42 / 50 页')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'ORD-PAGE-42' })).toBeVisible()
+  await expect(page).toHaveURL(/page=42/)
+  expect([...new Set(requests.map((request) => request.get('page')))]).toEqual(['9', '42'])
+  const jumpRequest = requests.find((request) => request.get('page') === '42')
+  expect(jumpRequest?.get('status')).toBe('PAID')
+  expect(jumpRequest?.has('after')).toBe(false)
+  await pager.getByRole('button', { name: '上一页' }).click()
+  await expect(pager.getByText('第 41 / 50 页')).toBeVisible()
+  await pager.getByRole('button', { name: '下一页' }).click()
+  await expect(pager.getByText('第 42 / 50 页')).toBeVisible()
+  await choose(pager.getByRole('combobox', { name: '选择页码' }), '第 1 页')
+  await expect(pager.getByText('第 1 / 50 页')).toBeVisible()
+  await choose(pager.getByRole('combobox', { name: '每页条数' }), '20 条 / 页')
+  await expect(pager.getByText('第 1 / 25 页')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 })
 
 test('workbench compares equal periods and opens funding facts from the actual summary', async ({ page }, testInfo) => {

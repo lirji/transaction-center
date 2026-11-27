@@ -1,4 +1,5 @@
 import { appliedFilters } from '../../shared/ui/appliedFilters'
+import { NumberedPager } from '../../components/NumberedPager'
 import { Select } from '../../components/Select'
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowDownUp } from 'lucide-react'
@@ -59,7 +60,7 @@ function OrderRows({ rows, recent, onSort }: { rows: AdminOrderView[]; recent: b
 }
 
 export function OrdersPage() {
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [sort, setSort] = useState(() => params.get('sort') ?? 'ID_ASC')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
@@ -92,11 +93,18 @@ export function OrdersPage() {
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
 
   const query = useQuery({
-    queryKey: ['admin-orders', after, pageSize, filters],
-    queryFn: () => api.orders({ after, limit: pageSize, ...filters }),
+    queryKey: ['admin-orders', after, page, pageSize, filters],
+    queryFn: async (context) => {
+      const numbered = after === '0' ? await api.numberedOrders(page, pageSize, filters, context.signal) : undefined
+      return numbered ?? api.orders({ after, limit: pageSize, ...filters })
+    },
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
   })
+
+  const result = query.isSuccess ? query.data : undefined
+  const numberedResult = result && 'totalCount' in result ? result : undefined
+  const cursorResult = result && 'nextAfter' in result ? result : undefined
 
   function applyStatus(value: string) {
     setStatus(value)
@@ -193,8 +201,10 @@ export function OrdersPage() {
             <PageQueryGate query={query} emptyTitle="当前筛选无订单" emptyDetail="可以调整查询条件或清空筛选后重试。">
               {(page) => <OrderRows rows={page.items} recent={filters.sort === 'CREATED_DESC'} onSort={toggleSort} />}
             </PageQueryGate>
-            <PagePager scope={['orders', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
-              result={query.isSuccess ? query.data : undefined} />
+            {numberedResult
+              ? <NumberedPager result={numberedResult} onPage={setPage} onPageSize={setPageSize} />
+              : <PagePager scope={['orders', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+                  result={cursorResult} />}
           </>
         )}
       </Panel>

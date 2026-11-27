@@ -31,6 +31,12 @@ export function pageQuery(params: Record<string, QueryScalar> = {}): string {
   return `?${search.toString()}`
 }
 
+export function numberedPageQuery(page: number, limit: number, filters: Record<string, QueryScalar>) {
+  const search = new URLSearchParams({ page: String(page), limit: boundedLimit(limit) })
+  appendKnown(search, filters)
+  return `?${search.toString()}`
+}
+
 export type RefundQueueQuery = {
   status?: string
   after?: string | number

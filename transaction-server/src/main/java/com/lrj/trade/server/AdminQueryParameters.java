@@ -1,7 +1,9 @@
 package com.lrj.trade.server;
 import com.lrj.trade.core.*;
 import com.lrj.trade.core.query.AdminQuery;
+import com.lrj.trade.core.query.AdminNumbers;
 import java.util.*;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 /** 每个资源独立参数白名单，避免错拼条件变成扩大范围的查询。 */
 public final class AdminQueryParameters {
@@ -56,6 +58,23 @@ public final class AdminQueryParameters {
             default -> AdminQuery.parse(input,fields,true);
         };
     }
+    /** 页码和游标是两种定位方式，只接受单一页码且沿用原订单筛选校验。 */
+    public static OrderPage orderPage(MultiValueMap<String, String> params) {
+        Map<String, List<String>> input = new HashMap<>(params);
+        var pages = input.remove("page");
+        if (input.containsKey("after") || pages != null && pages.size() != 1) {
+            throw AdminQuery.invalid();
+        }
+        long page = pages == null ? 1 : AdminQuery.number(pages.getFirst(), false);
+        if (page > AdminNumbers.MAX_SAFE_INTEGER) {
+            throw AdminQuery.invalid();
+        }
+        return new OrderPage(parse("order", new LinkedMultiValueMap<>(input)), page);
+    }
+
+    /** 页码和筛选条件独立，查询总量始终基于完整筛选范围。 */
+    public record OrderPage(AdminQuery query, long page) {}
+
     /** 审计使用时间游标，拒绝混入通用的主键游标或重复条件。 */
     public static AdminQuery operationAudit(MultiValueMap<String,String> params) {
         Map<String,List<String>> input = new HashMap<>(params);

@@ -590,6 +590,15 @@ export const operationsFinancialFactSchema = z.object({
   kind: operationsFactKind, amount: z.number().int().positive(), currency: currencyCode, confirmedAt: isoDateTime,
 })
 
+export const numberedOrderPageSchema = z.object({
+  items: z.array(adminOrderViewSchema),
+  page: z.int().positive(),
+  pageSize: z.int().min(1).max(100),
+  totalCount: z.int().nonnegative(),
+  totalPages: z.int().nonnegative(),
+  observedAt: isoDateTime,
+})
+
 export function pageSchema<T extends z.ZodType>(item: T) {
   return z.object({
     items: z.array(item),

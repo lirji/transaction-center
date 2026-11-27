@@ -25,6 +25,25 @@
   </constructor></resultMap>
   <sql id="columns">r.id AS `cursor`, r.id AS orderId, r.order_no AS orderNo, r.member_id AS memberId, r.quote_id AS quoteId, r.merchant_no AS merchantNo, r.warehouse_id AS warehouseId, r.status AS status, r.financial_status AS financialStatus, r.payable_amount AS payableAmount, r.currency AS currency, r.expires_at AS expiresAt, r.paid_at AS paidAt, r.completed_at AS completedAt, r.created_at AS createdAt, r.version AS version, r.payment_started_at AS paymentStartedAt, r.cancelled_at AS cancelledAt, r.updated_at AS updatedAt, r.business_no AS businessNo</sql>
   <sql id="source">FROM tc_order r </sql>
+  <sql id="filters">
+    <if test="q.filters.orderNo != null">AND r.order_no=#{q.filters.orderNo}</if>
+    <if test="q.filters.businessNo != null">AND r.business_no=#{q.filters.businessNo}</if>
+    <if test="q.filters.businessDate != null">
+      AND r.business_date=#{q.filters.businessDate} AND r.no_tail=#{q.filters.numberTail}
+    </if>
+    <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
+    <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
+    <if test="q.filters.financialStatus != null">AND r.financial_status=#{q.filters.financialStatus}</if>
+    <if test="q.filters.warehouseId != null">AND r.warehouse_id=#{q.filters.warehouseId}</if>
+    <if test="q.filters.currency != null">AND r.currency=#{q.filters.currency}</if>
+    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+  </sql>
+  <sql id="sort">
+    <choose>
+      <when test="q.filters.sort == 'CREATED_DESC'">ORDER BY r.created_at DESC,r.id DESC</when>
+      <otherwise>ORDER BY r.id ASC</otherwise>
+    </choose>
+  </sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
   <select id="page" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>
@@ -40,22 +59,26 @@
       </when>
       <otherwise>AND r.id &gt; #{q.after}</otherwise>
     </choose>
-    <if test="q.filters.orderNo != null">AND r.order_no=#{q.filters.orderNo}</if>
-    <if test="q.filters.businessNo != null">AND r.business_no=#{q.filters.businessNo}</if>
-    <if test="q.filters.businessDate != null">
-      AND r.business_date=#{q.filters.businessDate} AND r.no_tail=#{q.filters.numberTail}
-    </if>
-    <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
-    <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
-    <if test="q.filters.financialStatus != null">AND r.financial_status=#{q.filters.financialStatus}</if>
-    <if test="q.filters.warehouseId != null">AND r.warehouse_id=#{q.filters.warehouseId}</if>
-    <if test="q.filters.currency != null">AND r.currency=#{q.filters.currency}</if>
-    <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
-    <choose>
-      <when test="q.filters.sort == 'CREATED_DESC'">ORDER BY r.created_at DESC,r.id DESC</when>
-      <otherwise>ORDER BY r.id ASC</otherwise>
-    </choose>
+    <include refid="filters"/>
+    <include refid="sort"/>
     LIMIT #{q.fetchLimit}
+  </select>
+  <select id="count" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="source"/>
+    WHERE r.tenant_id=#{tenant}
+    <include refid="filters"/>
+  </select>
+  <!-- 深页仅排序和跳过必要的键，取出页内键后才读取展示字段。 -->
+  <select id="numberedPage" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="source"/>
+    JOIN (
+      SELECT r.id <include refid="source"/> WHERE r.tenant_id=#{tenant}
+      <include refid="filters"/>
+      <include refid="sort"/>
+      LIMIT #{q.limit} OFFSET #{offset}
+    ) selected ON selected.id=r.id
+    WHERE r.tenant_id=#{tenant}
+    <include refid="sort"/>
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>

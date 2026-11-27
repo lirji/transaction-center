@@ -3,6 +3,7 @@ package com.lrj.trade.core;
 import com.lrj.trade.core.mapper.AuditMapper;
 import com.lrj.trade.core.mapper.AuditMapper.Attempt;
 import com.lrj.trade.core.mapper.AuditMapper.Row;
+import com.lrj.trade.core.query.AdminQuery;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -93,11 +94,19 @@ public class AuditWriter {
 
     /** 只有已通过退款管理父资源授权的入口调用，返回前记录证据读取。 */
     public History refundHistory(Actor actor,String refundNo,String cursor) {
+        return refundHistory(actor, refundNo, cursor, DEFAULT_PAGE_SIZE);
+    }
+
+    /** 调整页容量只影响本次取证范围，读取仍须成功留痕后才能返回。 */
+    public History refundHistory(Actor actor, String refundNo, String cursor, int limit) {
+        if (limit < 1 || limit > AdminQuery.MAX_LIMIT) {
+            throw AdminQuery.invalid();
+        }
         return capture(actor,READ_REFUND_AUDIT,refundNo,attempt->{
             var position=parseCursor(cursor);
-            List<Row> rows=mapper.refundHistory(actor.tenantId(),refundNo,position.time(),position.id(),DEFAULT_PAGE_SIZE+1);
-            List<Row> items=rows.stream().limit(DEFAULT_PAGE_SIZE).toList();
-            String next=rows.size()>DEFAULT_PAGE_SIZE?items.getLast().occurredAt()+","+items.getLast().id():null;
+            List<Row> rows=mapper.refundHistory(actor.tenantId(),refundNo,position.time(),position.id(),limit+1);
+            List<Row> items=rows.stream().limit(limit).toList();
+            String next=rows.size()>limit?items.getLast().occurredAt()+","+items.getLast().id():null;
             expectWritten(mapper.insertOutcome(actor.tenantId(),attempt,"SUCCEEDED",null,refundNo,null));
             return new History(items,next);
         });

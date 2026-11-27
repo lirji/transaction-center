@@ -6,6 +6,9 @@ import java.util.*;
 
 /** 解析后的不可变查询条件；SQL只消费白名单字段，绝不拼接调用方列名。 */
 public record AdminQuery(long after,int limit,Instant createdFrom,Instant createdTo,Map<String,Object> filters,int fetchLimit) {
+    /** 查询接口的行数上限，审计等独立游标读取也使用相同预算。 */
+    public static final int MAX_LIMIT = 100;
+
     private static final Set<String> COMMON=Set.of("after","limit","createdFrom","createdTo");
     private static final int MAX_QUERY_NAME=200;
     private static final Duration MAX_WINDOW=Duration.ofDays(90);
@@ -19,7 +22,7 @@ public record AdminQuery(long after,int limit,Instant createdFrom,Instant create
     }
     /** 查询对象不能绕过页大小校验，构造后条件不可变。 */
     public AdminQuery {
-        if(after<0 || limit<1 || limit>100 || fetchLimit!=limit+1) throw invalid();
+        if(after<0 || limit<1 || limit>MAX_LIMIT || fetchLimit!=limit+1) throw invalid();
         filters=Map.copyOf(filters);
     }
     /** 重复参数拒绝，避免网关与后端对取首值或末值产生不同解释。 */
@@ -40,7 +43,7 @@ public record AdminQuery(long after,int limit,Instant createdFrom,Instant create
             }
             switch(key) {
                 case "after" -> after=number(value,true);
-                case "limit" -> { long n=number(value,false);if(n>100) throw invalid();limit=(int)n; }
+                case "limit" -> { long n=number(value,false);if(n>MAX_LIMIT) throw invalid();limit=(int)n; }
                 case "createdFrom" -> { if(!window) throw invalid();from=time(value); }
                 case "createdTo" -> { if(!window) throw invalid();to=time(value); }
                 default -> {
@@ -84,5 +87,6 @@ public record AdminQuery(long after,int limit,Instant createdFrom,Instant create
     public static Map<String,Set<String>> fields(String... names) {
         var result=new HashMap<String,Set<String>>();for(String name:names) result.put(name,Set.of());return result;
     }
-    private static TradeException invalid() { return new TradeException("INVALID_ARGUMENT","查询字段、编号、状态、时间窗口或分页参数无效"); }
+    /** 统一分页、筛选和条件校验的协议错误。 */
+    public static TradeException invalid() { return new TradeException("INVALID_ARGUMENT","查询字段、编号、状态、时间窗口或分页参数无效"); }
 }
