@@ -12,13 +12,15 @@ public interface AuditMapper {
     /** 追加操作证据，业务回滚时审计必须同时回滚。 */
     int insertAudit(@Param("tenant") long tenant, @Param("actorKey") String actorKey, @Param("action") String action, @Param("resourceType") String resourceType, @Param("resourceId") String resourceId, @Param("reason") String reason, @Param("beforeVersion") long beforeVersion, @Param("afterVersion") long afterVersion);
 
-    record Attempt(long tenant,String requestId,String actorKey,String action,String resourceId,String traceId) {}
+    /** 入口信息只从认证身份和已校验的资源范围取得。 */
+    record Attempt(String requestId,String actorKey,String action,String resourceId,String traceId) {}
+    /** 合并展示的成功效果和请求结果，不返回支付渠道原文。 */
     record Row(String id,String requestId,String traceId,String action,String actorId,String resourceId,
                Instant occurredAt,String result,String errorCode,String effectId,Long beforeVersion,Long afterVersion,
                String orderNo,String businessNo,String amountMinor,String currency,String beforeState,String afterState) {}
 
     /** 稳定入口事实，独立于业务回滚持久化。 */
-    int insertAttempt(Attempt attempt);
+    int insertAttempt(@Param("tenant") long tenant,@Param("attempt") Attempt attempt);
     /** 使用租户与请求唯一键找回本地引用。 */
     long findAttempt(@Param("tenant") long tenant,@Param("requestId") String requestId);
     /** 追加失败或重放证据，并关联已授权的原效果。 */

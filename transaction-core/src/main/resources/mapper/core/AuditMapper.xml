@@ -13,9 +13,9 @@
   </insert>
   <insert id="insertAttempt">
     INSERT INTO tc_audit_operation_attempt(tenant_id,request_id,actor_key,action_code,resource_id,trace_id,policy_version)
-    VALUES(#{tenant},#{requestId},#{actorKey},#{action},#{resourceId},#{traceId},1)
+    VALUES(#{tenant},#{attempt.requestId},#{attempt.actorKey},#{attempt.action},#{attempt.resourceId},#{attempt.traceId},1)
   </insert>
-  <select id="findAttempt" resultType="long">
+  <select useCache="false" id="findAttempt" resultType="long">
     SELECT id FROM tc_audit_operation_attempt WHERE tenant_id=#{tenant} AND request_id=#{requestId}
   </select>
   <insert id="insertOutcome">
@@ -30,10 +30,10 @@
       #{effect.attemptId},#{effect.orderNo},#{effect.businessNo},#{effect.amountMinor},#{effect.currency},#{effect.beforeState},
       #{effect.afterState},#{effect.traceId})
   </insert>
-  <select id="effectOfAttempt" resultType="java.lang.Long">
+  <select useCache="false" id="effectOfAttempt" resultType="java.lang.Long">
     SELECT id FROM tc_operation_audit WHERE tenant_id=#{tenant} AND audit_attempt_id=#{attempt}
   </select>
-  <select id="findRefundEffect" resultType="java.lang.Long">
+  <select useCache="false" id="findRefundEffect" resultType="java.lang.Long">
     SELECT id FROM tc_operation_audit
       WHERE tenant_id=#{tenant} AND resource_type='REFUND' AND resource_id=#{resource} AND action=#{action}
       ORDER BY id DESC LIMIT 1
@@ -60,7 +60,7 @@
       <arg column="after_state" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
-  <select id="refundHistory" resultMap="auditRow">
+  <select useCache="false" id="refundHistory" resultMap="auditRow">
     SELECT * FROM (
       (SELECT CONCAT('E',a.id) AS id,r.request_id,COALESCE(a.audit_trace_id,r.trace_id) AS trace_id,
         a.action,a.actor_key AS actor_id,a.resource_id,a.created_at AS occurred_at,'SUCCEEDED' AS result,

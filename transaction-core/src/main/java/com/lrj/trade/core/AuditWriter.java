@@ -63,7 +63,7 @@ public class AuditWriter {
     public <T> T capture(Actor actor,String action,String verifiedResource,LongFunction<T> operation) {
         String requestId=UUID.randomUUID().toString();
         long id=independent.execute(status->{
-            expectWritten(mapper.insertAttempt(new Attempt(actor.tenantId(),requestId,actor.key(),action,
+            expectWritten(mapper.insertAttempt(actor.tenantId(),new Attempt(requestId,actor.key(),action,
                 verifiedResource,traceId())));
             return mapper.findAttempt(actor.tenantId(),requestId);
         });
@@ -107,6 +107,7 @@ public class AuditWriter {
 
     /** 审计视图的安全字段和有界游标。 */
     public record History(List<Row> items,String nextCursor) {}
+    /** 分页时用记录时间和流水号保持稳定顺序。 */
     private record Position(Instant time,String id) {}
 
     private static Position parseCursor(String cursor) {
