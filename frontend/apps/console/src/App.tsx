@@ -1,4 +1,4 @@
-import { lazy, type ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
 import { RequireAuth } from './app/RequireAuth'
@@ -34,6 +34,9 @@ const ReconciliationPage = lazy(() => import('./features/reconciliation/Reconcil
 const AdmissionPage = lazy(() => import('./features/admission/AdmissionPage').then((module) => ({ default: module.AdmissionPage })))
 const OperationLogsPage = lazy(() => import('./features/operation-logs/OperationLogsPage').then((module) => ({ default: module.OperationLogsPage })))
 const NotFoundPage = lazy(() => import('./features/system/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
+const DesignPreview = import.meta.env.DEV
+  ? lazy(() => import('./features/design-preview/DesignPreview').then((module) => ({ default: module.DesignPreview })))
+  : undefined
 
 function Admin({ children }: { children: ReactNode }) {
   return <RequireScope anyOf={[TRADE_ADMIN]}>{children}</RequireScope>
@@ -52,6 +55,9 @@ export default function App() {
     <Routes>
       <Route path="login" element={<LoginPage />} />
       <Route path="auth/callback" element={<AuthCallbackPage />} />
+      {DesignPreview && <Route path="design-preview/*" element={<RequireAuth><Admin>
+        <Suspense fallback={<div className="route-loading" role="status">正在加载代表页…</div>}><DesignPreview /></Suspense>
+      </Admin></RequireAuth>} />}
       <Route element={<RequireAuth><AppShell /></RequireAuth>}>
         <Route index element={<Admin><OverviewPage /></Admin>} />
         <Route path="members" element={<Admin><MembersPage /></Admin>} />

@@ -16,8 +16,9 @@ import { EmptySelect, FilterBar } from '../../shared/ui/FilterBar'
 import { useAdminListSearch } from '../../shared/ui/useAdminListSearch'
 import { productStatusSchema, adminProductSchema, type AdminProduct } from '../../shared/api/schemas'
 import { productStatusLabels } from './productDisplay'
+import { formatInteger } from '../../shared/ui/display'
 
-export function ProductsPage() {
+export function ProductsPage({ preview = false }: { preview?: boolean } = {}) {
   const { search } = useLocation()
   const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
@@ -94,13 +95,20 @@ export function ProductsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className={preview ? 'workspace dp-products' : 'workspace'}>
       <PageHeader
-        title="商品"
+        title={preview ? '商品管理' : '商品'}
         description="查询目录价和发布状态，维护商品与 SKU。"
         actions={<><ProductOperations selected={selected} clear={clearSelection} resetPage={() => setAfter('0')} />
           <Button tone="primary" aria-haspopup="dialog" onClick={openCreate}><Plus size={16} aria-hidden="true" />创建草稿</Button></>}
       />
+      {preview && <div className="dp-order-presets dp-product-presets" role="group" aria-label="商品发布状态">
+        {['', ...productStatusSchema.options].map((value) => <Button key={value} tone="ghost"
+          aria-pressed={(filters.status ?? '') === value} onClick={() => {
+            setStatusFilter(value)
+            apply({ ...filters, status: value })
+          }}>{value ? productStatusLabels[productStatusSchema.parse(value)] : '全部商品'}</Button>)}
+      </div>}
       <FilterBar applied={appliedFilters(params, remove, [
           ['商品编号', 'productNo', () => setProductNoFilter('')],
           ['SKU 编码', 'skuNo', () => setSkuNoFilter('')],
@@ -120,12 +128,14 @@ export function ProductsPage() {
       </FilterBar>
       {create.data && <MutationBanner error={null} success={`商品草稿 ${create.data.resourceId} 已创建。`} />}
       <Panel className="table-panel">
-        <h2 className="table-title">商品列表</h2>
+        {preview ? <div className="dp-list-title"><h2 className="table-title">商品目录</h2>
+          {query.numbered && <span>筛选范围共 {formatInteger(query.numbered.totalCount)} 条</span>}
+        </div> : <h2 className="table-title">商品列表</h2>}
         <QueryGate query={query} emptyTitle="没有商品" emptyDetail="当前条件没有匹配的商品。">
           {(rows) => (
             <>
               <DataTable label="商品列表" className="trade-list-table pin-key">
-                <thead><tr><th className="key-cell">商品</th><th>发布状态</th><th className="numeric-cell">目录价</th><th>币种</th><th>主 SKU ID</th><th>商品 ID</th><th>发布修订</th><th>版本</th><th>操作</th></tr></thead>
+                <thead><tr><th className="key-cell">{preview ? '商品名称' : '商品'}</th>{preview && <th>商品编号</th>}<th>发布状态</th><th className="numeric-cell">目录价</th><th>币种</th><th>主 SKU ID</th><th>商品 ID</th><th>发布修订</th><th>版本</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.productId}>
@@ -136,9 +146,10 @@ export function ProductsPage() {
                             onChange={() => toggleSelection(row)} />
                           <ProductThumbnail url={row.imageUrl} />
                           <div><Link to={`/products/${row.productId}`} state={{ listSearch: search }}>{row.name}</Link>
-                            <small><CopyValue value={row.productNo} name="商品编号" /></small></div>
+                            {!preview && <small><CopyValue value={row.productNo} name="商品编号" /></small>}</div>
                         </div>
                       </td>
+                      {preview && <td><CopyValue value={row.productNo} name="商品编号" /></td>}
                       <td><Badge tone={row.status === productStatusSchema.enum.PUBLISHED ? 'good' : row.status === productStatusSchema.enum.OFFLINE ? 'neutral' : 'warn'}>{productStatusLabels[row.status]}</Badge></td>
                       <td className="numeric-cell">{formatMinorAmount(row.unitPrice)}</td>
                       <td>{row.currency}</td>

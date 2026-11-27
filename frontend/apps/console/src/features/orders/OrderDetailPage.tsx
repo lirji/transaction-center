@@ -18,6 +18,7 @@ import { ReceiptRows } from '../receipts/ReceiptsPage'
 import { RefundRows } from '../refunds/RefundRows'
 import { ReturnRows } from '../returns/ReturnRows'
 import { financialLabels, orderLabels } from './orderStatus'
+import { previewPath, type DesignVariant } from '../design-preview/previewRoutes'
 
 const sections = [
   { id: 'items', label: '商品明细' },
@@ -29,12 +30,19 @@ const sections = [
   { id: 'evidence', label: '交易证据' },
 ] as const
 
-export function OrderDetailPage() {
+const previewSections = [
+  { title: '订单概况', children: ['items'] },
+  { title: '资金', children: ['payments', 'receipts'] },
+  { title: '履约与售后', children: ['fulfillment', 'returns', 'refunds'] },
+  { title: '交易证据', children: ['evidence'] },
+] as const
+
+export function OrderDetailPage({ preview }: { preview?: DesignVariant } = {}) {
   const { orderNo = '' } = useParams()
-  return <OrderDetail key={orderNo} orderNo={orderNo} />
+  return <OrderDetail key={orderNo} orderNo={orderNo} preview={preview} />
 }
 
-function OrderDetail({ orderNo }: { orderNo: string }) {
+function OrderDetail({ orderNo, preview }: { orderNo: string; preview?: DesignVariant }) {
   const [copyResult, setCopyResult] = useState('')
   const auth = useAuth()
   const location = useLocation()
@@ -43,6 +51,9 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
   const canEvidence = auth.hasScope(TRADE_ADMIN_EVIDENCE_READ)
   const visibleSections = sections.filter(({ id }) => id !== 'evidence' || canEvidence)
   const active = visibleSections.find(({ id }) => id === params.get('section'))?.id ?? 'items'
+  const allowedGroups = previewSections.filter(({ children }) => canEvidence || children[0] !== 'evidence')
+  const activeGroup = allowedGroups.find(({ children }) => children.some((id) => id === active))
+  const listPath = preview ? previewPath(preview, 'orders') : '/orders'
   const listSearch = typeof location.state?.ordersSearch === 'string' ? location.state.ordersSearch : ''
   const detail = useQuery({
     queryKey: ['admin-order', orderNo],
@@ -62,8 +73,15 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
   const showFulfill = canFulfill && !order.fulfillment && order.status === orderStatusSchema.enum.PAID &&
     (noPayment || Boolean(order.paidAt))
 
+  function selectSection(id: typeof active) {
+    const next = new URLSearchParams(params)
+    if (id === 'items') next.delete('section')
+    else next.set('section', id)
+    setParams(next, { replace: true, preventScrollReset: true, state: location.state })
+  }
+
   return (
-    <div className="workspace">
+    <div className={preview ? 'workspace dp-order-detail' : 'workspace'}>
       <PageHeader
         title={order.businessNo ?? order.orderNo}
         description="查看订单状态、冻结商品与关联交易记录。"
@@ -76,13 +94,13 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
               setCopyResult('复制失败，可选中订单号手动复制')
             }
           }}>复制订单号</button>
-          <Link className="button secondary" to={{ pathname: '/orders', search: listSearch }} state={{ returnedOrder: order.orderNo, restoreListScroll: typeof location.state?.ordersSearch === 'string' }}>返回订单列表</Link>
+          <Link className="button secondary" to={{ pathname: listPath, search: listSearch }} state={{ returnedOrder: order.orderNo, restoreListScroll: typeof location.state?.ordersSearch === 'string' }}>返回订单列表</Link>
           {showFulfill ? <Link className="button primary" to={`/fulfillment?orderNo=${encodeURIComponent(order.orderNo)}`}>声明履约</Link> : null}
         </>}
       />
       <div className="copy-feedback" role="status" aria-live="polite">{copyResult}</div>
       <div className="section-gap">
-        <Panel>
+        <Panel className={preview ? 'dp-detail-summary' : ''}>
           <h2>订单摘要</h2>
           <dl className="summary-fields">
             <div><dt>订单状态</dt><dd><Badge tone={statusTone(order.status)}>{orderLabels[order.status]}</Badge></dd></div>
@@ -109,16 +127,19 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
             </dl>
           </details>
         </Panel>
-        <nav aria-label="订单信息分区" className="detail-tabs">
-          {visibleSections.map(({ id, label }) => (
-            <Button key={id} tone="ghost" aria-pressed={active === id} onClick={() => {
-              const next = new URLSearchParams(params)
-              if (id === 'items') next.delete('section')
-              else next.set('section', id)
-              setParams(next, { replace: true, preventScrollReset: true, state: location.state })
-            }}>{label}</Button>
-          ))}
-        </nav>
+        {preview ? <div className="dp-detail-nav">
+          <nav aria-label="订单业务分组" className="detail-tabs">
+            {allowedGroups.map(({ title, children }) => <Button key={title} tone="ghost"
+              aria-pressed={activeGroup?.title === title} onClick={() => selectSection(children[0])}>{title}</Button>)}
+          </nav>
+          {activeGroup && activeGroup.children.length > 1 && <nav aria-label="当前业务明细" className="dp-detail-subnav">
+            {visibleSections.filter(({ id }) => activeGroup.children.some((child) => child === id)).map(({ id, label }) =>
+              <Button key={id} tone="ghost" aria-pressed={active === id} onClick={() => selectSection(id)}>{label}</Button>)}
+          </nav>}
+        </div> : <nav aria-label="订单信息分区" className="detail-tabs">
+          {visibleSections.map(({ id, label }) => <Button key={id} tone="ghost" aria-pressed={active === id}
+            onClick={() => selectSection(id)}>{label}</Button>)}
+        </nav>}
         {active === 'fulfillment' ? (
           <Panel>
             <h2>履约摘要</h2>

@@ -6,15 +6,16 @@ import { usePageSize } from '../../shared/ui/usePageSize'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, ArrowRight, BarChart3 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button, Field, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api, type OperationsRange } from '../../shared/api/client'
-import { beijingRange } from '../../shared/api/businessTime'
+import { beijingRange, formatBeijingInput } from '../../shared/api/businessTime'
 import { type OperationsScope, operationsFinancialFactSchema } from '../../shared/api/schemas'
 import { parseCurrencyCode, parseTimeWindow } from '../../shared/api/validate'
 import { FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { PageQueryGate, QueryGate } from '../../shared/ui/QueryGate'
 import { formatBeijingTime } from '../../shared/ui/display'
+import { previewPath, type DesignVariant } from '../design-preview/previewRoutes'
 
 const financeLabels = {
   NORMAL_RECEIPT: '正常确认收款',
@@ -24,9 +25,18 @@ const financeLabels = {
   NET: '期间净收款',
 } satisfies Record<OperationsScope, string>
 const integerFormat = new Intl.NumberFormat('zh-CN')
+const CNY_MINOR_UNITS_PER_YUAN = 100n
 
 function displayAmount(amount: string | number | bigint) {
   return integerFormat.format(BigInt(amount))
+}
+
+function displayYuan(value: string | number) {
+  const amount = BigInt(value)
+  const absolute = amount < 0n ? -amount : amount
+  const yuan = integerFormat.format(absolute / CNY_MINOR_UNITS_PER_YUAN)
+  const minor = String(absolute % CNY_MINOR_UNITS_PER_YUAN).padStart(2, '0')
+  return `${amount < 0n ? '−' : ''}${yuan}.${minor}`
 }
 
 type Summary = Awaited<ReturnType<typeof api.operationsSummary>>
@@ -47,13 +57,13 @@ function precedingRange(range: OperationsRange): OperationsRange {
   return { currency: range.currency, createdFrom: new Date(from - duration).toISOString(), createdTo: range.createdFrom }
 }
 
-function comparisonText(current: string | number, previous: string | number) {
+function comparisonText(current: string | number, previous: string | number, displayCny?: boolean) {
   const base = BigInt(previous)
   const delta = BigInt(current) - base
   if (!delta) return '较上期持平'
   const sign = delta > 0n ? '+' : '−'
   const magnitude = delta > 0n ? delta : -delta
-  if (base === 0n) return `上期为 0，本期变化 ${sign}${displayAmount(magnitude)}`
+  if (base === 0n) return `上期为 0，本期变化 ${sign}${displayCny ? `${displayYuan(magnitude.toString())} 元` : displayAmount(magnitude)}`
   const tenths = magnitude * 1000n / (base > 0n ? base : -base)
   if (tenths === 0n) return `较上期 ${sign}<0.1%`
   return `较上期 ${sign}${displayAmount(tenths / 10n)}.${tenths % 10n}%`
@@ -86,25 +96,45 @@ function FundingBars({ result, select, active }: {
   )
 }
 
-function MetricValue({ name, value, unit, baseline }: {
-  name: string; value: string | number; unit: string; baseline?: string | number
+function MetricValue({ name, value, unit, baseline, displayCny }: {
+  name: string; value: string | number; unit: string; baseline?: string | number; displayCny?: boolean
 }) {
+  const comparison = baseline === undefined ? undefined : comparisonText(value, baseline, displayCny)
   return <>
     <span className="metric-label">{name}<ArrowUpRight size={15} aria-hidden="true" /></span>
-    <strong className="metric-value">{displayAmount(value)} <small>{unit}</small></strong>
-    {baseline !== undefined && <span className="metric-comparison">{comparisonText(value, baseline)}</span>}
+    <strong className="metric-value">{displayCny ? displayYuan(value) : displayAmount(value)} <small>{displayCny ? '元' : unit}</small></strong>
+    {comparison && <span className="metric-comparison">{comparison}</span>}
   </>
 }
 
-export function OperationsSummary() {
-  const [initial] = useState(() => beijingRange('today'))
+function initialPeriod(preview: DesignVariant | undefined, params: URLSearchParams) {
+  const fallback = { ...beijingRange(preview ? 'last7' : 'today'), currency: 'CNY' }
+  if (!preview || !params.has('createdFrom') || !params.has('createdTo')) return fallback
+  const from = Date.parse(params.get('createdFrom') ?? '')
+  const to = Date.parse(params.get('createdTo') ?? '')
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return fallback
+  try {
+    const start = formatBeijingInput(from)
+    const end = formatBeijingInput(to)
+    if (!parseTimeWindow(start, end)) return fallback
+    return { from: start, to: end, currency: parseCurrencyCode(params.get('currency') || 'CNY') }
+  } catch {
+    return fallback
+  }
+}
+
+export function OperationsSummary({ preview }: { preview?: DesignVariant } = {}) {
+  const [params, setParams] = useSearchParams()
+  const [initial] = useState(() => initialPeriod(preview, params))
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)
-  const [currency, setCurrency] = useState('CNY')
-  const [range, setRange] = useState<OperationsRange>(() => ({ ...parseTimeWindow(initial.from, initial.to)!, currency: 'CNY' }))
+  const [currency, setCurrency] = useState(initial.currency)
+  const [range, setRange] = useState<OperationsRange>(() => ({ ...parseTimeWindow(initial.from, initial.to)!, currency: initial.currency }))
   const [scope, setScope] = useState<OperationsScope>()
   const [contrast, setContrast] = useState(false)
   const [error, setError] = useState('')
+  const [showPreviewFilters, setShowPreviewFilters] = useState(false)
+  const orderPath = preview ? previewPath(preview, 'orders') : '/orders'
   const factSection = useRef<HTMLElement>(null)
   const priorRange = precedingRange(range)
   const summary = useQuery({
@@ -133,6 +163,7 @@ export function OperationsSummary() {
         void summary.refetch()
       } else {
         setRange(next)
+        if (preview) setParams(next, { replace: true, preventScrollReset: true })
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '筛选无效')
@@ -143,14 +174,18 @@ export function OperationsSummary() {
     <div className="section-gap">
       <Panel className="period-summary">
         <div className="panel-head"><h2>期间经营汇总</h2>
+          <div className="queue-actions">
+          {preview && preview !== 'analytics' && <Button aria-expanded={showPreviewFilters}
+            onClick={() => setShowPreviewFilters(!showPreviewFilters)}>统计期间</Button>}
           <Button aria-pressed={contrast} disabled={!summary.isSuccess} onClick={() => setContrast(!contrast)}>
             <BarChart3 size={16} aria-hidden="true" />{contrast ? '关闭上期对比' : '对比上一期'}
           </Button>
+          </div>
         </div>
-        <FilterBar onSubmit={run}>
+        {(!preview || showPreviewFilters || preview === 'analytics') && <FilterBar onSubmit={run}>
           <Field label="统计币种"><input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} required /></Field>
           <TimeRangeFields labelPrefix="统计" from={from} to={to} onFrom={setFrom} onTo={setTo} />
-        </FilterBar>
+        </FilterBar>}
         {error && <StateBanner tone="warn" title="筛选条件无效" detail={error} />}
         <QueryGate query={summary} emptyTitle="暂无汇总" emptyDetail="请选择统计期间后重新读取。">
           {(result) => {
@@ -168,11 +203,12 @@ export function OperationsSummary() {
                 </div>}
                 {baseline && <p className="panel-note">上期 {formatBeijingTime(baseline.from)} 至 {formatBeijingTime(baseline.to)}（北京时间）</p>}
                 <div className="metric-grid">
-                  <Link className="metric" to={`/orders?${orderQuery}`} aria-label="查看创建订单">
+                  <Link className="metric" to={`${orderPath}?${orderQuery}`} aria-label="查看创建订单">
                     <MetricValue name="新建订单" value={result.orderCount} unit="单" baseline={baseline?.orderCount} />
                   </Link>
-                  <Link className="metric" to={`/orders?${orderQuery}`} aria-label="查看创建应付额关联订单">
-                    <MetricValue name="创建应付额" value={result.orderPayable} unit="最小单位" baseline={baseline?.orderPayable} />
+                  <Link className="metric" to={`${orderPath}?${orderQuery}`} aria-label="查看创建应付额关联订单">
+                    <MetricValue name="创建应付额" value={result.orderPayable} unit="最小单位" baseline={baseline?.orderPayable}
+                      displayCny={Boolean(preview) && result.currency === 'CNY'} />
                   </Link>
                   <button type="button" className="metric" aria-expanded={scope === 'NORMAL_RECEIPT'}
                     aria-label="查看确认付费订单的收款" onClick={() => setScope('NORMAL_RECEIPT')}>
@@ -180,19 +216,25 @@ export function OperationsSummary() {
                   </button>
                   <button type="button" className="metric metric-primary" aria-expanded={scope === 'NET'}
                     aria-label="查看期间净收款明细" onClick={() => setScope('NET')}>
-                    <MetricValue name="期间净收款" value={result.netReceipt} unit="最小单位" baseline={baseline?.netReceipt} />
+                    <MetricValue name="期间净收款" value={result.netReceipt} unit="最小单位" baseline={baseline?.netReceipt}
+                      displayCny={Boolean(preview) && result.currency === 'CNY'} />
                   </button>
                 </div>
-                <FundingBars result={result} select={setScope} active={scope} />
+                {preview === 'analytics'
+                  ? <details className="dp-funding-details"><summary>查看确认收付款项（{result.currency}）</summary>
+                    <FundingBars result={result} select={setScope} active={scope} />
+                  </details>
+                  : <FundingBars result={result} select={setScope} active={scope} />}
                 <p className="panel-note">新建订单含取消及零元订单。资金按本地确认时间归期，期间净收款为正常确认收款减去正常实收的已确认退款。</p>
               </>
             )
           }}
         </QueryGate>
       </Panel>
-      <OperationsAnalysis range={range} />
-      <SourceWorkspaces range={range} />
+      <OperationsAnalysis range={range} preview={preview} periodReady={!preview || summary.isFetched} />
+      {!preview && <SourceWorkspaces range={range} />}
       {scope && <section ref={factSection} id="financial-facts"><FinancialFacts key={scope} range={range} scope={scope} /></section>}
+      {preview && <SourceWorkspaces range={range} />}
     </div>
   )
 }
