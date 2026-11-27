@@ -110,7 +110,7 @@ final class RefundAuditArchive {
         Instant cutoff = clock.instant().minus(minimumAge);
         var subject = mapper.subject(tenant, id, cutoff);
         if (subject == null) return null;
-        var operations = audits.refundHistory(tenant, nativeRefundNo, null, null, MAX_FACTS + 1);
+        var operations = audits.refundHistory(tenant, nativeRefundNo, null, null, MAX_FACTS + 1, null, MAX_FACTS + 1);
         var references = mapper.references(tenant, id, MAX_FACTS + 1);
         int count = operations.size() + references.size();
         if (count == 0) return null;

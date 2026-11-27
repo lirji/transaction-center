@@ -111,7 +111,7 @@ public class AuditWriter {
         }
         return capture(actor,READ_REFUND_AUDIT,refundNo,attempt->{
             var position=parseCursor(cursor);
-            List<Row> rows=mapper.refundHistory(actor.tenantId(),refundNo,position.time(),position.id(),limit+1);
+            List<Row> rows=mapper.refundHistory(actor.tenantId(), refundNo, position.time(), position.id(), limit + 1, null, limit + 1);
             List<Row> items=rows.stream().limit(limit).toList();
             String next=rows.size()>limit?items.getLast().occurredAt()+","+items.getLast().id():null;
             expectWritten(mapper.insertOutcome(actor.tenantId(),attempt,"SUCCEEDED",null,refundNo,null));

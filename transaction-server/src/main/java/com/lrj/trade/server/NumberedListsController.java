@@ -125,7 +125,9 @@ public class NumberedListsController {
         return AdminQuery.number(jwt.getClaimAsString("tenant_id"), false);
     }
 
+    /** 领域只读方法只接受已校验租户、筛选和页码。 */
     private interface Query {
+        /** 返回跨请求独立观察的一次编号页。 */
         AdminNumberedPage<?> page(long tenant, AdminQuery query, long page);
     }
 }

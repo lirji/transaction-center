@@ -1,5 +1,6 @@
 package com.lrj.trade.server;
 
+import com.lrj.trade.core.query.AdminQuery;
 import java.io.StringReader;
 import java.nio.file.*;
 import java.util.*;
@@ -54,13 +55,19 @@ class MapperContractTest {
                         assertFalse(Map.class.isAssignableFrom(parameter.getType()),"不使用通用参数Map替代明确合同");
                     }
                     Set<String> bindings=new HashSet<>();
-                    var matcher=Pattern.compile("#\\{([A-Za-z][A-Za-z0-9]*)(?:\\.([A-Za-z][A-Za-z0-9]*))?}").matcher(expandedText(statement,mapper));
+                    // 参数校验基于最终 SQL，允许空值绑定显式 JDBC 类型。
+                    String expanded = expandedText(statement, mapper);
+                    var matcher = Pattern.compile("#\\{([A-Za-z][A-Za-z0-9]*)(?:\\.([A-Za-z][A-Za-z0-9]*)(?:\\.([A-Za-z][A-Za-z0-9]*))?)?(?:,jdbcType=[A-Z_]+)?}").matcher(expanded);
                     while(matcher.find()) {
                         String bindingRoot=matcher.group(1);bindings.add(bindingRoot);
                         if(matcher.group(2)!=null) {
                             var parameter=Arrays.stream(method.getParameters()).filter(p->p.getAnnotation(Param.class).value().equals(bindingRoot)).findFirst().orElseThrow();
                             assertTrue(parameter.getType().isRecord(),"嵌套绑定仅允许明确record合同："+method);
                             assertNotNull(parameter.getType().getMethod(matcher.group(2)),"绑定属性必须是实际record字段");
+                            if (matcher.group(3) != null) {
+                                assertEquals(AdminQuery.class, parameter.getType(), "二级绑定只接受经过白名单解析的管理筛选");
+                                assertEquals("filters", matcher.group(2));
+                            }
                         }
                     }
                     // foreach的局部别名不是Mapper参数；集合必须来自明确声明的参数，值仍采用绑定。
@@ -101,7 +108,7 @@ class MapperContractTest {
                             assertEquals(3,statement.getTextContent().split("job_type='OUTBOX_PUBLISH'",-1).length-1);
                         } else assertTrue(parameters.contains("tenant"),"业务SQL必须显式传递租户："+method);
                         if(!Set.of("com.lrj.trade.jobs.mapper.OutboxQueueSnapshotMapper","com.lrj.trade.payment.mapper.PaymentFinancialSnapshotMapper","com.lrj.trade.refund.mapper.RefundFinancialSnapshotMapper","com.lrj.trade.core.mapper.ReconciliationFinancialSnapshotMapper").contains(namespace))
-                            assertTrue(statement.getTextContent().contains("tenant_id"),method.toString());
+                            assertTrue(expanded.contains("tenant_id"),method.toString());
                     }
                     statements++;
                 }

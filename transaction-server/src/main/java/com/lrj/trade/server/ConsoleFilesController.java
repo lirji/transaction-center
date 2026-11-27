@@ -86,6 +86,7 @@ public class ConsoleFilesController {
         return new Actor(AdminQuery.number(jwt.getClaimAsString("tenant_id"), false), jwt.getIssuer().toString(), jwt.getSubject());
     }
 
+    /** 按安全字段和有限行数生成完整订单表。 */
     private static final class OrdersCsv {
         private static final String NEWLINE = "\r\n";
         private final StringBuilder body = new StringBuilder("\uFEFF订单号,订单状态,资金状态,应付额(最小单位),币种,创建时间(UTC)\r\n");

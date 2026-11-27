@@ -37,11 +37,6 @@ public interface AuditMapper {
     Long effectOfAttempt(@Param("tenant") long tenant,@Param("attempt") long attempt);
     /** 重放以已提交的租户、退款及动作定位原证据。 */
     Long findRefundEffect(@Param("tenant") long tenant,@Param("resource") String resource,@Param("action") String action);
-    /** 有界读取授权父资源的实际效果和请求结果。 */
-    default List<Row> refundHistory(long tenant, String resource, Instant before, String cursor, int limit) {
-        return refundHistory(tenant, resource, before, cursor, limit, null, limit);
-    }
-
     /** 游标模式扫描一页，编号模式扫描足以为合并后的目标页排序的记录。 */
     List<Row> refundHistory(@Param("tenant") long tenant, @Param("resource") String resource,
             @Param("before") Instant before, @Param("cursor") String cursor, @Param("limit") int limit,
