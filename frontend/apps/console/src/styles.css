@@ -372,7 +372,7 @@ body:has(.modal-card[open]) { overflow: hidden; }
 .pager-select { min-width: 74px; padding: 0; border: 0; background: transparent; }
 .pager-select .select-trigger { min-height: 30px; font-size: 12px; }
 
-.period-summary { display: grid; gap: 12px; }
+.period-summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .period-summary > * { margin-block: 0; }
 .period-summary .panel-head { margin-bottom: 0; }
 .metrics-context { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-600); }

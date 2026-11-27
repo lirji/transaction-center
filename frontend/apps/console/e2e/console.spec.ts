@@ -468,6 +468,26 @@ test('workbench compares equal periods and opens funding facts from the actual s
   await expect(page.getByRole('heading', { name: '期间无资金记录' })).toBeVisible()
 })
 
+test('the expanded operations analysis keeps its table scroll inside a 390px workbench', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/api/v1/trade/**', (route) => route.fulfill({
+    status: 404, json: { code: 'NOT_FOUND', message: '无测试记录', retryable: false },
+  }))
+  await page.route('**/api/v1/trade/admin/operations/analysis?**', (route) => route.fulfill({ json: {
+    from: '2026-09-08T00:00:00Z', to: '2026-09-09T00:00:00Z',
+    observedAt: '2026-09-08T12:00:00Z', currency: 'CNY', payableCount: 4, convertedCount: 1,
+    orderStates: [{ status: 'PAID', count: 1, payableCount: 1, convertedCount: 1 }],
+    daily: [{ day: '2026-09-08', orderCount: 4, paidOrderCount: 1, normalReceipt: '20000', normalRefund: '1000', netReceipt: '19000' }],
+  } }))
+  await page.goto('/')
+  await page.getByRole('button', { name: '查看经营分析' }).click()
+  const table = page.getByRole('region', { name: '每日订单与资金' })
+  await expect(table.getByText('19,000')).toBeVisible()
+  await expect(page.getByText('25%')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  expect(await table.evaluate((element) => element.scrollWidth)).toBeGreaterThan(await table.evaluate((element) => element.clientWidth))
+})
+
 test('table tools, keyboard selection, presets and real page size requests', async ({ page, browserName }, testInfo) => {
   const issued: URLSearchParams[] = []
   await page.route('**/api/v1/trade/admin/orders?**', async (route) => {
