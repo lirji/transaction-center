@@ -293,14 +293,33 @@ class CheckoutPilotQuoteTest {
         assertEquals(409, forbidden.statusCode(), forbidden.body());
         assertEquals(OrderService.CHECKOUT_FUNDING_PENDING, json.readTree(forbidden.body()).path("code").asString());
         assertEquals(0, total("tc_payment_intent", tenant));
-        assertFundingReceipt(reference, facts);
+        String fundingApplication = assertFundingReceipt(reference, facts);
+        // 审计投影使用原绑定；同时验证控制台权限和对照租户。
+        String timeline = "/api/v1/trade/admin/orders/" + no + "/operation-evidence";
+        when(decoder.decode("audit-reader")).thenReturn(jwt("audit-reader", "audit-reader", TENANT,
+            "trade.admin trade.admin.evidence.read"));
+        when(decoder.decode("audit-reader-other")).thenReturn(jwt("audit-reader-other", "audit-reader", "906022",
+            "trade.admin trade.admin.evidence.read"));
+        assertEquals(403, http.send(api("buyer", timeline).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+        assertEquals(404, http.send(api("audit-reader-other", timeline).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode());
+        var evidenceProjection = http.send(api("audit-reader", timeline).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, evidenceProjection.statusCode(), evidenceProjection.body());
+        var projection = json.readTree(evidenceProjection.body());
+        var binding = projection.path("binding");
+        assertEquals(no, projection.path("businessNo").asString());
+        assertEquals("lc02-pilot", binding.path("commerceTenant").asString());
+        assertEquals(ELIGIBLE_QUOTE, binding.path("commerceQuoteId").asString());
+        assertEquals(reference, binding.path("checkoutReference").asString());
+        assertEquals(fundingApplication, binding.path("fundingApplicationId").asString());
+        assertFalse(evidenceProjection.body().contains("ownerRef"));
+        assertFalse(evidenceProjection.body().contains(proofHash));
         var cancel = post("buyer", "/api/v1/trade/orders/" + no + ":cancel", "abort", Map.of("reason", "未预留预算"));
         assertEquals("CANCELLED", json.readTree(http.send(cancel, HttpResponse.BodyHandlers.ofString()).body()).path("status").asString());
         assertEquals(0, inventory.balances(tenant, 0, 5).getFirst().reserved());
         assertEquals(5, inventory.balances(tenant, 0, 5).getFirst().available());
     }
 
-    private void assertFundingReceipt(String reference, tools.jackson.databind.JsonNode facts) throws Exception {
+    private String assertFundingReceipt(String reference, tools.jackson.databind.JsonNode facts) throws Exception {
         when(decoder.decode("funding")).thenReturn(jwt("funding", SUBJECT, TENANT, "trade.checkout-pilot.funding"));
         when(decoder.decode("funding-other")).thenReturn(jwt("funding-other", "different-machine", TENANT, "trade.checkout-pilot.funding"));
         var claims = new TreeMap<String, String>();
@@ -312,6 +331,7 @@ class CheckoutPilotQuoteTest {
         claims.put("expiresAt", facts.path("orderExpiresAt").asString());
         claims.put("applicationId", UUID.randomUUID().toString());
         String path = CheckoutFundingReceiptController.PATH.replace("{reference}", reference);
+        String applicationId = claims.get("applicationId");
         String token = sign(claims, "funding-test", FUNDING_KEY);
         assertEquals(403, http.send(post("funding-other", path, "wrong-actor", Map.of("fundingReceipt", token)),
             HttpResponse.BodyHandlers.ofString()).statusCode());
@@ -328,6 +348,7 @@ class CheckoutPilotQuoteTest {
         claims.put("applicationId", UUID.randomUUID().toString());
         assertEquals(409, http.send(post("funding", path, "new-application",
             Map.of("fundingReceipt", sign(claims, "funding-test", FUNDING_KEY))), HttpResponse.BodyHandlers.ofString()).statusCode());
+        return applicationId;
     }
 
     private int total(String table, long tenant) {
