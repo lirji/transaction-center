@@ -71,10 +71,11 @@ export function ConsentsPage() {
                     ))}
                   </tbody>
                 </DataTable>
-                <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
               </>
             )}
           </QueryGate>
+          <CursorPager scope={['consent-documents']} after={after} onPage={setAfter} pageSize={20}
+            rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.id} />
         </Panel>
         <Panel>
           <h2>发布新版本</h2>

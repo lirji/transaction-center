@@ -117,14 +117,13 @@ export function JobsPage() {
         {incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (
-          <PageQueryGate query={query} emptyTitle="没有任务" emptyDetail="当前筛选没有任务记录。">
-            {(page) => (
-              <>
-                <JobRows rows={page.items} />
-                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
-              </>
-            )}
-          </PageQueryGate>
+          <>
+            <PageQueryGate query={query} emptyTitle="没有任务" emptyDetail="当前筛选没有任务记录。">
+              {(page) => <JobRows rows={page.items} />}
+            </PageQueryGate>
+            <PagePager scope={['jobs', filters]} after={after} onPage={setAfter}
+              result={query.isSuccess ? query.data : undefined} />
+          </>
         )}
       </Panel>
     </div>

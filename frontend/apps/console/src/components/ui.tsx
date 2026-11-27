@@ -1,8 +1,9 @@
 import { cloneElement, isValidElement, useEffect, useId, useRef, type ButtonHTMLAttributes, type FormEvent, type ReactElement, type ReactNode, type TableHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ChevronRight, CircleAlert, CircleCheck, Info, LoaderCircle, X } from 'lucide-react'
+import { Archive, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Info, LoaderCircle, X } from 'lucide-react'
 import { nextCursor } from '../shared/api/keys'
 import { formatBeijingTime } from '../shared/ui/display'
+import { useCursorTrail, type CursorScope } from '../shared/ui/useCursorTrail'
 
 export function PageHeader({ title, description, actions }: { title: string; description: string; actions?: ReactNode }) {
   return <section className="page-heading"><div><h1>{title}</h1><p>{description}</p></div>{actions && <div className="heading-actions">{actions}</div>}</section>
@@ -114,64 +115,73 @@ export function Field({ label, hint, error, children, wide }: { label: string; h
   )
 }
 
-export function CursorPager({
-  after,
-  pageSize,
-  lastId,
-  length,
-  onReset,
-  onNext,
-}: {
-  after: number
+type PagerNavigation<T> = {
+  after: T
+  scope: CursorScope
+  onPage: (cursor: T) => void
+}
+
+export function CursorPager<Row>({ pageSize, rows, getCursor, ...navigation }: PagerNavigation<number> & {
   pageSize: number
-  lastId?: string
-  length: number
-  onReset: () => void
-  onNext: (cursor: number) => void
+  rows?: readonly Row[]
+  getCursor: (row: Row) => string
 }) {
-  const next = nextCursor(lastId, length, pageSize)
-  return <Pager previous={after !== 0} count={length} canAdvance={next !== undefined} onReset={onReset}
-    onNext={() => { if (next !== undefined) onNext(next) }} />
+  const last = rows?.at(-1)
+  const next = nextCursor(last === undefined ? undefined : getCursor(last), rows?.length ?? 0, pageSize)
+  return <Pager first={0} count={rows?.length} next={next} {...navigation} />
 }
 
-export function PagePager({
-  after,
-  nextAfter,
-  hasMore,
-  observedAt,
-  count,
-  onReset,
-  onNext,
-}: {
-  after: string
-  nextAfter: string | null
-  hasMore: boolean
-  observedAt?: string
-  count?: number
-  onReset: () => void
-  onNext: (cursor: string) => void
-}) {
-  return <Pager previous={after !== '0'} count={count} observedAt={observedAt} canAdvance={hasMore && Boolean(nextAfter)}
-    onReset={onReset} onNext={() => { if (nextAfter) onNext(nextAfter) }} />
+type CursorResult = { items: readonly unknown[] } & (
+  { nextAfter: string | null; hasMore: boolean; observedAt?: string }
+  | { nextCursor?: string | null }
+)
+
+export function PagePager({ result, ...navigation }: PagerNavigation<string> & { result?: CursorResult }) {
+  const next = result && ('hasMore' in result ? (result.hasMore ? result.nextAfter : null) : result.nextCursor)
+  const observedAt = result && 'observedAt' in result ? result.observedAt : undefined
+  return <Pager first="0" next={next || undefined} count={result?.items.length} observedAt={observedAt} {...navigation} />
 }
 
-function Pager({ previous, count, canAdvance, observedAt, onReset, onNext }: {
-  previous: boolean
+function Pager<T extends string | number>({ first, after, scope, next, count, observedAt, onPage }: PagerNavigation<T> & {
+  first: T
+  next?: T
   count?: number
-  canAdvance: boolean
   observedAt?: string
-  onReset: () => void
-  onNext: () => void
 }) {
+  const { trail, choices, position, pageNumber, forward, remember } = useCursorTrail(scope, first, after, next, count !== undefined)
+  const previous = trail[position - 1]
+  if (count === undefined && after === first) return null
+
+  function change(cursor: T, path: T[]) {
+    if (cursor === after) return
+    remember(path)
+    onPage(cursor)
+  }
+
   return (
     <nav className="pager" aria-label="结果分页">
-      <div className="pager-meta">
+      <div className="pager-meta" aria-live="polite">
+        {pageNumber !== undefined && <span>第 {pageNumber} 页</span>}
         {count !== undefined && <span>本页 {count} 条</span>}
         {observedAt && <span>读取于 {formatBeijingTime(observedAt)}（北京时间）</span>}
       </div>
       <div className="pager-actions">
-        <Button disabled={!previous} onClick={onReset}>回到首页</Button>
-        <Button disabled={!canAdvance} onClick={onNext}>下一页<ChevronRight size={14} aria-hidden="true" /></Button>
+        <Button disabled={after === first} onClick={() => change(first, trail[0] === first ? trail : [first])}>回到首页</Button>
+        <Button disabled={previous === undefined} onClick={() => {
+          if (previous !== undefined) change(previous, trail)
+        }}><ChevronLeft size={14} aria-hidden="true" />上一页</Button>
+        {pageNumber !== undefined && choices.length > 1 && (
+          <select className="pager-select" aria-label="跳转页码" value={position}
+            onChange={(event) => {
+              const cursor = choices[Number(event.target.value)]
+              if (cursor !== undefined) change(cursor, choices)
+            }}>
+            {choices.map((cursor, index) => <option key={cursor} value={index}>第 {index + 1} 页</option>)}
+          </select>
+        )}
+        <Button disabled={forward === undefined} onClick={() => {
+          if (forward !== undefined) change(forward, choices)
+        }}>下一页<ChevronRight size={14} aria-hidden="true" /></Button>
       </div>
     </nav>
   )

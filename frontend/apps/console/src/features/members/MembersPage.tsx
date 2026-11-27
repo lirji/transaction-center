@@ -119,10 +119,11 @@ export function MembersPage() {
                   ))}
                 </tbody>
               </DataTable>
-              <PagePager count={rows.length} after={after} nextAfter={rows.at(-1)?.memberId ?? null} hasMore={rows.length === 20} onReset={() => setAfter('0')} onNext={setAfter} />
             </>
           )}
         </QueryGate>
+        <PagePager scope={['members', filters]} after={after} onPage={setAfter}
+          result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.memberId ?? null, hasMore: query.data.length === 20 } : undefined} />
       </Panel>
       {selected && (
         <Modal

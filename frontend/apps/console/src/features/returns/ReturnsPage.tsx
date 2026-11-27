@@ -182,14 +182,13 @@ export function ReturnsPage() {
         {memberUrlError || incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (
-          <PageQueryGate query={list} emptyTitle="没有退货申请" emptyDetail="当前筛选没有退货记录。">
-            {(page) => (
-              <>
-                <ReturnRows rows={page.items} onSelect={setActiveNo} />
-                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
-              </>
-            )}
-          </PageQueryGate>
+          <>
+            <PageQueryGate query={list} emptyTitle="没有退货申请" emptyDetail="当前筛选没有退货记录。">
+              {(page) => <ReturnRows rows={page.items} onSelect={setActiveNo} />}
+            </PageQueryGate>
+            <PagePager scope={['returns', filters]} after={after} onPage={setAfter}
+              result={list.isSuccess ? list.data : undefined} />
+          </>
         )}
       </Panel>
       <div className="section-gap">

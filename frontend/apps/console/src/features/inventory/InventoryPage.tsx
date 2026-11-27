@@ -172,10 +172,11 @@ export function InventoryPage() {
                     ))}
                   </tbody>
                 </DataTable>
-                <PagePager count={rows.length} after={balAfter} nextAfter={rows.at(-1)?.id ?? null} hasMore={rows.length === 20} onReset={() => setBalAfter('0')} onNext={setBalAfter} />
               </>
             )}
           </QueryGate>
+          <PagePager scope={['inventory-balances', balanceFilters]} after={balAfter} onPage={setBalAfter}
+            result={balances.isSuccess ? { items: balances.data, nextAfter: balances.data.at(-1)?.id ?? null, hasMore: balances.data.length === 20 } : undefined} />
         </Panel>
         <Panel className="table-panel">
           <h2 className="table-title">仓库</h2>
@@ -190,10 +191,11 @@ export function InventoryPage() {
                     ))}
                   </tbody>
                 </DataTable>
-                <CursorPager after={whAfter} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setWhAfter(0)} onNext={setWhAfter} />
               </>
             )}
           </QueryGate>
+          <CursorPager scope={['warehouses']} after={whAfter} onPage={setWhAfter} pageSize={20}
+            rows={warehouses.isSuccess ? warehouses.data : undefined} getCursor={(row) => row.id} />
         </Panel>
         <div className="page-grid">
           <Panel>
@@ -244,30 +246,33 @@ export function InventoryPage() {
               <p>已查询仓库 {ledgerSelection.warehouseId}，SKU {ledgerSelection.skuId}</p>
             ) : null}
             {ledgerSelection ? (
-              <QueryGate query={ledgers} emptyTitle="没有流水" emptyDetail="该仓库与 SKU 组合尚无审计记录。">
-                {(rows) => (
-                  <>
-                    <DataTable label="库存流水列表" className="trade-list-table">
-                      <thead><tr><th className="time-cell">发生时间（北京时间）</th><th>操作类型</th><th>可售变化</th><th>预占变化</th><th>已售变化</th><th>总量变化</th><th>业务引用</th><th>原因</th></tr></thead>
-                      <tbody>
-                        {rows.map((row) => (
-                          <tr key={row.id}>
-                            <td className="time-cell">{formatBeijingTime(row.occurredAt)}</td>
-                            <td>{row.operationType}</td>
-                            <td>{row.availableDelta}</td>
-                            <td>{row.reservedDelta}</td>
-                            <td>{row.soldDelta}</td>
-                            <td>{row.totalDelta}</td>
-                            <td className="mono">{row.operationRef}</td>
-                            <td>{row.reason}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </DataTable>
-                    <CursorPager after={ledgerAfter} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setLedgerAfter(0)} onNext={setLedgerAfter} />
-                  </>
-                )}
-              </QueryGate>
+              <>
+                <QueryGate query={ledgers} emptyTitle="没有流水" emptyDetail="该仓库与 SKU 组合尚无审计记录。">
+                  {(rows) => (
+                    <>
+                      <DataTable label="库存流水列表" className="trade-list-table">
+                        <thead><tr><th className="time-cell">发生时间（北京时间）</th><th>操作类型</th><th>可售变化</th><th>预占变化</th><th>已售变化</th><th>总量变化</th><th>业务引用</th><th>原因</th></tr></thead>
+                        <tbody>
+                          {rows.map((row) => (
+                            <tr key={row.id}>
+                              <td className="time-cell">{formatBeijingTime(row.occurredAt)}</td>
+                              <td>{row.operationType}</td>
+                              <td>{row.availableDelta}</td>
+                              <td>{row.reservedDelta}</td>
+                              <td>{row.soldDelta}</td>
+                              <td>{row.totalDelta}</td>
+                              <td className="mono">{row.operationRef}</td>
+                              <td>{row.reason}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </DataTable>
+                    </>
+                  )}
+                </QueryGate>
+                <CursorPager scope={['inventory-ledger', ledgerSelection]} after={ledgerAfter} onPage={setLedgerAfter} pageSize={20}
+                  rows={ledgers.isSuccess ? ledgers.data : undefined} getCursor={(row) => row.id} />
+              </>
             ) : null}
           </Panel>
         </section>

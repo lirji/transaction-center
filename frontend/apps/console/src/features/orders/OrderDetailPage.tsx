@@ -191,11 +191,10 @@ function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children 
     <Panel className="table-panel">
       <h2 className="table-title">{title}</h2>
       <PageQueryGate query={query} emptyTitle={emptyTitle} emptyDetail="当前订单没有匹配记录。">
-        {(page) => (<>
-          {children(page.items)}
-          <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
-        </>)}
+        {(page) => children(page.items)}
       </PageQueryGate>
+      <PagePager scope={[`order-detail-${resource}`, orderNo]} after={after} onPage={setAfter}
+        result={query.isSuccess ? query.data : undefined} />
     </Panel>
   )
 }
@@ -211,11 +210,10 @@ function OrderRefunds({ orderNo }: { orderNo: string }) {
     <Panel className="table-panel">
       <h2 className="table-title">退款</h2>
       <QueryGate query={query} emptyTitle="本单无退款" emptyDetail="当前订单没有退款记录。">
-        {(rows) => (<>
-          <RefundRows rows={rows} />
-          <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.cursor} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
-        </>)}
+        {(rows) => <RefundRows rows={rows} />}
       </QueryGate>
+      <CursorPager scope={['order-detail-refunds', orderNo]} after={after} onPage={setAfter} pageSize={20}
+        rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.cursor} />
     </Panel>
   )
 }

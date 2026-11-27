@@ -212,9 +212,10 @@ function ProductDetail({ id }: { id: string }) {
                   ))}
                 </tbody>
               </DataTable>
-              <CursorPager after={skuAfter} pageSize={20} lastId={skus.data.at(-1)?.skuId} length={skus.data.length} onReset={() => setSkuAfter(0)} onNext={setSkuAfter} />
             </>
           ) : skus.data ? <div className="panel-inset"><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
+          <CursorPager scope={['product-skus', id]} after={skuAfter} onPage={setSkuAfter} pageSize={20}
+            rows={skus.isSuccess ? skus.data : undefined} getCursor={(row) => row.skuId} />
         </Panel>
         {draft ? (
           <div className="page-grid">

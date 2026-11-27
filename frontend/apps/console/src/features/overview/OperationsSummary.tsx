@@ -144,11 +144,11 @@ function FinancialFacts({ range, scope }: { range: OperationsRange; scope: Opera
                 ))}
               </tbody>
             </DataTable>
-            <PagePager count={result.items.length} after={after} nextAfter={result.nextAfter} hasMore={result.hasMore}
-              observedAt={result.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
           </>
         )}
       </PageQueryGate>
+      <PagePager scope={['operations-financial-facts', range, scope]} after={after} onPage={setAfter}
+        result={query.isSuccess ? query.data : undefined} />
     </Panel>
   )
 }

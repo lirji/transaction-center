@@ -67,10 +67,11 @@ export function PaymentChannelsPage() {
                     ))}
                   </tbody>
                 </DataTable>
-                <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.channelId} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
               </>
             )}
           </QueryGate>
+          <CursorPager scope={['payment-channels']} after={after} onPage={setAfter} pageSize={20}
+            rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.channelId} />
         </Panel>
         <Panel>
           <h2>登记渠道</h2>

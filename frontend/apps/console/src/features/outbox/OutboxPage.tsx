@@ -80,10 +80,11 @@ export function OutboxPage() {
                   ))}
                 </tbody>
               </DataTable>
-              <CursorPager after={after} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
             </>
           )}
         </QueryGate>
+        <CursorPager scope={['outbox', state]} after={after} onPage={setAfter} pageSize={50}
+          rows={publications.isSuccess ? publications.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">维护任务</h2>
@@ -111,10 +112,11 @@ export function OutboxPage() {
                   ))}
                 </tbody>
               </DataTable>
-              <CursorPager after={taskAfter} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setTaskAfter(0)} onNext={setTaskAfter} />
             </>
           )}
         </QueryGate>
+        <CursorPager scope={['outbox-tasks', taskState]} after={taskAfter} onPage={setTaskAfter} pageSize={50}
+          rows={tasks.isSuccess ? tasks.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       {selected && (
         <Modal title="受控重放" description={`eventId=${selected.eventId} · expectedVersion=${selected.version}。ticketRef 不代表自动开单。`} pending={replay.isPending} onClose={() => setSelected(undefined)}>

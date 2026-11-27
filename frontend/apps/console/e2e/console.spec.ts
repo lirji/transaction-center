@@ -135,6 +135,10 @@ test.describe('transaction console', () => {
 
       await page.getByRole('button', { name: '下一页' }).click()
       await expect(page.getByText('REFUND_INVALID')).toBeVisible()
+      await page.getByRole('button', { name: '上一页' }).click()
+      await expect(page.getByRole('link', { name: 'ORD-AUDIT' })).toBeVisible()
+      await page.getByRole('combobox', { name: '跳转页码' }).selectOption({ label: '第 2 页' })
+      await expect(page.getByText('REFUND_INVALID')).toBeVisible()
       await page.getByLabel('对象类型').selectOption('ORDER')
       await page.getByLabel('对象编号').fill('ORD-AUDIT')
       const request = page.waitForRequest((pending) => pending.url().includes('/admin/operation-audits?resourceType=ORDER&resourceRef=ORD-AUDIT'))
@@ -307,3 +311,68 @@ for (const width of [1440, 1024, 390]) {
     expect(errors).toEqual([])
   })
 }
+
+test('uses known cursors for previous page and jumps, restores them after refresh and detail navigation', async ({ page }, testInfo) => {
+  const requested: string[] = []
+  await page.route('**/api/v1/trade/admin/orders?**', async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const cursor = params.get('after') || '0'
+    requested.push(cursor)
+    const filtered = params.has('orderNo')
+    const next = filtered ? null : { '0': '10', '10': '20', '20': '30' }[cursor] ?? null
+    await route.fulfill({
+      json: {
+        items: cursor === '30' ? [] : [{ ...order, orderNo: 'ORD-' + cursor }],
+        nextAfter: next,
+        hasMore: next !== null,
+        observedAt: order.updatedAt,
+      },
+    })
+  })
+  await page.route('**/api/v1/trade/admin/orders/ORD-20', (route) => route.fulfill({
+    json: { ...order, orderNo: 'ORD-20', observedAt: order.updatedAt, items: [], fulfillment: null },
+  }))
+
+  await page.setViewportSize({ width: 390, height: 900 })
+  await page.goto('/orders')
+  const pager = page.getByRole('navigation', { name: '结果分页' })
+  const jump = pager.getByRole('combobox', { name: '跳转页码' })
+  const previous = pager.getByRole('button', { name: '上一页' })
+  const next = pager.getByRole('button', { name: '下一页' })
+  await expect(previous).toBeDisabled()
+  await next.click()
+  await expect(page.getByRole('link', { name: 'ORD-10', exact: true })).toBeVisible()
+  await next.click()
+  await expect(page.getByRole('link', { name: 'ORD-20', exact: true })).toBeVisible()
+  await expect(jump).toHaveValue('2')
+
+  await next.click()
+  await expect(page.getByRole('heading', { name: '当前筛选无订单' })).toBeVisible()
+  await expect(next).toBeDisabled()
+  await previous.click()
+  await expect(page.getByRole('link', { name: 'ORD-20', exact: true })).toBeVisible()
+  await jump.selectOption({ label: '第 1 页' })
+  await expect(page.getByRole('link', { name: 'ORD-0', exact: true })).toBeVisible()
+  const requestsBeforeJump = requested.length
+  await jump.selectOption({ label: '第 3 页' })
+  await expect(page.getByRole('link', { name: 'ORD-20', exact: true })).toBeVisible()
+  expect(requested.slice(requestsBeforeJump).every((cursor) => cursor === '20')).toBe(true)
+  await expect(page).toHaveURL(/after=20/)
+
+  await page.reload()
+  await expect(jump).toHaveValue('2')
+  await expect(previous).toBeEnabled()
+  await page.getByRole('link', { name: 'ORD-20', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '订单摘要' })).toBeVisible()
+  await page.getByRole('link', { name: '返回订单列表' }).click()
+  await expect(jump).toHaveValue('2')
+  await expect(previous).toBeEnabled()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await pager.screenshot({ path: testInfo.outputPath('cursor-pager-mobile.png') })
+
+  await page.getByLabel('订单号').fill('ORD-0')
+  await page.getByRole('button', { name: '查询' }).click()
+  await expect(page).toHaveURL(/orderNo=ORD-0$/)
+  await expect(previous).toBeDisabled()
+  await expect(jump).toHaveCount(0)
+})

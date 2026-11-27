@@ -181,14 +181,13 @@ export function RefundsPage() {
           {memberUrlError || incompleteWindow ? (
             <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
           ) : (
-            <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
-              {(rows: RefundQueueItem[]) => (
-                <>
-                  <RefundRows rows={rows} />
-                  <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.cursor} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
-                </>
-              )}
-            </QueryGate>
+            <>
+              <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
+                {(rows: RefundQueueItem[]) => <RefundRows rows={rows} />}
+              </QueryGate>
+              <CursorPager scope={['refunds', filters]} after={after} onPage={setAfter} pageSize={20}
+                rows={queue.isSuccess ? queue.data : undefined} getCursor={(row) => row.cursor} />
+            </>
           )}
         </Panel>
       </div>

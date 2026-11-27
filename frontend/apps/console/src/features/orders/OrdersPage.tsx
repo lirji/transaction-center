@@ -165,14 +165,13 @@ export function OrdersPage() {
         {memberUrlError || incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，未向服务器发送请求。</p>
         ) : (
-          <PageQueryGate query={query} emptyTitle="当前筛选无订单" emptyDetail="可以调整查询条件或清空筛选后重试。">
-            {(page) => (
-              <>
-                <OrderRows rows={page.items} />
-                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
-              </>
-            )}
-          </PageQueryGate>
+          <>
+            <PageQueryGate query={query} emptyTitle="当前筛选无订单" emptyDetail="可以调整查询条件或清空筛选后重试。">
+              {(page) => <OrderRows rows={page.items} />}
+            </PageQueryGate>
+            <PagePager scope={['orders', filters]} after={after} onPage={setAfter}
+              result={query.isSuccess ? query.data : undefined} />
+          </>
         )}
       </Panel>
     </div>

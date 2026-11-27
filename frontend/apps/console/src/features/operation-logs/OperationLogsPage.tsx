@@ -175,17 +175,10 @@ export function OperationLogsPage() {
         <Panel className="table-panel">
           <h2 className="table-title">操作日志记录</h2>
           <PageQueryGate query={query} emptyTitle="暂无操作日志" emptyDetail="当前筛选范围没有操作记录。">
-            {(page) => (
-              <>
-                <OperationRows rows={page.items} />
-                <PagePager count={page.items.length} after={after} nextAfter={page.nextCursor} hasMore={Boolean(page.nextCursor)}
-                  onReset={() => setAfter('0')} onNext={setAfter} />
-              </>
-            )}
+            {(page) => <OperationRows rows={page.items} />}
           </PageQueryGate>
-          {after !== '0' && (query.isError || query.data?.items.length === 0) && (
-            <PagePager after={after} nextAfter={null} hasMore={false} onReset={() => setAfter('0')} onNext={setAfter} />
-          )}
+          <PagePager scope={['operation-logs', filters]} after={after} onPage={setAfter}
+            result={query.isSuccess ? query.data : undefined} />
         </Panel>
       </div>
     </div>

@@ -122,10 +122,11 @@ export function ProductsPage() {
                   ))}
                 </tbody>
               </DataTable>
-              <PagePager count={rows.length} after={after} nextAfter={rows.at(-1)?.productId ?? null} hasMore={rows.length === 20} onReset={() => setAfter('0')} onNext={setAfter} />
             </>
           )}
         </QueryGate>
+        <PagePager scope={['products', filters]} after={after} onPage={setAfter}
+          result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.productId ?? null, hasMore: query.data.length === 20 } : undefined} />
       </Panel>
       {createOpen && (
         <Modal title="创建商品草稿" description="填写商品信息和主 SKU。创建后可在商品详情维护规格并发布。"

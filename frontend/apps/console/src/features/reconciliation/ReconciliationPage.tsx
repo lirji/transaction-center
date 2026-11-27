@@ -87,10 +87,11 @@ export function ReconciliationPage() {
                   ))}
                 </tbody>
               </DataTable>
-              <CursorPager after={after} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
             </>
           )}
         </QueryGate>
+        <CursorPager scope={['recon-cases', state, number]} after={after} onPage={setAfter} pageSize={50}
+          rows={cases.isSuccess ? cases.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">查单作业</h2>
@@ -118,10 +119,11 @@ export function ReconciliationPage() {
                   ))}
                 </tbody>
               </DataTable>
-              <CursorPager after={opAfter} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setOpAfter(0)} onNext={setOpAfter} />
             </>
           )}
         </QueryGate>
+        <CursorPager scope={['recon-operations', opState, number]} after={opAfter} onPage={setOpAfter} pageSize={50}
+          rows={operations.isSuccess ? operations.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       {selected && (
         <Modal title="原渠道只查单" description={`caseNo=${selected.caseNo} · version=${selected.version}。202 只表示排队。`} pending={queryCase.isPending} onClose={() => setSelected(undefined)}>

@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Button, PageHeader, PagePager, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -12,15 +12,13 @@ import { refundLabels } from './refundStatus'
 /** 按已授权的原退款读取独立操作流水，部分日志故障不影响退款详情。 */
 function RefundAuditHistory({ refundNo }: { refundNo: string }) {
   const [shown, setShown] = useState(false)
-  const [cursors, setCursors] = useState<string[]>([])
-  const cursor = cursors.at(-1)
+  const [cursor, setCursor] = useState('0')
   const history = useQuery({
     queryKey: ['refund-operation-audits', refundNo, cursor],
-    queryFn: ({ signal }) => api.refundAudit(refundNo, cursor, signal),
+    queryFn: ({ signal }) => api.refundAudit(refundNo, cursor === '0' ? undefined : cursor, signal),
     enabled: shown,
     retry: false,
   })
-  const next = history.data?.nextCursor
   return (
     <Panel className="table-panel">
       <h2 className="table-title">操作日志</h2>
@@ -51,13 +49,13 @@ function RefundAuditHistory({ refundNo }: { refundNo: string }) {
           </tbody>
         </DataTable>
       )}
-      {shown && (cursor || next || history.isError) && (
-        <div className="panel-inset queue-actions">
-          {history.isError && <Button onClick={() => void history.refetch()}>重试</Button>}
-          {cursor && <Button onClick={() => setCursors(cursors.slice(0, -1))}>上一页</Button>}
-          {next && <Button onClick={() => setCursors([...cursors, next])}>下一页</Button>}
+      {shown && history.isError && (
+        <div className="state-actions">
+          <Button onClick={() => void history.refetch()}>重试</Button>
         </div>
       )}
+      {shown && <PagePager scope={['refund-operation-audits', refundNo]} after={cursor} onPage={setCursor}
+        result={history.isSuccess ? history.data : undefined} />}
     </Panel>
   )
 }

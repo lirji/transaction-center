@@ -90,10 +90,11 @@ export function PaymentDetailPage() {
                     ))}
                   </tbody>
                 </DataTable>
-                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}
           </PageQueryGate>
+          <PagePager scope={['payment-attempts', paymentNo, status]} after={after} onPage={setAfter}
+            result={attempts.isSuccess ? attempts.data : undefined} />
         </Panel>
       </div>
     </div>
