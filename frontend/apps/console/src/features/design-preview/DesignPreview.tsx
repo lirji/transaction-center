@@ -89,7 +89,7 @@ export function DesignPreview() {
       <Route index element={<PreviewHome />} />
       <Route path="orders" element={<PreviewOrders />} />
       <Route path="orders/:orderNo" element={<PreviewDetail />} />
-      <Route path="products" element={<ProductsPage preview />} />
+      <Route path="products" element={<ProductsPage />} />
       <Route path="*" element={<Navigate to={previewPath('modern')} replace />} />
     </Route>
     <Route path="*" element={<Navigate to={previewPath('modern')} replace />} />

@@ -6,18 +6,17 @@ import { api, type OperationsRange } from '../../shared/api/client'
 import { QueryGate } from '../../shared/ui/QueryGate'
 import { formatInteger } from '../../shared/ui/display'
 import { orderLabels } from '../orders/orderStatus'
-import { previewPath, type DesignVariant } from '../design-preview/previewRoutes'
 
 const percent = new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 1 })
 const wholeNumber = new Intl.NumberFormat('zh-CN')
 
-export function OperationsAnalysis({ range, preview, periodReady }: {
-  range: OperationsRange; preview?: DesignVariant; periodReady: boolean
+export function OperationsAnalysis({ range, orderPath, showTrend, periodReady }: {
+  range: OperationsRange; orderPath: string; showTrend: boolean; periodReady: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>()
   const [showTable, setShowTable] = useState(false)
-  const dataView = preview === 'analytics'
+  const dataView = showTrend
   const visible = expanded || dataView
   const query = useQuery({
     queryKey: ['operations-analysis', range],
@@ -37,7 +36,6 @@ export function OperationsAnalysis({ range, preview, periodReady }: {
       {(analysis) => {
         const peak = Math.max(1, ...analysis.daily.map((daily) => Math.max(daily.orderCount, daily.paidOrderCount)))
         const selected = analysis.daily.find(({ day }) => day === selectedDate) ?? analysis.daily.at(-1)
-        const orderPath = preview ? previewPath(preview, 'orders') : '/orders'
         const statusContext = <>
           <div className="cohort-bar">
             <strong>创建订单付费转化率</strong>
@@ -53,17 +51,17 @@ export function OperationsAnalysis({ range, preview, periodReady }: {
         </>
         return <>
           {!dataView && statusContext}
-          {dataView && !showTable && <div className="dp-trend">
-            <div className="dp-trend-head">
-              <div className="dp-chart-legend"><span>创建订单</span><span>确认付费</span></div>
+          {dataView && !showTable && <div className="order-trend">
+            <div className="trend-heading">
+              <div className="chart-legend"><span>创建订单</span><span>确认付费</span></div>
               <div role="status">{selected ? `${selected.day} · 创建 ${formatInteger(selected.orderCount)} 单 · 确认付费 ${formatInteger(selected.paidOrderCount)} 单` : '暂无日趋势'}</div>
             </div>
-            <div className="dp-chart-scroll">
-              <div className="dp-chart" role="group" aria-label="每日订单趋势（北京时间）">
+            <div className="chart-scroll">
+              <div className="daily-chart" role="group" aria-label="每日订单趋势（北京时间）">
                 {analysis.daily.map((day) => <button type="button" key={day.day}
                   aria-label={`${day.day} 创建 ${day.orderCount} 单，确认付费 ${day.paidOrderCount} 单`}
                   aria-pressed={selected?.day === day.day} onClick={() => setSelectedDate(day.day)}>
-                  <span className="dp-chart-bars" aria-hidden="true">
+                  <span className="chart-bars" aria-hidden="true">
                     <i style={{ height: `${100 * day.orderCount / peak}%` }} />
                     <i style={{ height: `${100 * day.paidOrderCount / peak}%` }} />
                   </span>

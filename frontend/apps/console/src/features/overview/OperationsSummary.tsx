@@ -14,7 +14,7 @@ import { type OperationsScope, operationsFinancialFactSchema } from '../../share
 import { parseCurrencyCode, parseTimeWindow } from '../../shared/api/validate'
 import { FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { PageQueryGate, QueryGate } from '../../shared/ui/QueryGate'
-import { formatBeijingTime } from '../../shared/ui/display'
+import { formatBeijingTime, formatInteger } from '../../shared/ui/display'
 import { previewPath, type DesignVariant } from '../design-preview/previewRoutes'
 
 const financeLabels = {
@@ -37,6 +37,31 @@ function displayYuan(value: string | number) {
   const yuan = integerFormat.format(absolute / CNY_MINOR_UNITS_PER_YUAN)
   const minor = String(absolute % CNY_MINOR_UNITS_PER_YUAN).padStart(2, '0')
   return `${amount < 0n ? '−' : ''}${yuan}.${minor}`
+}
+
+export function TodaySummary({ enabled }: { enabled: boolean }) {
+  const today = beijingRange('today')
+  const range = { ...parseTimeWindow(today.from, today.to)!, currency: 'CNY' }
+  const query = useQuery({
+    queryKey: ['operations-summary', range],
+    queryFn: ({ signal }) => api.operationsSummary(range, signal),
+    enabled,
+    retry: false,
+  })
+  const url = new URLSearchParams(range)
+  return <Panel className="today-summary">
+    <div className="panel-head">
+      <div><h2>今日经营</h2><small>北京时间 · CNY</small></div>
+      <Link className="button secondary" to={`/analytics?${url}`}>经营分析<ArrowRight size={15} aria-hidden="true" /></Link>
+    </div>
+    {enabled ? <QueryGate query={query} emptyTitle="暂无今日汇总" emptyDetail="请在经营分析中核对统计期间。">
+      {(result) => <dl className="today-metrics">
+        <div><dt>新建订单</dt><dd>{formatInteger(result.orderCount)} <small>单</small></dd></div>
+        <div><dt>净收款</dt><dd>{displayYuan(result.netReceipt)} <small>元</small></dd></div>
+        <div><dt>数据读取时间</dt><dd><small>{formatBeijingTime(result.observedAt)}</small></dd></div>
+      </dl>}
+    </QueryGate> : <p className="panel-note" role="status">正在读取今日经营数据…</p>}
+  </Panel>
 }
 
 type Summary = Awaited<ReturnType<typeof api.operationsSummary>>
@@ -107,9 +132,9 @@ function MetricValue({ name, value, unit, baseline, displayCny }: {
   </>
 }
 
-function initialPeriod(preview: DesignVariant | undefined, params: URLSearchParams) {
-  const fallback = { ...beijingRange(preview ? 'last7' : 'today'), currency: 'CNY' }
-  if (!preview || !params.has('createdFrom') || !params.has('createdTo')) return fallback
+function initialPeriod(params: URLSearchParams) {
+  const fallback = { ...beijingRange('last7'), currency: 'CNY' }
+  if (!params.has('createdFrom') || !params.has('createdTo')) return fallback
   const from = Date.parse(params.get('createdFrom') ?? '')
   const to = Date.parse(params.get('createdTo') ?? '')
   if (!Number.isFinite(from) || !Number.isFinite(to)) return fallback
@@ -125,7 +150,7 @@ function initialPeriod(preview: DesignVariant | undefined, params: URLSearchPara
 
 export function OperationsSummary({ preview }: { preview?: DesignVariant } = {}) {
   const [params, setParams] = useSearchParams()
-  const [initial] = useState(() => initialPeriod(preview, params))
+  const [initial] = useState(() => initialPeriod(params))
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)
   const [currency, setCurrency] = useState(initial.currency)
@@ -133,7 +158,8 @@ export function OperationsSummary({ preview }: { preview?: DesignVariant } = {})
   const [scope, setScope] = useState<OperationsScope>()
   const [contrast, setContrast] = useState(false)
   const [error, setError] = useState('')
-  const [showPreviewFilters, setShowPreviewFilters] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const showTrend = !preview || preview === 'analytics'
   const orderPath = preview ? previewPath(preview, 'orders') : '/orders'
   const factSection = useRef<HTMLElement>(null)
   const priorRange = precedingRange(range)
@@ -163,7 +189,7 @@ export function OperationsSummary({ preview }: { preview?: DesignVariant } = {})
         void summary.refetch()
       } else {
         setRange(next)
-        if (preview) setParams(next, { replace: true, preventScrollReset: true })
+        setParams(next, { replace: true, preventScrollReset: true })
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '筛选无效')
@@ -175,14 +201,14 @@ export function OperationsSummary({ preview }: { preview?: DesignVariant } = {})
       <Panel className="period-summary">
         <div className="panel-head"><h2>期间经营汇总</h2>
           <div className="queue-actions">
-          {preview && preview !== 'analytics' && <Button aria-expanded={showPreviewFilters}
-            onClick={() => setShowPreviewFilters(!showPreviewFilters)}>统计期间</Button>}
+          {!showTrend && <Button aria-expanded={showFilters}
+            onClick={() => setShowFilters(!showFilters)}>统计期间</Button>}
           <Button aria-pressed={contrast} disabled={!summary.isSuccess} onClick={() => setContrast(!contrast)}>
             <BarChart3 size={16} aria-hidden="true" />{contrast ? '关闭上期对比' : '对比上一期'}
           </Button>
           </div>
         </div>
-        {(!preview || showPreviewFilters || preview === 'analytics') && <FilterBar onSubmit={run}>
+        {(showTrend || showFilters) && <FilterBar onSubmit={run}>
           <Field label="统计币种"><input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} required /></Field>
           <TimeRangeFields labelPrefix="统计" from={from} to={to} onFrom={setFrom} onTo={setTo} />
         </FilterBar>}
@@ -208,7 +234,7 @@ export function OperationsSummary({ preview }: { preview?: DesignVariant } = {})
                   </Link>
                   <Link className="metric" to={`${orderPath}?${orderQuery}`} aria-label="查看创建应付额关联订单">
                     <MetricValue name="创建应付额" value={result.orderPayable} unit="最小单位" baseline={baseline?.orderPayable}
-                      displayCny={Boolean(preview) && result.currency === 'CNY'} />
+                      displayCny={result.currency === 'CNY'} />
                   </Link>
                   <button type="button" className="metric" aria-expanded={scope === 'NORMAL_RECEIPT'}
                     aria-label="查看确认付费订单的收款" onClick={() => setScope('NORMAL_RECEIPT')}>
@@ -217,11 +243,11 @@ export function OperationsSummary({ preview }: { preview?: DesignVariant } = {})
                   <button type="button" className="metric metric-primary" aria-expanded={scope === 'NET'}
                     aria-label="查看期间净收款明细" onClick={() => setScope('NET')}>
                     <MetricValue name="期间净收款" value={result.netReceipt} unit="最小单位" baseline={baseline?.netReceipt}
-                      displayCny={Boolean(preview) && result.currency === 'CNY'} />
+                      displayCny={result.currency === 'CNY'} />
                   </button>
                 </div>
-                {preview === 'analytics'
-                  ? <details className="dp-funding-details"><summary>查看确认收付款项（{result.currency}）</summary>
+                {showTrend
+                  ? <details className="funding-details"><summary>查看确认收付款项（{result.currency}）</summary>
                     <FundingBars result={result} select={setScope} active={scope} />
                   </details>
                   : <FundingBars result={result} select={setScope} active={scope} />}
@@ -231,10 +257,9 @@ export function OperationsSummary({ preview }: { preview?: DesignVariant } = {})
           }}
         </QueryGate>
       </Panel>
-      <OperationsAnalysis range={range} preview={preview} periodReady={!preview || summary.isFetched} />
-      {!preview && <SourceWorkspaces range={range} />}
+      <OperationsAnalysis range={range} orderPath={orderPath} showTrend={showTrend} periodReady={summary.isFetched} />
       {scope && <section ref={factSection} id="financial-facts"><FinancialFacts key={scope} range={range} scope={scope} /></section>}
-      {preview && <SourceWorkspaces range={range} />}
+      <SourceWorkspaces range={range} />
     </div>
   )
 }

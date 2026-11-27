@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { ApiProblem } from './shared/api/client'
 import { runtimeConfigError } from './shared/config/runtime'
 import './styles.css'
+import './console-workspaces.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

@@ -78,8 +78,10 @@ export function AppShell() {
       {!navOpen && <a className="button primary skip-link" href="#main-content">跳至内容</a>}
       <aside className={`sidebar ${navOpen ? 'open' : ''}`} id="console-navigation">
         <div className="brand">
-          <span className="brand-mark"><ArrowLeftRight size={18} aria-hidden="true" /></span>
-          <span><strong>交易中枢</strong><small>运营控制台</small></span>
+          <Link className="brand-home" to="/" aria-label="交易中枢工作台" onClick={() => setNavOpen(false)}>
+            <span className="brand-mark"><ArrowLeftRight size={18} aria-hidden="true" /></span>
+            <span><strong>交易中枢</strong><small>运营控制台</small></span>
+          </Link>
           <button className="icon-button mobile-close" ref={closeMenu} type="button" onClick={() => setNavOpen(false)} aria-label="关闭菜单"><X size={18} /></button>
         </div>
         <nav aria-label="主导航">
@@ -107,7 +109,8 @@ export function AppShell() {
               {isDetail ? (
                 <>
                   <li><Link to={{ pathname: sectionPath, search: typeof listSearch === 'string' ? listSearch : '' }}
-                    state={typeof listSearch === 'string' ? { restoreListScroll: true, returnedOrder: location.state?.listOrderRef } : undefined}>{current?.label}</Link><ChevronRight size={14} aria-hidden="true" /></li>
+                    state={typeof listSearch === 'string' ? { restoreListScroll: true, returnedOrder: location.state?.listOrderRef,
+                      orderPreview: location.state?.orderPreview } : undefined}>{current?.label}</Link><ChevronRight size={14} aria-hidden="true" /></li>
                   <li aria-current="page">详情</li>
                 </>
               ) : <li aria-current="page">{current?.label ?? '控制台'}</li>}

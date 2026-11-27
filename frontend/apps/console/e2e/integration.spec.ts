@@ -40,7 +40,7 @@ test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ p
   await expect(page.getByRole('link', { name: data.paidOrder, exact: true })).toBeVisible()
   await page.getByRole('link', { name: data.paidOrder, exact: true }).click()
   await expect(page.getByRole('heading', { name: data.paidOrder, exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '支付意图', exact: true }).click()
+  await page.getByRole('button', { name: '资金', exact: true }).click()
   await page.getByRole('link', { name: data.paymentNo, exact: true }).first().click()
   await expect(page.getByRole('heading', { name: data.paymentNo, exact: true })).toBeVisible()
   await page.goto(`/refunds/${data.refundNo}`)
@@ -233,7 +233,7 @@ test('product SKU, member registration, and available inventory filters read pas
 })
 
 test('operations totals reconcile with paged facts for the same window, currency and tenant', async ({ page }, testInfo) => {
-  await login(page, 'admin', '/')
+  await login(page, 'admin', '/analytics')
   const paid = await api(page, `/admin/orders/${data.paidOrder}`)
   const seedTime = Date.parse(paid.body.createdAt)
   const beijing = (epoch: number) => new Date(epoch + 8 * 3_600_000).toISOString().slice(0, 16)
@@ -285,8 +285,8 @@ test('operations totals reconcile with paged facts for the same window, currency
   await page.getByLabel('统计起始时间（北京时间）').fill(beijing(from))
   await page.getByLabel('统计结束时间（北京时间）').fill(beijing(to))
   await page.getByRole('button', { name: '查询', exact: true }).click()
-  await expect(page.getByRole('button', { name: '查看期间净收款明细' })).toContainText('19,000')
-  await page.screenshot({ path: testInfo.outputPath('workbench-summary.png'), fullPage: true })
+  await expect(page.getByRole('button', { name: '查看期间净收款明细' })).toContainText('190.00 元')
+  await page.screenshot({ path: testInfo.outputPath('analytics-summary.png'), fullPage: true })
   await page.getByRole('button', { name: '查看期间净收款明细' }).click()
   await expect(page.getByRole('heading', { name: '期间净收款明细' })).toBeVisible()
   const refundNo = netRefund.body.items[0].refundBusinessNo

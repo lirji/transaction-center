@@ -42,13 +42,14 @@ function OrderRows({ rows, recent, onSort, orderBase, onPreview, selected }: {
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.orderNo} id={`order-row-${row.orderNo}`} className={selected === row.orderNo ? 'dp-selected-order' : undefined}>
+          <tr key={row.orderNo} id={`order-row-${row.orderNo}`} className={selected === row.orderNo ? 'selected-order' : undefined}>
             <td>
-              <CopyValue value={row.businessNo ?? row.orderNo} name="订单号"><Link to={`${orderBase}/${encodeURIComponent(row.orderNo)}`} state={{ ordersSearch: location.search, listOrderRef: row.orderNo }} className="mono"
+              <CopyValue value={row.businessNo ?? row.orderNo} name="订单号"><Link to={`${orderBase}/${encodeURIComponent(row.orderNo)}`}
+                state={{ ordersSearch: location.search, listOrderRef: row.orderNo, orderPreview: selected }} className="mono"
                 title={row.businessNo ?? row.orderNo}>{row.businessNo ?? row.orderNo}</Link></CopyValue>
             </td>
-            {onPreview && <td><Button tone="ghost" className="dp-row-preview" data-order-preview={row.orderNo}
-              aria-expanded={selected === row.orderNo} aria-label={`速览订单 ${row.businessNo ?? row.orderNo}`}
+            {onPreview && <td><Button tone="ghost" className="order-preview-button" data-order-preview={row.orderNo}
+              aria-expanded={selected === row.orderNo} aria-controls={selected === row.orderNo ? 'order-preview' : undefined} aria-label={`速览订单 ${row.businessNo ?? row.orderNo}`}
               onClick={() => onPreview(row.orderNo)}><PanelRightOpen size={16} aria-hidden="true" /></Button></td>}
             <td><Badge tone={statusTone(row.status)}>{orderLabels[row.status]}</Badge>
               {row.status === orderStatusSchema.enum.PENDING_PAYMENT && Date.parse(row.expiresAt) <= Date.now() &&
@@ -56,7 +57,7 @@ function OrderRows({ rows, recent, onSort, orderBase, onPreview, selected }: {
             </td>
             <td><Badge tone={statusTone(row.financialStatus)}>{financialLabels[row.financialStatus]}</Badge></td>
             <td className="numeric-cell">{formatMinorAmount(row.payableAmount)}</td>
-            <td className="dp-order-currency">{row.currency}</td>
+            <td className="order-currency">{row.currency}</td>
             <td className="time-cell">{formatBeijingTime(row.createdAt)}</td>
             <td className="mono">{row.memberId}</td>
             <td className="mono">{dash(row.warehouseId)}</td>
@@ -69,6 +70,7 @@ function OrderRows({ rows, recent, onSort, orderBase, onPreview, selected }: {
 
 export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
   const location = useLocation()
+  const layout = preview ?? 'operations'
   const orderBase = preview ? previewPath(preview, 'orders') : '/orders'
   const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [sort, setSort] = useState(() => params.get('sort') ?? 'ID_ASC')
@@ -81,7 +83,7 @@ export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
   const [to, setTo] = useState(() => isoFromSearch(params, 'createdTo'))
   const [formError, setFormError] = useState('')
-  const [previewOrderNo, setPreviewOrderNo] = useState<string | undefined>(() => location.state?.returnedOrder)
+  const [previewOrderNo, setPreviewOrderNo] = useState<string | undefined>(() => location.state?.orderPreview)
 
   const memberDraftError = memberId.trim() && (() => {
     try { parseMemberId(memberId); return '' } catch (cause) { return cause instanceof Error ? cause.message : '无效' }
@@ -128,7 +130,7 @@ export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
   const result = query.isSuccess ? query.data : undefined
   const numberedResult = result && 'totalCount' in result ? result : undefined
   const cursorResult = result && 'nextAfter' in result ? result : undefined
-  const selectedOrder = preview === 'operations' ? result?.items.find((item) => item.orderNo === previewOrderNo) : undefined
+  const selectedOrder = layout === 'operations' ? result?.items.find((item) => item.orderNo === previewOrderNo) : undefined
 
   function applyStatus(value: string) {
     setStatus(value)
@@ -176,10 +178,9 @@ export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
   }
 
   const queryPanel = (
-    <Panel className={preview ? 'dp-order-query' : ''}>
-      {!preview && <h2>查询订单</h2>}
-      {preview === 'operations'
-        ? <div className="dp-order-presets" role="group" aria-label="订单状态快捷筛选">
+    <Panel className="orders-query">
+      {layout === 'operations'
+        ? <div className="status-presets" role="group" aria-label="订单状态快捷筛选">
           {['', ...ORDER_STATUSES].map((value) => (
             <Button key={value} tone="ghost" aria-pressed={(filters.status ?? '') === value}
               onClick={() => applyStatus(value)}>{value ? orderLabels[orderStatusSchema.parse(value)] : '全部订单'}</Button>
@@ -221,16 +222,16 @@ export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
   )
   const resultPanel = (
     <Panel className="table-panel">
-      {preview ? <div className="dp-list-title"><h2 className="table-title">订单列表</h2>
+      <div className="list-heading"><h2 className="table-title">订单列表</h2>
         {numberedResult && <span>筛选范围共 {formatInteger(numberedResult.totalCount)} 条</span>}
-      </div> : <h2 className="table-title">订单列表</h2>}
+      </div>
       {memberUrlError || incompleteWindow ? (
         <p className="invalid-filter" role="alert">当前筛选无效，未向服务器发送请求。</p>
       ) : (
         <>
           <PageQueryGate query={query} emptyTitle="当前筛选无订单" emptyDetail="可以调整查询条件或清空筛选后重试。">
             {(page) => <OrderRows rows={page.items} recent={filters.sort === 'CREATED_DESC'} onSort={toggleSort}
-              orderBase={orderBase} selected={selectedOrder?.orderNo} onPreview={preview === 'operations'
+              orderBase={orderBase} selected={selectedOrder?.orderNo} onPreview={layout === 'operations'
                 ? (number) => setPreviewOrderNo(previewOrderNo === number ? undefined : number) : undefined} />}
           </PageQueryGate>
           {numberedResult
@@ -242,12 +243,12 @@ export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
     </Panel>
   )
   const quickView = selectedOrder && (
-    <aside className="dp-order-aside" aria-label="订单速览">
-      <div className="dp-aside-heading"><h2>订单速览</h2><Button tone="ghost" aria-label="关闭订单速览" onClick={() => {
+    <aside id="order-preview" className="order-preview" aria-label="订单速览">
+      <div className="order-preview-heading"><h2>订单速览</h2><Button tone="ghost" aria-label="关闭订单速览" onClick={() => {
         document.querySelector<HTMLButtonElement>(`[data-order-preview="${CSS.escape(selectedOrder.orderNo)}"]`)?.focus()
         setPreviewOrderNo(undefined)
       }}><X size={16} aria-hidden="true" /></Button></div>
-      <strong className="dp-aside-number">{selectedOrder.businessNo ?? selectedOrder.orderNo}</strong>
+      <strong className="order-preview-number">{selectedOrder.businessNo ?? selectedOrder.orderNo}</strong>
       <dl>
         <div><dt>应付金额</dt><dd>{formatMinor(selectedOrder.payableAmount, selectedOrder.currency)}</dd></div>
         <div><dt>订单状态</dt><dd><Badge tone={statusTone(selectedOrder.status)}>{orderLabels[selectedOrder.status]}</Badge></dd></div>
@@ -255,29 +256,25 @@ export function OrdersPage({ preview }: { preview?: DesignVariant } = {}) {
         <div><dt>创建时间（北京时间）</dt><dd>{formatBeijingTime(selectedOrder.createdAt)}</dd></div>
       </dl>
       <Link className="button primary" to={`${orderBase}/${encodeURIComponent(selectedOrder.orderNo)}`}
-        state={{ ordersSearch: location.search, listOrderRef: selectedOrder.orderNo }}>打开完整详情 <ArrowUpRight size={15} aria-hidden="true" /></Link>
+        state={{ ordersSearch: location.search, listOrderRef: selectedOrder.orderNo, orderPreview: selectedOrder.orderNo }}>打开完整详情 <ArrowUpRight size={15} aria-hidden="true" /></Link>
     </aside>
   )
 
   return (
-    <div className={preview ? 'workspace dp-orders' : 'workspace'}>
+    <div className="workspace orders-workspace" data-density={layout === 'operations' ? 'compact' : undefined}>
       <PageHeader
         title={preview ? '订单管理' : '订单'}
         description="按订单号、会员或状态查询，可按创建时间查看最近订单。"
         actions={<Button loading={exportOrders.isPending} disabled={Boolean(memberUrlError) || incompleteWindow}
           onClick={() => exportOrders.mutate()}><Download size={16} aria-hidden="true" />导出筛选结果</Button>}
       />
-      {preview === 'analytics' && <OrderReadout rows={result?.items} total={numberedResult?.totalCount}
+      {layout === 'analytics' && <OrderReadout rows={result?.items} total={numberedResult?.totalCount}
         status={filters.status} onStatus={applyStatus} />}
-      {preview ? <div className="dp-order-surface">
+      <div className="orders-surface">
         {queryPanel}
         <MutationBanner error={exportOrders.error} />
-        <div className={quickView ? 'dp-order-split' : undefined}>{resultPanel}{quickView}</div>
-      </div> : <>
-        {queryPanel}
-        <MutationBanner error={exportOrders.error} />
-        {resultPanel}
-      </>}
+        <div className={quickView ? 'orders-with-preview' : undefined}>{resultPanel}{quickView}</div>
+      </div>
     </div>
   )
 }
@@ -287,12 +284,12 @@ function OrderReadout({ rows, total, status, onStatus }: {
 }) {
   const statuses = new Map<AdminOrderView['status'], number>()
   for (const row of rows ?? []) statuses.set(row.status, (statuses.get(row.status) ?? 0) + 1)
-  return <section className="dp-order-readout" aria-label="订单数据摘要">
+  return <section className="order-readout" aria-label="订单数据摘要">
     <div><span>当前筛选订单</span><strong>{total === undefined ? '—' : formatInteger(total)}</strong></div>
     <div><span>当前页订单</span><strong>{rows ? formatInteger(rows.length) : '—'}</strong></div>
-    <div className="dp-order-distribution">
+    <div className="order-distribution">
       <span>当前页订单状态分布</span>
-      {statuses.size ? <><div className="dp-distribution-bars" aria-hidden="true">
+      {statuses.size ? <><div className="distribution-bars" aria-hidden="true">
         {[...statuses].map(([status, count]) => <i key={status} data-status={status} style={{ flexGrow: count }} />)}
       </div><ul>{[...statuses].map(([value, count]) =>
         <li key={value}><Button tone="ghost" aria-pressed={status === value} onClick={() => onStatus(status === value ? '' : value)}>

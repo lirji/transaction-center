@@ -8,6 +8,7 @@ import { TRADE_ADMIN, TRADE_ADMIN_JOBS_READ } from './shared/auth/auth-context'
 import { LoginPage } from './features/auth/LoginPage'
 import { AuthCallbackPage } from './features/auth/AuthCallbackPage'
 const OverviewPage = lazy(() => import('./features/overview/OverviewPage').then((module) => ({ default: module.OverviewPage })))
+const AnalyticsPage = lazy(() => import('./features/overview/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })))
 const MembersPage = lazy(() => import('./features/members/MembersPage').then((module) => ({ default: module.MembersPage })))
 const ConsentsPage = lazy(() => import('./features/consents/ConsentsPage').then((module) => ({ default: module.ConsentsPage })))
 const MerchantPage = lazy(() => import('./features/merchant/MerchantPage').then((module) => ({ default: module.MerchantPage })))
@@ -60,6 +61,7 @@ export default function App() {
       </Admin></RequireAuth>} />}
       <Route element={<RequireAuth><AppShell /></RequireAuth>}>
         <Route index element={<Admin><OverviewPage /></Admin>} />
+        <Route path="analytics" element={<Admin><AnalyticsPage /></Admin>} />
         <Route path="members" element={<Admin><MembersPage /></Admin>} />
         <Route path="consents" element={<Admin><ConsentsPage /></Admin>} />
         <Route path="merchant" element={<Admin><MerchantPage /></Admin>} />

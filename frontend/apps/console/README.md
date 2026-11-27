@@ -23,7 +23,13 @@ Casdoor 应用若尚未签发上述 audience / scope，需要 IAM 侧补齐，�
 
 `public/config.js` 可覆盖 `OIDC_CLIENT_ID` / `OIDC_ORGANIZATION`。Outbox 重放、对账只查单、改准入策略还需要对应额外 scope。
 
-「运行与准入 → 操作日志」供租户管理员查询已记录的业务操作，支持对象类型、对象编号和北京时间范围筛选。
+「系统管理 → 操作日志」供租户管理员查询已记录的业务操作，支持对象类型、对象编号和北京时间范围筛选。
+
+## 工作台与经营分析
+
+首页 `/` 提供当前待办、交易受理和今日经营快照。`/orders` 支持侧栏速览及保留筛选的完整详情返回。`/analytics` 独立提供期间、币种、趋势和资金明细。
+
+若本机 Docker 已占用 IPv4 的 4180，且 Casdoor 已登记 localhost 的回调，可在前端目录运行 `TRADE_UI_PORT=4180 pnpm dev --host ::1 --strictPort`，通过 `http://localhost:4180/` 打开开发实例。详细方案见 [设计系统](../../../DESIGN_SYSTEM.md)。
 
 ## 隔离浏览器与CI
 

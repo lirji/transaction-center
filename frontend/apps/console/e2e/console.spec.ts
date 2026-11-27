@@ -92,6 +92,9 @@ test.describe('transaction console', () => {
   test('shows the admin shell and members from the API', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: '交易运营工作台' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '当前待处理', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '今日经营', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '期间经营汇总' })).toHaveCount(0)
     await page.getByRole('link', { name: '会员' }).click()
     await expect(page.getByRole('heading', { name: '会员', level: 1 })).toBeVisible()
     await expect(page.getByText('林若')).toBeVisible()
@@ -107,7 +110,16 @@ test.describe('transaction console', () => {
     await page.goto('/')
     await page.getByRole('link', { name: '订单', exact: true }).click()
     await expect(page.getByRole('heading', { name: '订单', level: 1 })).toBeVisible()
-    await expect(page.getByText('ORD-1')).toBeVisible()
+    const orderLink = page.getByRole('link', { name: 'ORD-1', exact: true })
+    await expect(orderLink).toBeVisible()
+    const openPreview = page.getByRole('button', { name: '速览订单 ORD-1' })
+    await openPreview.click()
+    const preview = page.getByRole('complementary', { name: '订单速览' })
+    await expect(preview.getByText('ORD-1', { exact: true })).toBeVisible()
+    await expect(preview.getByRole('link', { name: '打开完整详情' })).toHaveAttribute('href', '/orders/ORD-1')
+    await preview.getByRole('button', { name: '关闭订单速览' }).click()
+    await expect(preview).toHaveCount(0)
+    await expect(openPreview).toBeFocused()
   })
 
   for (const width of [1440, 390]) {
@@ -186,6 +198,7 @@ test.describe('transaction console', () => {
     await expect(page.getByRole('heading', { name: '冻结商品' })).toBeVisible()
     expect(requests).toEqual(['orders', 'orders/ORD-1'])
     await page.screenshot({ path: testInfo.outputPath('order-detail.png') })
+    await page.getByRole('button', { name: '履约与售后', exact: true }).click()
     await page.getByRole('button', { name: '退款', exact: true }).click()
     await expect(page.getByText(/3 秒后重试/)).toBeVisible()
     await expect(page.getByRole('heading', { name: 'ORD-1', exact: true })).toBeVisible()
@@ -195,6 +208,7 @@ test.describe('transaction console', () => {
     expect([...new Set(requests)]).toEqual(['orders', 'orders/ORD-1', 'numbered-pages/refunds', 'refunds'])
     await page.getByRole('link', { name: '返回订单列表' }).click()
     await expect(page).toHaveURL(/\/orders\?status=PAID&after=10$/)
+    await expect(page.getByRole('complementary', { name: '订单速览' })).toHaveCount(0)
   })
 
 })
@@ -253,7 +267,10 @@ test('product dialogs keep draft input on failure and return to the original lis
   await create.getByRole('button', { name: '创建', exact: true }).click()
   await expect(create).toBeHidden()
   await expect(open).toBeFocused()
-  await page.getByRole('link', { name: draft.name }).click()
+  const product = page.getByRole('link', { name: draft.name })
+  await expect(product).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await product.click()
   await page.getByRole('button', { name: '编辑', exact: true }).click()
   const edit = page.getByRole('dialog', { name: '编辑 SKU SKU-1' })
   await expect(edit.getByLabel('单价')).toHaveValue('199')
@@ -292,7 +309,7 @@ test('keeps advanced order filters visible in the applied count and clears the c
 })
 
 const moduleRoutes = [
-  ['/', '交易运营工作台'], ['/members', '会员'], ['/consents', '条款文档'], ['/merchant', '逻辑商户'],
+  ['/', '交易运营工作台'], ['/analytics', '经营分析'], ['/members', '会员'], ['/consents', '条款文档'], ['/merchant', '逻辑商户'],
   ['/products', '商品'], ['/inventory', '仓库与库存'], ['/orders', '订单'], ['/payments', '支付'],
   ['/receipts', '实收'], ['/quotes', '报价'], ['/refunds', '退款'], ['/payment-channels', '支付渠道'],
   ['/returns', '退货'], ['/fulfillment', '履约'], ['/outbox', '发布隔离'],
@@ -431,7 +448,8 @@ test('shows the true order total and jumps to a page that has never been visited
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 })
 
-test('workbench compares equal periods and opens funding facts from the actual summary', async ({ page }, testInfo) => {
+test('analytics compares equal periods and opens funding facts from the actual summary', async ({ page }, testInfo) => {
+  await page.route('**/api/v1/trade/admin/operations/analysis?**', (route) => route.fulfill({ status: 404 }))
   const windows: Array<{ from: string; to: string }> = []
   await page.route('**/api/v1/trade/admin/operations/summary?**', async (route) => {
     const params = new URL(route.request().url()).searchParams
@@ -453,22 +471,23 @@ test('workbench compares equal periods and opens funding facts from the actual s
     await route.fulfill({ json: { items: [], nextAfter: null, hasMore: false, observedAt: order.updatedAt } })
   })
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/')
+  await page.goto('/analytics')
   const summary = page.getByRole('button', { name: '查看期间净收款明细' })
-  await expect(summary).toContainText('19,000')
+  await expect(summary).toContainText('190.00 元')
+  await page.getByText('查看确认收付款项（CNY）', { exact: true }).click()
   await expect(page.getByRole('button', { name: '查看正常确认收款明细' })).toContainText('20,800')
   await page.getByRole('button', { name: '对比上一期' }).click()
   await expect(page.getByRole('link', { name: '查看创建订单' })).toContainText('较上期 +100.0%')
   expect(windows[1].to).toBe(windows[0].from)
   expect(Date.parse(windows[1].to) - Date.parse(windows[1].from))
     .toBe(Date.parse(windows[0].to) - Date.parse(windows[0].from))
-  await page.screenshot({ path: testInfo.outputPath('workbench-financial-summary.png') })
+  await page.screenshot({ path: testInfo.outputPath('analytics-financial-summary.png') })
   await summary.click()
   await expect(page.getByRole('heading', { name: '期间净收款明细' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '期间无资金记录' })).toBeVisible()
 })
 
-test('the expanded operations analysis keeps its table scroll inside a 390px workbench', async ({ page }) => {
+test('analytics switches from the chart to its data table without horizontal page overflow at 390px', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.route('**/api/v1/trade/**', (route) => route.fulfill({
     status: 404, json: { code: 'NOT_FOUND', message: '无测试记录', retryable: false },
@@ -479,8 +498,10 @@ test('the expanded operations analysis keeps its table scroll inside a 390px wor
     orderStates: [{ status: 'PAID', count: 1, payableCount: 1, convertedCount: 1 }],
     daily: [{ day: '2026-09-08', orderCount: 4, paidOrderCount: 1, normalReceipt: '20000', normalRefund: '1000', netReceipt: '19000' }],
   } }))
-  await page.goto('/')
-  await page.getByRole('button', { name: '查看经营分析' }).click()
+  await page.goto('/analytics')
+  const chart = page.getByRole('group', { name: '每日订单趋势（北京时间）' })
+  await expect(chart.getByRole('button', { name: /2026-09-08/ })).toBeVisible()
+  await page.getByRole('button', { name: '查看数据表' }).click()
   const table = page.getByRole('region', { name: '每日订单与资金' })
   await expect(table.getByText('19,000')).toBeVisible()
   await expect(page.getByText('25%')).toBeVisible()
