@@ -25,7 +25,7 @@ async function api(page: Page, path: string, init: { method?: string; body?: str
   }, { path, init })
 }
 
-test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ page }) => {
+test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ page }, testInfo) => {
   await login(page)
   await expect(page.getByRole('link', { name: data.paidOrder, exact: true })).toBeVisible()
   await page.getByRole('link', { name: data.paidOrder, exact: true }).click()
@@ -38,6 +38,12 @@ test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ p
   expect(refundNoDetail.status).toBe(200)
   expect(refundNoDetail.body.businessNo).toMatch(/TRD-RFD-[0-9]{6}-[0-9]{10}/)
   await expect(page.getByRole('heading', { name: refundNoDetail.body.businessNo, exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '查看操作日志', exact: true }).click()
+  const auditRequests = page.getByRole('row').filter({ hasText: '申请退款' })
+  await expect(auditRequests.getByText('已提交', { exact: true })).toBeVisible()
+  await expect(auditRequests.getByText('重复请求', { exact: true })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('refund-operation-audit.png'), fullPage: true })
+
   await expect(page.getByRole('button', { name: /批准|驳回/ })).toHaveCount(0)
   await page.goto(`/quotes/${data.quoteId}`)
   const quoteIdDetail = await api(page, `/admin/quotes/${data.quoteId}`)

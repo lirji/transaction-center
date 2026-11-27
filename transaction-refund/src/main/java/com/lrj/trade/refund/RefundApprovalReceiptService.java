@@ -19,11 +19,12 @@ public class RefundApprovalReceiptService {
     private final RefundApprovalPort approvals;
     private final EvidenceProtectionPort protector;
     private final Clock clock;
+    private final AuditWriter audit;
     private final TransactionTemplate tx;
     /** 复用公开审批端口与认证加密；独立短事务包含证据、审计和持久唤醒。 */
     public RefundApprovalReceiptService(ApprovalReceiptMapper mapper,RefundApprovalPort approvals,EvidenceProtectionPort protector,
-        Clock clock,PlatformTransactionManager transactions) {
-        this.mapper=mapper; this.approvals=approvals; this.protector=protector; this.clock=clock;
+        Clock clock,PlatformTransactionManager transactions,AuditWriter audit) {
+        this.mapper=mapper; this.approvals=approvals; this.protector=protector; this.clock=clock; this.audit=audit;
         tx=new TransactionTemplate(transactions); tx.setTimeout(10);
     }
     /** 只能接收可信认证适配层产物；网络验签和加密在事务外，资金许可仍在退款域重检。 */
@@ -31,6 +32,11 @@ public class RefundApprovalReceiptService {
     public String accept(VerifiedApprovalReceipt receipt) {
         if(TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("审批受理禁止外层事务");
         validate(receipt);
+        String action=RefundService.approvalAuditAction(receipt.approve());
+        return audit.capture(receipt.approver(),action,receipt.refundNo(),attempt->acceptAudited(receipt,action,attempt));
+    }
+
+    private String acceptAudited(VerifiedApprovalReceipt receipt,String action,long attempt) {
         long tenant=receipt.approver().tenantId();
         String number="RAP-"+UUID.randomUUID();
         String facts=Checks.hash(receipt.sourceIssuer(),receipt.sourceSubject(),receipt.eventId(),tenant,receipt.approver().key(),
@@ -54,11 +60,15 @@ public class RefundApprovalReceiptService {
                     throw new TradeException("REFUND_APPROVAL_EVENT_CONFLICT","审批证据摘要异常");
             } finally { Arrays.fill(proof,(byte)0); }
             // 重复成功事件可直接返回；首个受理在等待锁后再次检查回执时效，再由领域校验审批业务期限。
-            if(!stored.receiptNo().equals(number)) return stored.receiptNo();
+            if(!stored.receiptNo().equals(number)) {
+                audit.resolveRefundReplay(tenant,attempt,receipt.refundNo(),action);
+                return stored.receiptNo();
+            }
             if(!clock.instant().isBefore(receipt.expiresAt())) throw new TradeException("REFUND_APPROVAL_UNTRUSTED","审批回执已过期");
-            approvals.applyApproval(receipt.approver(),receipt.refundNo(),receipt.approvalRef(),receipt.decisionVersion(),receipt.approve(),receipt.evidenceRef());
+            approvals.applyApproval(receipt.approver(),receipt.refundNo(),receipt.approvalRef(),receipt.decisionVersion(),receipt.approve(),receipt.evidenceRef(),attempt);
             // 领域锁等待可能跨越JWT截止点，末尾重检失败必须连同审批与唤醒一起回滚。
             if(!clock.instant().isBefore(receipt.expiresAt())) throw new TradeException("REFUND_APPROVAL_UNTRUSTED","审批回执已过期");
+            audit.resolveRefundReplay(tenant,attempt,receipt.refundNo(),action);
             return stored.receiptNo();
         });
     }

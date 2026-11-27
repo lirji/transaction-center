@@ -11,4 +11,81 @@
       VALUES (#{tenant},#{actorKey},#{action},#{resourceType},#{resourceId},#{reason},#{beforeVersion},#{afterVersion})
     ]]>
   </insert>
+  <insert id="insertAttempt">
+    INSERT INTO tc_audit_operation_attempt(tenant_id,request_id,actor_key,action_code,resource_id,trace_id,policy_version)
+    VALUES(#{tenant},#{requestId},#{actorKey},#{action},#{resourceId},#{traceId},1)
+  </insert>
+  <select id="findAttempt" resultType="long">
+    SELECT id FROM tc_audit_operation_attempt WHERE tenant_id=#{tenant} AND request_id=#{requestId}
+  </select>
+  <insert id="insertOutcome">
+    INSERT INTO tc_audit_attempt_outcome(tenant_id,attempt_id,event_ref,result_code,error_code,resource_id,effect_id)
+    VALUES(#{tenant},#{attempt},CONCAT(#{attempt},':result'),#{result},#{error},#{resource},#{effect})
+  </insert>
+  <insert id="insertRefundEffect">
+    INSERT INTO tc_operation_audit(tenant_id,actor_key,action,resource_type,resource_id,reason,before_version,after_version,
+      audit_attempt_id,audit_order_ref,audit_refund_display_no,audit_amount_minor,audit_currency,audit_before_state,
+      audit_after_state,audit_trace_id)
+    VALUES(#{tenant},#{actorKey},#{action},'REFUND',#{resource},#{reason},#{before},#{after},
+      #{effect.attemptId},#{effect.orderNo},#{effect.businessNo},#{effect.amountMinor},#{effect.currency},#{effect.beforeState},
+      #{effect.afterState},#{effect.traceId})
+  </insert>
+  <select id="effectOfAttempt" resultType="java.lang.Long">
+    SELECT id FROM tc_operation_audit WHERE tenant_id=#{tenant} AND audit_attempt_id=#{attempt}
+  </select>
+  <select id="findRefundEffect" resultType="java.lang.Long">
+    SELECT id FROM tc_operation_audit
+      WHERE tenant_id=#{tenant} AND resource_type='REFUND' AND resource_id=#{resource} AND action=#{action}
+      ORDER BY id DESC LIMIT 1
+  </select>
+  <resultMap id="auditRow" type="com.lrj.trade.core.mapper.AuditMapper$Row">
+    <constructor>
+      <idArg column="id" javaType="java.lang.String"/>
+      <arg column="request_id" javaType="java.lang.String"/>
+      <arg column="trace_id" javaType="java.lang.String"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="actor_id" javaType="java.lang.String"/>
+      <arg column="resource_id" javaType="java.lang.String"/>
+      <arg column="occurred_at" javaType="java.time.Instant"/>
+      <arg column="result" javaType="java.lang.String"/>
+      <arg column="error_code" javaType="java.lang.String"/>
+      <arg column="effect_id" javaType="java.lang.String"/>
+      <arg column="before_version" javaType="java.lang.Long"/>
+      <arg column="after_version" javaType="java.lang.Long"/>
+      <arg column="order_no" javaType="java.lang.String"/>
+      <arg column="business_no" javaType="java.lang.String"/>
+      <arg column="amount_minor" javaType="java.lang.String"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="before_state" javaType="java.lang.String"/>
+      <arg column="after_state" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <select id="refundHistory" resultMap="auditRow">
+    SELECT * FROM (
+      (SELECT CONCAT('E',a.id) AS id,r.request_id,COALESCE(a.audit_trace_id,r.trace_id) AS trace_id,
+        a.action,a.actor_key AS actor_id,a.resource_id,a.created_at AS occurred_at,'SUCCEEDED' AS result,
+        NULL AS error_code,CAST(a.id AS CHAR) AS effect_id,a.before_version,a.after_version,
+        a.audit_order_ref AS order_no,a.audit_refund_display_no AS business_no,CAST(a.audit_amount_minor AS CHAR) AS amount_minor,
+        a.audit_currency AS currency,a.audit_before_state AS before_state,a.audit_after_state AS after_state
+       FROM tc_operation_audit a
+       LEFT JOIN tc_audit_operation_attempt r ON r.tenant_id=a.tenant_id AND r.id=a.audit_attempt_id
+       WHERE a.tenant_id=#{tenant} AND a.resource_type='REFUND' AND a.resource_id=#{resource}
+       <if test="cursor != null">
+         AND (a.created_at &lt; #{before} OR (a.created_at=#{before} AND CONCAT('E',a.id) &lt; #{cursor}))
+       </if>
+       ORDER BY occurred_at DESC,id DESC LIMIT #{limit})
+      UNION ALL
+      (SELECT CONCAT('R',o.id) AS id,r.request_id,r.trace_id,r.action_code AS action,r.actor_key AS actor_id,
+        o.resource_id,r.occurred_at,o.result_code AS result,o.error_code,CAST(o.effect_id AS CHAR) AS effect_id,
+        NULL AS before_version,NULL AS after_version,NULL AS order_no,NULL AS business_no,NULL AS amount_minor,
+        NULL AS currency,NULL AS before_state,NULL AS after_state
+       FROM tc_audit_attempt_outcome o
+       JOIN tc_audit_operation_attempt r ON r.tenant_id=o.tenant_id AND r.id=o.attempt_id
+       WHERE o.tenant_id=#{tenant} AND o.resource_id=#{resource} AND r.action_code &lt;&gt; 'refund.audit.list'
+       <if test="cursor != null">
+         AND (r.occurred_at &lt; #{before} OR (r.occurred_at=#{before} AND CONCAT('R',o.id) &lt; #{cursor}))
+       </if>
+       ORDER BY occurred_at DESC,id DESC LIMIT #{limit})
+    ) evidence ORDER BY occurred_at DESC,id DESC LIMIT #{limit}
+  </select>
 </mapper>

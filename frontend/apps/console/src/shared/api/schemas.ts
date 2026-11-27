@@ -438,6 +438,22 @@ export const adminRefundDetailSchema = adminRefundViewSchema.extend({
 })
 export type AdminRefundDetail = z.infer<typeof adminRefundDetailSchema>
 
+export const refundAuditHistorySchema = z.object({
+  items: z.array(z.object({
+    id: z.string(),
+    requestId: z.string().nullish(),
+    traceId: z.string().nullish(),
+    action: z.string(),
+    occurredAt: isoDateTime,
+    result: z.string(),
+    errorCode: z.string().nullish(),
+    effectId: z.string().nullish(),
+    beforeState: z.string().nullish(),
+    afterState: z.string().nullish(),
+  })),
+  nextCursor: z.string().nullish(),
+})
+
 export const adminQuoteViewSchema = z.object({
   businessNo: z.string().nullish(),
   quoteId: z.string(),

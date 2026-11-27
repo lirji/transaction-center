@@ -18,6 +18,7 @@
 | GET /payment-receipts | 按 receiptNo/paymentNo/orderNo/channelCode/disposition/abnormalOnly 查实收 |
 | GET /payment-receipts/{receiptNo} | 实收、累计退款、预占及未占用金额 |
 | GET /refunds/{refundNo} | 退款分项、审批引用、版本、processingReasonCode |
+| GET /refunds/{refundNo}/operation-audits | 当前租户退款的申请、审批、已核实渠道终态、重复请求及业务效果证据 |
 | GET /returns | 按 returnNo/orderNo/memberId/orderItemId/warehouseId/status 查退货申请 |
 | GET /quotes | 按 quoteId/memberId 查不可变报价 |
 | GET /quotes/{quoteId} | 报价冻结商品与失效时间 |
@@ -86,3 +87,11 @@ FoundationTest覆盖实际HTTP、MySQL投影、租户隔离、会员归属、分
 实际验证结果：完整 `mvn verify` 退出0，450项测试，0失败／错误／跳过，其中FoundationTest 316项、AdminQueryTest 6项。独立只读审查发现的HEAD权限和429审计问题已修复并复核。报告见 [verification.json](delivery/admin-query-apis/verification.json)，文件清单见 [FILES.txt](delivery/admin-query-apis/FILES.txt)。
 
 V045 为支付和退款增加业务编号及唯一索引。新支付使用 `TRD-PAY` 编号，退款展示和查找使用 `TRD-RFD`，V1 证据中沿用原退款引用。订单、支付及退款详情兼容旧号和可读号，真实资金动作继续使用返回的原生标识。补录工具支持 `trade-payments` 和 `trade-refunds`，记录以不可变主键辨别，旧渠道请求号、回调和审批证据按原链路处理。
+
+## 退款操作审计
+
+使用现有 `trade.admin` 作用域和退款父资源授权。接受可读退款编号及有效旧编号，未知和跨租户退款均返回 404。每页最多 50 个事实，继续读取时原样传回 `nextCursor`。现有控制台从退款详情按需加载。
+
+实际申请、审批、渠道提交和终态的审计与本地交易、资金和原事件同事务。重试保留原提交引用。审批验真失败沿用原入口的独立拒绝证据。审核和退款原因、签名原文、渠道账户及付款信息不属于管理审计查询的输出字段。V051 新增尝试和结果表，并向原 `tc_operation_audit` 追加可空关联和状态字段。版本依据为当前主线基线 V050。
+
+专项 MySQL 覆盖申请与审批重放、渠道成功写审计失败后整体回滚、授权读取及跨租户拒绝。真实 OIDC 控制台浏览器验证同时看到已提交和重试的退款申请，两条记录指向同一提交。

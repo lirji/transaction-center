@@ -28,9 +28,10 @@ public class AdminQueryController {
     private final AdminJobQueryService job;
     private final AdminAttemptQueryService attempt;
     private final AdminRefundQueryService refund;
+    private final AuditWriter operationAudit;
     private final OrderReferralEvidenceService evidence;private final CustomerEligibilityService eligibility;private final AdminEvidenceAccess evidenceAccess;
     /** 管理员证据有独立入口授权，复用交易事实算法而非内部HTTP身份。 */
-    public AdminQueryController(AdminOrderQueryService order,AdminReturnQueryService returns,AdminPaymentQueryService payment,AdminReceiptQueryService receipt,AdminQuoteQueryService quote,AdminJobQueryService job,AdminAttemptQueryService attempt,AdminRefundQueryService refund,OrderReferralEvidenceService evidence,CustomerEligibilityService eligibility,AdminEvidenceAccess evidenceAccess) {
+    public AdminQueryController(AdminOrderQueryService order,AdminReturnQueryService returns,AdminPaymentQueryService payment,AdminReceiptQueryService receipt,AdminQuoteQueryService quote,AdminJobQueryService job,AdminAttemptQueryService attempt,AdminRefundQueryService refund,OrderReferralEvidenceService evidence,CustomerEligibilityService eligibility,AdminEvidenceAccess evidenceAccess,AuditWriter operationAudit) {
         this.order=order;
         this.returns=returns;
         this.payment=payment;
@@ -39,6 +40,7 @@ public class AdminQueryController {
         this.job=job;
         this.attempt=attempt;
         this.refund=refund;
+        this.operationAudit=operationAudit;
         this.evidence=evidence;this.eligibility=eligibility;this.evidenceAccess=evidenceAccess;
     }
     /** 有界租户查询，精确筛选不接受任意列名或自由文本搜索。 */
@@ -122,6 +124,18 @@ public class AdminQueryController {
     @GetMapping("/refunds/{refundNo}")
     public AdminRefundQueryService.Detail refund(@AuthenticationPrincipal Jwt jwt,@PathVariable String refundNo,@RequestParam MultiValueMap<String,String> params) {
         AdminQueryParameters.none(params);AdminQuery.text(refundNo,64);return refund.detail(actor(jwt).tenantId(),refundNo);
+    }
+    /** 审计查询先按租户和可读业务编号解析真实退款父资源。 */
+    @GetMapping("/refunds/{refundNo}/operation-audits")
+    public AuditWriter.History refundAudit(@AuthenticationPrincipal Jwt jwt,@PathVariable String refundNo,
+                                          @RequestParam MultiValueMap<String,String> params) {
+        AdminQuery.text(refundNo,64);
+        var cursors=params.get("cursor");
+        if(params.size()!=(cursors==null?0:1) || cursors!=null && cursors.size()!=1)
+            throw new TradeException("INVALID_ARGUMENT","审计查询参数无效");
+        Actor actor=actor(jwt);
+        var owned=refund.read(actor.tenantId(),refundNo);
+        return operationAudit.refundHistory(actor,owned.refundNo(),cursors==null?null:cursors.getFirst());
     }
     /** 证据读取不预占资格，不改变首单或资金事实。 */
     @GetMapping("/orders/{orderNo}/referral-evidence")

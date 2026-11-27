@@ -41,6 +41,7 @@ import {
   reconciliationOperationSchema,
   reconciliationQueryResultSchema,
   refundPolicySchema,
+  refundAuditHistorySchema,
   refundQueueItemSchema,
   resourceSchema,
   skuSchema,
@@ -344,6 +345,9 @@ export const api = {
     request(`${admin}/refunds${refundQueueQuery(query)}`, { signal }, (value) => parseArray(refundQueueItemSchema, value)),
   refund: (refundNo: string) =>
     request(`${admin}/refunds/${encodeURIComponent(refundNo)}`, undefined, (value) => parseWith(adminRefundDetailSchema, value)),
+  refundAudit: (refundNo: string, cursor?: string, signal?: AbortSignal) =>
+    request(`${admin}/refunds/${encodeURIComponent(refundNo)}/operation-audits${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`,
+      { signal }, (value) => parseWith(refundAuditHistorySchema, value)),
 
   paymentChannels: (after = 0, limit = 20) =>
     request(`${admin}/payment-channels${cursorQuery(after, limit)}`, undefined, (value) => parseArray(channelViewSchema, value)),

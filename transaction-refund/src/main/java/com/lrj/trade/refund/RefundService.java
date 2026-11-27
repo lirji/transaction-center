@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.*;
 /** 退款应用组合公开订单/支付端口；额度、明细、审批与事件不可部分提交。 */
 @Service
 public class RefundService implements RefundApprovalPort,RefundExecutionPort,RefundRecoveryPort,RefundCompensationPort {
+    private static final String REQUEST="refund.request";
+    private static final String SYSTEM="urn:transaction-center:system";
     private final RefundMapper mapper;
     private final OrderRefundPort orders;
     private final PaymentRefundPort funds;
@@ -32,13 +34,18 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
 
     /** 正常本人退款不接受渠道/收款标识；价格、归属与可退上限均从冻结事实获取。 */
     public RefundView request(Actor actor,String key,String orderNo,long amount,List<RefundSelection> input,String reason) {
+        return audit.capture(actor,REQUEST,null,attempt->requestAudited(actor,key,orderNo,amount,input,reason,attempt));
+    }
+
+    private RefundView requestAudited(Actor actor,String key,String orderNo,long amount,List<RefundSelection> input,
+                                      String reason,long attempt) {
         Checks.text(orderNo,64); Checks.text(key,128); Checks.text(reason,255); money(amount);
         var selected=normalize(input); long sum=selected.stream().mapToLong(RefundSelection::amount).sum();
         if(sum!=amount) throw new TradeException("REFUND_ALLOCATION_INVALID","退款明细合计必须等于申请金额");
         var hashParts=new ArrayList<Object>(List.of(orderNo,amount,reason));
         for(var item:selected) { hashParts.add(item.componentType()); hashParts.add(item.orderItemId()); hashParts.add(item.quantity()); hashParts.add(item.amount()); }
         String hash=Checks.hash(hashParts.toArray());
-        String number=commands.run(actor,"refund.request",key,hash,()->{
+        String number=commands.run(actor,REQUEST,key,hash,()->{
             var order=orders.lockOwn(actor,orderNo); long orderId=Long.parseLong(order.orderId());
             var source=funds.lockNormalSource(actor.tenantId(),orderId);
             if(!source.disposition().equals("NORMAL") || source.amount()!=order.payableAmount() || !source.currency().equals(order.currency()))
@@ -69,12 +76,14 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
                 mapper.insertItem(actor.tenantId(),row.refundId(),orderId,component.key(),item.componentType(),itemId,item.quantity(),item.amount(),now);
             }
             refreshOrder(actor.tenantId(),row,"REFUND_RESERVED");
-            audit.append(actor,"refund.request","REFUND",no,reason,0,0);
+            recordEffect(actor,REQUEST,row,reason,attempt,null,row.status(),0,0);
             outbox.append(actor.tenantId(),policy.requiresApproval()?"refund.approval-requested.internal.v0":"refund.ready.internal.v0",no);
             jobs.schedule(actor.tenantId(),JobType.REFUND_RECOVER,no,approval==null?now:now.plus(Duration.ofDays(1)));
             return no;
         });
-        return read(actor,number);
+        RefundView result=read(actor,number);
+        audit.resolveRefundReplay(actor.tenantId(),attempt,number,REQUEST);
+        return result;
     }
 
     /**
@@ -83,7 +92,7 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
      */
     public RefundView requestCompensation(long tenant,String receiptNo) {
         Checks.positive(tenant); Checks.text(receiptNo,64);
-        var actor=new Actor(tenant,"urn:transaction-center:system","refund-compensation");
+        var actor=new Actor(tenant,SYSTEM,"refund-compensation");
         String key="compensation:"+receiptNo;
         String number=commands.run(actor,"refund.compensation",key,Checks.hash(receiptNo),()->{
             // Port先锁订单、意图、收款；补偿聚合必须最后锁，不能按申请键倒置资金锁序。
@@ -114,7 +123,7 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
             changed(mapper.reserveBudget(tenant,orderId,component,source.amount(),source.amount(),now));
             mapper.insertItem(tenant,row.refundId(),orderId,component,"EXCESS",null,0,source.amount(),now);
             // 异常资金不属于正常消费，不能触发正常订单财务状态/首单/库存更新。
-            audit.append(actor,"refund.compensation","REFUND",no,reason,0,0);
+            recordEffect(actor,"refund.compensation",row,reason,null,null,row.status(),0,0);
             outbox.append(tenant,"refund.approval-requested.internal.v0",no);
             jobs.schedule(tenant,JobType.REFUND_RECOVER,no,now.plus(Duration.ofDays(1)));
             return no;
@@ -158,6 +167,13 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
     /** 此端口不等同于流程签名验证，必须先认证审批主体与调用服务。 */
     @Override @Transactional(propagation=Propagation.MANDATORY)
     public RefundView applyApproval(Actor approver,String number,String approvalRef,long decisionVersion,boolean approve,String evidenceRef) {
+        return applyApproval(approver,number,approvalRef,decisionVersion,approve,evidenceRef,null);
+    }
+
+    /** 确认的审批将实际改变和受理请求关联，同一个审批版本只提交一次效果。 */
+    @Override @Transactional(propagation=Propagation.MANDATORY)
+    public RefundView applyApproval(Actor approver,String number,String approvalRef,long decisionVersion,boolean approve,
+                                    String evidenceRef,Long auditAttempt) {
         Checks.text(approvalRef,64); Checks.positive(decisionVersion); Checks.text(evidenceRef,255);
         long tenant=approver.tenantId(); var row=lock(tenant,number); String decision=approve?"APPROVE":"REJECT";
         if(!approvalRef.equals(row.approvalRef()) || approver.key().equals(row.applicantKey()))
@@ -175,7 +191,8 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
             funds.releaseUnsubmitted(tenant,number,evidenceRef); releaseComponents(tenant,row);
             refreshOrder(tenant,row,"REFUND_RELEASED");
         }
-        audit.append(approver,approve?"refund.approved":"refund.rejected","REFUND",number,evidenceRef,row.version(),row.version()+1);
+        recordEffect(approver,approvalAuditAction(approve),row,evidenceRef,auditAttempt,row.status(),
+            approve?"READY":"REJECTED",row.version(),row.version()+1);
         outbox.append(tenant,approve?"refund.ready.internal.v0":"refund.rejected.internal.v0",number);
         jobs.wake(tenant,JobType.REFUND_RECOVER,number);
         return view(tenant,mapper.lockRefund(tenant,number).getFirst());
@@ -191,7 +208,11 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
                 (row.policyVersion()==0 || row.policyLimit()==0)))
             throw new TradeException("REFUND_APPROVAL_INVALID","缺少冻结政策或有效批准决定");
         if(row.status().equals("READY")) {
-            funds.markSubmitted(tenant,number); changed(mapper.markSubmitted(tenant,number,row.version(),now())); action="CREATE";
+            funds.markSubmitted(tenant,number);
+            changed(mapper.markSubmitted(tenant,number,row.version(),now()));
+            recordEffect(new Actor(tenant,SYSTEM,"refund-dispatch"),"refund.channel.submitted",row,"提交原渠道",
+                null,row.status(),"SUBMITTED",row.version(),row.version()+1);
+            action="CREATE";
         } else action=switch(row.status()) { case "SUBMITTED"->"QUERY"; case "PENDING_APPROVAL"->"WAIT_APPROVAL"; default->"DONE"; };
         var source=funds.lockSource(tenant,row.receiptNo());
         return new Plan(tenant,row.refundNo(),row.merchantRefundNo(),row.receiptNo(),source.attemptId(),
@@ -208,6 +229,8 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
         if(row.status().equals("SUCCEEDED")) return view(tenant,row);
         for(var item:mapper.items(tenant,row.refundId())) changed(mapper.confirmBudget(tenant,row.orderId(),item.componentKey(),item.amount(),now()));
         changed(mapper.markSucceeded(tenant,number,row.version(),providerRefundNo,now()));
+        recordEffect(new Actor(tenant,SYSTEM,"refund-channel"),"refund.channel.succeeded",row,"渠道成功已核验",
+            null,row.status(),"SUCCEEDED",row.version(),row.version()+1);
         refreshOrder(tenant,row,"REFUND_SUCCEEDED"); outbox.append(tenant,"refund.succeeded.internal.v0",number);
         jobs.wake(tenant,JobType.REFUND_RECOVER,number);
         return view(tenant,mapper.lockRefund(tenant,number).getFirst());
@@ -221,6 +244,8 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
         if(!row.status().equals("SUBMITTED")) throw new TradeException("REFUND_TERMINAL_CONFLICT","当前退款不能按渠道失败释放");
         funds.releaseVerifiedFailure(tenant,number,evidenceRef); releaseComponents(tenant,row);
         changed(mapper.markFailed(tenant,number,row.version(),now()));
+        recordEffect(new Actor(tenant,SYSTEM,"refund-channel"),"refund.channel.failed",row,"渠道失败已核验",
+            null,row.status(),"FAILED",row.version(),row.version()+1);
         refreshOrder(tenant,row,"REFUND_RELEASED"); outbox.append(tenant,"refund.failed.internal.v0",number);
         jobs.wake(tenant,JobType.REFUND_RECOVER,number);
         return view(tenant,mapper.lockRefund(tenant,number).getFirst());
@@ -235,6 +260,8 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
             throw new TradeException("REFUND_APPROVAL_INVALID","当前申请不能按审批到期释放");
         funds.releaseUnsubmitted(tenant,number,"refund:approval-expired"); releaseComponents(tenant,row);
         changed(mapper.markExpired(tenant,number,row.version(),now()));
+        recordEffect(new Actor(tenant,SYSTEM,"refund-recovery"),"refund.approval.expired",row,"审批期限届满",
+            null,row.status(),"EXPIRED",row.version(),row.version()+1);
         refreshOrder(tenant,row,"REFUND_RELEASED"); outbox.append(tenant,"refund.expired.internal.v0",number);
         return view(tenant,mapper.lockRefund(tenant,number).getFirst());
     }
@@ -270,6 +297,18 @@ public class RefundService implements RefundApprovalPort,RefundExecutionPort,Ref
         return new Step(new Plan(plan.tenantId(),plan.refundNo(),plan.merchantRefundNo(),plan.receiptNo(),
             plan.paymentAttemptId(),plan.channelCode(),plan.channelMerchantNo(),plan.providerTransactionNo(),
             plan.amount(),plan.currency(),"CREATE"),null);
+    }
+
+    /** 审批真正生效和受理重放统一使用同一个动作编码。 */
+    static String approvalAuditAction(boolean approve) {
+        return approve?"refund.approved":"refund.rejected";
+    }
+
+    private void recordEffect(Actor actor,String action,RefundRow row,String reason,Long attempt,
+                              String beforeState,String afterState,long before,long after) {
+        audit.appendRefund(actor,action,row.refundNo(),reason,before,after,
+            new AuditWriter.RefundEffect(attempt,row.orderNo(),row.businessNo(),row.amount(),row.currency(),
+                beforeState,afterState,AuditWriter.traceId()));
     }
 
     private RefundRow lock(long tenant,String number) {

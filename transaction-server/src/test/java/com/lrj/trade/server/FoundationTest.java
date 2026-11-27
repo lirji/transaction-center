@@ -2343,6 +2343,51 @@ class FoundationTest {
             receipt.approver(),receipt.refundNo(),receipt.approvalRef(),1,false,receipt.evidenceRef(),receipt.issuedAt(),receipt.expiresAt(),receipt.signedReceipt());
         assertCode("REFUND_APPROVAL_EVENT_CONFLICT",()->approvalReceipts.accept(changed));
     }
+    @Test void refundOperationsExposeOnlyScopedCommittedFactsAndRetries() throws Exception {
+        Fixture f=paymentFixture(1);
+        long tenant=f.actor().tenantId();
+        var order=paidRefundOrder(f,"operation-audit",1);
+        var refund=requestRefund(f,order,"request",100);
+        assertEquals(refund.refundNo(),requestRefund(f,order,"request",100).refundNo());
+        var approval=approvalReceipt(f,refund,"operation-audit",new Actor(tenant,"https://identity.test","audit-approver"));
+        assertEquals(approvalReceipts.accept(approval),approvalReceipts.accept(approval));
+        assertEquals("CREATE",prepareRefund(f,refund).action());
+
+        var writer=org.springframework.test.util.AopTestUtils.<AuditWriter>getUltimateTargetObject(auditWriter);
+        doThrow(new IllegalStateException("audit storage unavailable")).doCallRealMethod().when(writer)
+            .appendRefund(any(),eq("refund.channel.succeeded"),eq(refund.refundNo()),anyString(),anyLong(),anyLong(),any());
+        assertThrows(IllegalStateException.class,()->completeRefund(f,refund,"provider-operation-audit"));
+        assertEquals("SUBMITTED",refunds.read(f.actor(),refund.refundNo()).status());
+        assertApplicationAmounts(f,100,0);
+        assertEquals("SUCCEEDED",completeRefund(f,refund,"provider-operation-audit").status());
+        assertEquals("SUCCEEDED",completeRefund(f,refund,"provider-operation-audit").status());
+        assertApplicationAmounts(f,0,100);
+
+        jwt("operation-audit-admin","trade.admin",tenant);
+        jwt("operation-audit-other","trade.admin",TENANTS.incrementAndGet());
+        String path="/api/v1/trade/admin/refunds/"+refund.businessNo()+"/operation-audits";
+        assertEquals(404,request("GET",path,"operation-audit-other",null).statusCode());
+        var reply=request("GET",path,"operation-audit-admin",null);
+        assertEquals(200,reply.statusCode(),reply.body());
+        var items=tools.jackson.databind.json.JsonMapper.builder().build().readTree(reply.body()).path("items");
+        assertEquals(6,items.size(),items.toString());
+        var actions=new java.util.HashSet<String>();
+        for(var row:items) {
+            actions.add(row.path("action").asText()+"/"+row.path("result").asText());
+            assertFalse(row.has("reason"));
+            if(row.path("result").asText().equals("REPLAYED"))
+                assertTrue(row.path("effectId").isTextual());
+            if(row.path("action").asText().equals("refund.channel.succeeded")) {
+                assertEquals(order.orderNo(),row.path("orderNo").asText());
+                assertEquals(refund.businessNo(),row.path("businessNo").asText());
+                assertEquals("100",row.path("amountMinor").asText());
+                assertEquals("SUCCEEDED",row.path("afterState").asText());
+            }
+        }
+        assertEquals(Set.of("refund.request/SUCCEEDED","refund.request/REPLAYED","refund.approved/SUCCEEDED",
+            "refund.approved/REPLAYED","refund.channel.submitted/SUCCEEDED","refund.channel.succeeded/SUCCEEDED"),actions);
+    }
+
     @Test void approvalReceiptRejectedBusinessDecisionLeavesNoAcceptedEvidence() {
         Fixture f=paymentFixture(1); var refund=requestRefund(f,paidRefundOrder(f,"approval-self",1),"approval",100);
         var self=approvalReceipt(f,refund,"self",f.actor());

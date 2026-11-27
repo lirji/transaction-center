@@ -8762,6 +8762,185 @@
         }
       }
     },
+    "/api/v1/trade/admin/refunds/{refundNo}/operation-audits": {
+      "get": {
+        "operationId": "adminQueryRefundOperationAudit",
+        "summary": "退款操作证据",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "按当前租户授权的退款查询。支持可读退款编号或仍被支持的旧编号。展示实际提交、重试和已验真失败，查询本身留痕。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refundNo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 55
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全操作证据分页，每页最多50条",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "action",
+                          "actorId",
+                          "resourceId",
+                          "occurredAt",
+                          "result"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "requestId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "traceId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "actorId": {
+                            "type": "string"
+                          },
+                          "resourceId": {
+                            "type": "string"
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "result": {
+                            "type": "string"
+                          },
+                          "errorCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "effectId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "beforeVersion": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "afterVersion": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "orderNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "businessNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "amountMinor": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "currency": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "beforeState": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "afterState": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "游标无效"
+          },
+          "401": {
+            "description": "未认证"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "退款不存在或属于其他租户"
+          }
+        }
+      }
+    },
     "/api/v1/trade/admin/refunds/{refundNo}": {
       "get": {
         "operationId": "adminQueryRefundDetail",
