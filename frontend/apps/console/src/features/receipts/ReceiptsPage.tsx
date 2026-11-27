@@ -1,9 +1,10 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
+import { Badge, Button, Field, Modal, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminReceiptView } from '../../shared/api/client'
 import { formatMinor, formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseReceiptDispositionFilter, parseTimeWindow } from '../../shared/api/validate'
@@ -11,7 +12,7 @@ import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch, useListLinkState } from '../../shared/ui/useAdminListSearch'
 import { formatBeijingTime } from '../../shared/ui/display'
-import { receiptDispositionSchema } from '../../shared/api/schemas'
+import { receiptDispositionSchema, adminReceiptViewSchema } from '../../shared/api/schemas'
 import { dispositionLabels } from './receiptDisposition'
 
 const DISPOSITIONS = receiptDispositionSchema.options
@@ -71,7 +72,7 @@ export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
 }
 
 export function ReceiptsPage() {
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [receiptNo, setReceiptNo] = useState(() => params.get('receiptNo') ?? '')
   const [paymentNo, setPaymentNo] = useState(() => params.get('paymentNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
@@ -101,12 +102,12 @@ export function ReceiptsPage() {
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo) ||
     Boolean(filters.confirmedFrom) !== Boolean(filters.confirmedTo)
 
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['admin-receipts', after, pageSize, filters],
     queryFn: () => api.paymentReceipts({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !urlConflict && !incompleteWindow,
-  })
+  }, { path: 'numbered-pages/payment-receipts', schema: adminReceiptViewSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageProjection)
 
   function applyPreset(onlyAbnormal: boolean) {
     setFormError('')
@@ -203,7 +204,7 @@ export function ReceiptsPage() {
             <PageQueryGate query={query} emptyTitle="没有收款" emptyDetail="当前筛选没有实收记录。">
               {(page) => <ReceiptRows rows={page.items} />}
             </PageQueryGate>
-            <PagePager scope={['receipts', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+            <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['receipts', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

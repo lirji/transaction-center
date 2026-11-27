@@ -16,4 +16,8 @@ public interface ConsentDocumentMapper {
 
     /** 有界查询已发布条款，不跨租户合并版本。 */
     List<Document> listDocuments(@Param("tenant") long tenant, @Param("after") long after, @Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long listDocumentsCount(@Param("tenant") long tenant);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<Document> listDocumentsAtOffset(@Param("tenant") long tenant, @Param("limit") int limit, @Param("offset") long offset);
 }

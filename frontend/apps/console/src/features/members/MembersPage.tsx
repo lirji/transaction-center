@@ -1,9 +1,12 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
+import { memberSchema } from '../../shared/api/schemas'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { DateTimePicker } from '../../components/DateTimePicker'
 import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Badge, Button, Field, Modal, PageHeader, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
 import { api, type Member } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -24,7 +27,7 @@ const MEMBER_STATUS_LABELS: Record<string, string> = { [MEMBER_ACTIVE]: '正常'
 export function MembersPage() {
   const auth = useAuth()
   const canEvidence = auth.hasScope(TRADE_ADMIN_EVIDENCE_READ)
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
     memberId: params.get('memberId') || undefined,
     status: params.get('status') || undefined,
@@ -41,7 +44,7 @@ export function MembersPage() {
   const [reason, setReason] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['members', after, pageSize, filters], queryFn: () => api.members({ after, limit: pageSize, ...filters }) })
+  const query = useNumberedList({ queryKey: ['members', after, pageSize, filters], queryFn: () => api.members({ after, limit: pageSize, ...filters }) }, { path: 'numbered-pages/members', schema: memberSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageItems)
   const change = useMutation({
     mutationFn: (payload: { member: Member; targetStatus: 'ACTIVE' | 'FROZEN'; reason: string }) =>
       api.changeMemberStatus(payload.member.memberId, {
@@ -130,7 +133,7 @@ export function MembersPage() {
             </>
           )}
         </QueryGate>
-        <PagePager scope={['members', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+        <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['members', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.memberId ?? null, hasMore: query.data.length === pageSize } : undefined} />
       </Panel>
       {selected && (

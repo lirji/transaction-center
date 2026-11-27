@@ -1,8 +1,10 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
+import { adminQuoteViewSchema } from '../../shared/api/schemas'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Field, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
+import { Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminQuoteView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
@@ -38,7 +40,7 @@ export function QuoteRows({ rows, observedAt }: { rows: AdminQuoteView[]; observ
 }
 
 export function QuotesPage() {
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [quoteId, setQuoteId] = useState(() => params.get('quoteId') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
@@ -54,12 +56,12 @@ export function QuotesPage() {
     try { parseMemberId(filters.memberId); return '' } catch { return 'memberId 须为正整数文本' }
   })() : ''
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['admin-quotes', after, pageSize, filters],
     queryFn: () => api.quotes({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
-  })
+  }, { path: 'numbered-pages/quotes', schema: adminQuoteViewSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageProjection)
 
   function submit() {
     setFormError('')
@@ -116,7 +118,7 @@ export function QuotesPage() {
             <PageQueryGate query={query} emptyTitle="没有报价" emptyDetail="当前筛选没有报价记录。">
               {(page) => <QuoteRows rows={page.items} observedAt={page.observedAt} />}
             </PageQueryGate>
-            <PagePager scope={['quotes', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+            <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['quotes', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

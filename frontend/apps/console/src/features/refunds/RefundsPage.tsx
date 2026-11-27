@@ -1,10 +1,13 @@
+import { NumberedCursorPager } from '../../components/NumberedPager'
+import { refundQueueItemSchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, CursorPager, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Button, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type RefundQueueItem } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -23,7 +26,7 @@ const statusLabel = (value: typeof STATUSES[number]) => value === 'ALL' ? '全�
 export function RefundsPage() {
   const [params, setParams] = useSearchParams()
   const status = STATUSES.find((value) => value === params.get('status')) ?? 'PENDING_APPROVAL'
-  const [after, setAfter] = useState(0)
+  const [after, setAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('refunds', 20, () => setAfter(0))
   const [approvalNo, setApprovalNo] = useState(() => params.get('approvalNo') ?? '')
   const [refundNo, setRefundNo] = useState(() => params.get('refundNo') ?? '')
@@ -58,12 +61,12 @@ export function RefundsPage() {
     Boolean(filters.approvalDeadlineFrom) !== Boolean(filters.approvalDeadlineTo)
 
   const policy = useQuery({ queryKey: ['refund-policy'], queryFn: api.refundPolicy, enabled: policyOpen, retry: false })
-  const queue = useQuery({
+  const queue = useNumberedList({
     queryKey: ['refunds', after, pageSize, filters],
     queryFn: () => api.refunds({ ...filters, after, limit: pageSize }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
-  })
+  }, { path: 'numbered-pages/refunds', schema: refundQueueItemSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageItems)
   const update = useMutation({
     mutationFn: api.updateRefundPolicy,
     onSuccess: async () => {
@@ -204,7 +207,7 @@ export function RefundsPage() {
               <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
                 {(rows: RefundQueueItem[]) => <RefundRows rows={rows} />}
               </QueryGate>
-              <CursorPager scope={['refunds', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+              <NumberedCursorPager numbered={queue.numbered} onNumber={setPage} scope={['refunds', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
                 rows={queue.isSuccess ? queue.data : undefined} getCursor={(row) => row.cursor} />
             </>
           )}

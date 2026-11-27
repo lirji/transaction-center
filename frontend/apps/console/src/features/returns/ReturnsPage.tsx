@@ -1,8 +1,11 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
+import { adminReturnViewSchema } from '../../shared/api/schemas'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, ConfirmDialog, Field, PageHeader, PagePager, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, PageQueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -19,7 +22,7 @@ import { ReturnRows } from './ReturnRows'
 export function ReturnsPage() {
   const auth = useAuth()
   const canWrite = auth.hasScope(TRADE_RETURN_WRITE)
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [lookup, setLookup] = useState('')
   const [activeNo, setActiveNo] = useState('')
   const [orderItemId, setOrderItemId] = useState('')
@@ -56,12 +59,12 @@ export function ReturnsPage() {
   })() : ''
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
 
-  const list = useQuery({
+  const list = useNumberedList({
     queryKey: ['admin-returns', after, pageSize, filters],
     queryFn: () => api.returns({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
-  })
+  }, { path: 'numbered-pages/returns', schema: adminReturnViewSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageProjection)
   const detail = useQuery({
     queryKey: ['return', activeNo],
     queryFn: () => api.returnByNo(activeNo),
@@ -197,7 +200,7 @@ export function ReturnsPage() {
             <PageQueryGate query={list} emptyTitle="没有退货申请" emptyDetail="当前筛选没有退货记录。">
               {(page) => <ReturnRows rows={page.items} onSelect={setActiveNo} />}
             </PageQueryGate>
-            <PagePager scope={['returns', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+            <NumberedPagePager numbered={list.numbered} onNumber={setPage} scope={['returns', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={list.isSuccess ? list.data : undefined} />
           </>
         )}

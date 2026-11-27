@@ -1,4 +1,9 @@
 package com.lrj.trade.core;
+import com.lrj.trade.core.query.AdminQuery;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import com.lrj.trade.core.mapper.ReconciliationOperationMapper;
 import java.time.Clock;
 import java.time.Instant;
@@ -9,7 +14,18 @@ import org.springframework.transaction.annotation.*;
 /** 查询申请永久幂等，原归属、差异关联、任务和审计在一个事务内提交。 */
 @Service
 public class ReconciliationOperationService {
+    private static final Set<String> QUEUE_STATES = Set.of("QUEUED", "RUNNING", "RESULT_ACCEPTED", "REVIEW");
     private final ReconciliationOperationMapper mapper;private final ReconciliationQueryExecutorPort executor;private final JobSchedulerPort jobs;private final AuditWriter audit;private final Clock clock;private final ReconciliationCaseService cases;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<View> numberedPage(long tenant, String state, int limit, long page, String number) {
+        Checks.positive(tenant);
+        if (state == null || !QUEUE_STATES.contains(state)) throw AdminQuery.invalid();
+        if (number != null) Checks.text(number, 64);
+        return AdminNumberedPage.of(page, limit, mapper.pageCount(tenant, state, number), Instant.now(),
+                offset -> mapper.pageAtOffset(tenant, state, number, limit, offset).stream().map(ReconciliationOperationService::safeView).toList());
+    }
+
     /** 不在申请事务发网络，QueryExecutor.validate仅执行原绑定只读核验。 */
     public ReconciliationOperationService(ReconciliationOperationMapper mapper,ReconciliationQueryExecutorPort executor,JobSchedulerPort jobs,AuditWriter audit,Clock clock,ReconciliationCaseService cases) {this.mapper=mapper;this.executor=executor;this.jobs=jobs;this.audit=audit;this.clock=clock;this.cases=cases;}
     /** RC保证持差异锁读取旧操作终态时不使用更早快照，不需要反向锁旧操作。 */
@@ -76,10 +92,12 @@ public class ReconciliationOperationService {
     /** 管理操作号为精确筛选，历史 UUID 查询继续沿用。 */
     @Transactional(readOnly=true,timeout=5)
     public List<View> page(long tenant,String state,long after,int limit,String number) {
-        Checks.positive(tenant);if(state==null || !Set.of("QUEUED","RUNNING","RESULT_ACCEPTED","REVIEW").contains(state) || after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","查询操作分页参数无效");
+        Checks.positive(tenant);if(state==null || !QUEUE_STATES.contains(state) || after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","查询操作分页参数无效");
         if(number!=null) Checks.text(number,64);
-        return mapper.page(tenant,state,after,limit,number).stream().map(o->new View(Long.toString(o.id()),o.operationNo(),o.caseNo(),o.action(),o.status(),o.lastCode(),o.version(),o.acceptedAt(),o.businessNo())).toList();
+        return mapper.page(tenant,state,after,limit,number).stream().map(ReconciliationOperationService::safeView).toList();
     }
+    private static View safeView(ReconciliationOperation o) { return new View(Long.toString(o.id()),o.operationNo(),o.caseNo(),o.action(),o.status(),o.lastCode(),o.version(),o.acceptedAt(),o.businessNo()); }
+
     private Result result(ReconciliationOperation operation) {return new Result(operation.operationNo(),operation.caseNo(),operation.caseVersion(),"QUEUED",operation.acceptedAt(),operation.businessNo());}
     private static void uuid(String value) {try {if(!UUID.fromString(value).toString().equals(value)) throw new IllegalArgumentException();} catch(RuntimeException invalid) {throw new TradeException("INVALID_ARGUMENT","差异编号必须为规范UUID");}}
     /** 操作终态不等于case关闭或真实资金成功。 */

@@ -45,12 +45,22 @@
   </update>
 
   <!-- 后台有界读取规格草稿，版本为整体商品版本。 -->
+  <sql id="listDraftSkusScope">
+    FROM tc_sku s JOIN tc_product p ON p.tenant_id=s.tenant_id AND p.id=s.product_id
+      WHERE s.tenant_id=#{tenant} AND s.product_id=#{productId}
+  </sql>
   <select id="listDraftSkus" resultMap="Sku" useCache="false">
-    <![CDATA[
-      SELECT s.id AS skuId,s.sku_no AS skuNo,s.product_id AS productId,p.name AS title,s.unit_price AS unitPrice,s.currency AS currency,s.stock_type AS stockType,s.specification AS specification,p.version AS revision
-      FROM tc_sku s JOIN tc_product p ON p.tenant_id=s.tenant_id AND p.id=s.product_id
-      WHERE s.tenant_id=#{tenant} AND s.product_id=#{productId} AND s.id>#{after} ORDER BY s.id LIMIT #{limit}
-    ]]>
+    SELECT s.id AS skuId,s.sku_no AS skuNo,s.product_id AS productId,p.name AS title,s.unit_price AS unitPrice,s.currency AS currency,s.stock_type AS stockType,s.specification AS specification,p.version AS revision
+      <include refid="listDraftSkusScope"/>
+    AND s.id>#{after} ORDER BY s.id LIMIT #{limit}
+  </select>
+  <select id="listDraftSkusCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listDraftSkusScope"/>
+  </select>
+  <select id="listDraftSkusAtOffset" resultMap="Sku" useCache="false" timeout="3">
+    SELECT s.id AS skuId,s.sku_no AS skuNo,s.product_id AS productId,p.name AS title,s.unit_price AS unitPrice,s.currency AS currency,s.stock_type AS stockType,s.specification AS specification,p.version AS revision
+      <include refid="listDraftSkusScope"/>
+    ORDER BY s.id LIMIT #{limit} OFFSET #{offset}
   </select>
 
   <!-- 会员只读取已发布版本快照，不暴露未发布草稿。 -->

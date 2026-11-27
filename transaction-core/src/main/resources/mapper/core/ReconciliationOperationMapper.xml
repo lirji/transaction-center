@@ -11,5 +11,18 @@
 <update id="beginCase">UPDATE tc_reconciliation_case SET status='PROCESSING',resolution_ref=#{number},version=version+1,updated_at=UTC_TIMESTAMP(3) WHERE tenant_id=#{tenant} AND case_no=#{caseNo} AND version=#{version} AND status IN ('OPEN','PROCESSING')</update>
 <update id="accept">UPDATE tc_reconciliation_operation SET channel_id=#{channel},reference_type=#{type},business_ref=#{reference},case_version=#{caseVersion},accepted_at=UTC_TIMESTAMP(3),updated_at=UTC_TIMESTAMP(3) WHERE tenant_id=#{tenant} AND id=#{id} AND accepted_at IS NULL</update>
 <update id="mark">UPDATE tc_reconciliation_operation SET status=#{status},last_code=#{code},completed_at=CASE WHEN #{terminal} THEN UTC_TIMESTAMP(3) ELSE NULL END,version=version+1,updated_at=UTC_TIMESTAMP(3) WHERE tenant_id=#{tenant} AND id=#{id} AND status IN ('QUEUED','RUNNING')</update>
-<select id="page" resultMap="Operation" useCache="false">SELECT id,operation_no,request_hash,case_no,action,channel_id,reference_type,business_ref,case_version,accepted_at,status,last_code,version,business_no FROM tc_reconciliation_operation WHERE tenant_id=#{tenant} AND status=#{state} AND id&gt;#{after} <if test="number != null">AND <choose><when test='number.startsWith("TRD-ROP-")'>business_no=#{number}</when><otherwise>operation_no=#{number}</otherwise></choose></if> ORDER BY id LIMIT #{limit}</select>
+  <sql id="pageScope">
+    FROM tc_reconciliation_operation WHERE tenant_id=#{tenant} AND status=#{state} <if test="number != null">AND <choose><when test='number.startsWith("TRD-ROP-")'>business_no=#{number}</when><otherwise>operation_no=#{number}</otherwise></choose></if>
+  </sql>
+  <select id="page" resultMap="Operation" useCache="false">
+    SELECT id,operation_no,request_hash,case_no,action,channel_id,reference_type,business_ref,case_version,accepted_at,status,last_code,version,business_no <include refid="pageScope"/>
+    AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="pageCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="pageScope"/>
+  </select>
+  <select id="pageAtOffset" resultMap="Operation" useCache="false" timeout="3">
+    SELECT id,operation_no,request_hash,case_no,action,channel_id,reference_type,business_ref,case_version,accepted_at,status,last_code,version,business_no <include refid="pageScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
+  </select>
 </mapper>

@@ -4,7 +4,10 @@ import { Button, EmptyState, StateBanner } from '../../components/ui'
 import { TableQueryContext } from './tableQuery'
 import { ApiProblem, describeProblem, isVersionConflict } from '../api/client'
 
-export function QueryError({ query }: { query: UseQueryResult<unknown> }) {
+type QueryView<T> = Pick<UseQueryResult<T>, 'data' | 'isLoading' | 'isError' | 'error' | 'isFetching'>
+  & { refetch: () => Promise<unknown> }
+
+export function QueryError({ query }: { query: QueryView<unknown> }) {
   const problem = describeProblem(query.error)
   const retryable = query.error instanceof ApiProblem && query.error.retryable
   return (
@@ -16,7 +19,7 @@ export function QueryError({ query }: { query: UseQueryResult<unknown> }) {
 }
 
 export function QueryGate<T>({ query, emptyTitle, emptyDetail, children }: {
-  query: UseQueryResult<T>
+  query: QueryView<T>
   emptyTitle: string
   emptyDetail: string
   children: (data: T) => ReactNode
@@ -33,7 +36,7 @@ export function QueryGate<T>({ query, emptyTitle, emptyDetail, children }: {
 }
 
 export function PageQueryGate<T extends { items: unknown[] }>({ query, emptyTitle, emptyDetail, children }: {
-  query: UseQueryResult<T>
+  query: QueryView<T>
   emptyTitle: string
   emptyDetail: string
   children: (data: T) => ReactNode

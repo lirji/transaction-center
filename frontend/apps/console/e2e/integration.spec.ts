@@ -21,8 +21,18 @@ async function api(page: Page, path: string, init: { method?: string; body?: str
       Authorization: `Bearer ${user?.access_token}`, 'Content-Type': 'application/json', ...init.headers,
     } })
     const text = await response.text()
-    return { status: response.status, body: text ? JSON.parse(text) : null, etag: response.headers.get('ETag') }
+    const contentType = response.headers.get('Content-Type') ?? ''
+    return { status: response.status, body: text && contentType.includes('json') ? JSON.parse(text) : text || null,
+      contentType, etag: response.headers.get('ETag'), retryAfter: response.headers.get('Retry-After') }
   }, { path, init })
+}
+
+async function guardedRead(page: Page, path: string) {
+  const result = await api(page, path)
+  if (result.status !== 429 || !result.retryAfter) return result
+  // 两个用例共享真实租户配额，按服务器声明等一次再校验业务响应。
+  await new Promise<void>((resolve) => setTimeout(resolve, Number(result.retryAfter) * 1000))
+  return api(page, path)
 }
 
 test('OIDC login and persisted order/payment/refund/quote drilldown', async ({ page }, testInfo) => {
@@ -101,9 +111,51 @@ test('approval deadline and receipt confirmation use half-open server time windo
   expect(receiptOutside.body.items.map((row: { receiptNo: string }) => row.receiptNo)).not.toContain(data.abnormalReceiptNo)
 })
 
+test('numbered list gateways preserve real visibility and filtered totals', async ({ page }) => {
+  await login(page)
+  const available = `warehouseId=${data.warehouseId}&skuId=${data.skuId}`
+  const lists = [
+    ['numbered-pages/payments', `orderNo=${data.paidOrder}`],
+    ['numbered-pages/payment-receipts', `orderNo=${data.paidOrder}`],
+    ['numbered-pages/returns', `orderNo=${data.paidOrder}`],
+    ['numbered-pages/quotes', ''],
+    ['numbered-pages/refunds', 'status=ALL'],
+    ['numbered-pages/products', 'status=DRAFT'],
+    ['numbered-pages/members', 'status=ACTIVE'],
+    ['numbered-pages/inventories', available],
+    ['numbered-pages/warehouses', ''],
+    ['numbered-pages/consent-documents', ''],
+    ['numbered-pages/payment-channels', ''],
+    ['numbered-pages/inventory-ledger', available],
+    ['numbered-operations/operation-audits', 'resourceType=ORDER'],
+    ['numbered-operations/outbox-publications', 'state=SENT'],
+    ['numbered-operations/outbox-tasks', 'state=READY'],
+    ['numbered-operations/reconciliation-cases', 'state=OPEN'],
+    ['numbered-operations/reconciliation-operations', 'state=REVIEW'],
+    [`numbered-pages/payment-attempts/${data.paymentNo}`, ''],
+    [`numbered-operations/refund-audits/${data.refundNo}`, ''],
+  ]
+  for (const [resource, query] of lists) {
+    const result = await guardedRead(page, `/admin/${resource}?page=2&limit=1&${query}`)
+    expect(result.status, resource).toBe(200)
+    expect(result.body.pageSize).toBe(1)
+    expect(result.body.totalPages).toBe(result.body.totalCount)
+    expect(result.body.page).toBe(result.body.totalCount > 1 ? 2 : 1)
+    expect(result.body.items.length).toBe(result.body.totalCount > 0 ? 1 : 0)
+  }
+
+  const refunds = await guardedRead(page, `/admin/numbered-operations/refund-audits/${data.refundNo}?limit=1`)
+  expect(refunds.body.totalCount).toBeGreaterThan(1)
+  const paymentRows = await guardedRead(page, `/admin/numbered-pages/payments?orderNo=${data.paidOrder}`)
+  const previous = await guardedRead(page, `/admin/payments?orderNo=${data.paidOrder}`)
+  expect(paymentRows.body.items).toEqual(previous.body.items)
+  const forbiddenJobs = await guardedRead(page, '/admin/numbered-pages/jobs')
+  expect(forbiddenJobs.status).toBe(403)
+})
+
 test('latest orders keep the same order across cursor pages', async ({ page }) => {
   await login(page)
-  const full = await api(page, '/admin/orders?sort=CREATED_DESC&limit=100')
+  const full = await guardedRead(page, '/admin/orders?sort=CREATED_DESC&limit=100')
   expect(full.status).toBe(200)
   const rows: { orderId: string; orderNo: string; createdAt: string }[] = full.body.items
   expect(rows.length).toBeGreaterThan(1)
@@ -111,13 +163,13 @@ test('latest orders keep the same order across cursor pages', async ({ page }) =
   expect(rows.map(row => row.orderNo)).toEqual(expected.map(row => row.orderNo))
   let after = '0'
   for (const row of expected) {
-    const current = await api(page, `/admin/orders?sort=CREATED_DESC&limit=1&after=${after}`)
+    const current = await guardedRead(page, `/admin/orders?sort=CREATED_DESC&limit=1&after=${after}`)
     expect(current.status).toBe(200)
     expect(current.body.items[0].orderNo).toBe(row.orderNo)
     after = current.body.nextAfter
   }
   expect(after).toBeNull()
-  expect((await api(page, '/admin/orders?sort=member_id')).status).toBe(400)
+  expect((await guardedRead(page, '/admin/orders?sort=member_id')).status).toBe(400)
 })
 
 test('numbered order pages count the filtered tenant and jump directly with stable sorting', async ({ page }) => {
@@ -193,6 +245,14 @@ test('operations totals reconcile with paged facts for the same window, currency
   const cny = makeRange(from, to, 'CNY')
   const totals = await api(page, `/admin/operations/summary?${cny}`)
   expect(totals.status).toBe(200)
+  const analysis = await api(page, `/admin/operations/analysis?${cny}`)
+  expect(analysis.status).toBe(200)
+  expect(analysis.body).toMatchObject({ payableCount: 3, convertedCount: 1 })
+  expect(analysis.body.orderStates.reduce((sum: number, entry: { count: number }) => sum + entry.count, 0)).toBe(4)
+  expect(analysis.body.daily.reduce((sum: bigint, day: { netReceipt: string }) => sum + BigInt(day.netReceipt), 0n)).toBe(19000n)
+  const factPage = await api(page, `/admin/operations/financial-fact-pages?${cny}&scope=NET&page=2&limit=1`)
+  expect(factPage.status).toBe(200)
+  expect(factPage.body).toMatchObject({ page: 2, totalCount: 2, totalPages: 2 })
   expect(totals.body).toMatchObject({
     currency: 'CNY', orderCount: 4, orderPayable: '60000', paidOrderCount: 1,
     normalReceipt: '20000', abnormalReceipt: '100', normalRefund: '1000', abnormalRefund: '0', netReceipt: '19000',
@@ -285,6 +345,76 @@ test('return inspection uses real ETag, idempotency and inventory flow', async (
   expect(detail.body.inspection.restockQuantity).toBe(1)
 })
 
+test('product file commands, display image and replenishment rules use real versions and idempotency', async ({ page }) => {
+  await login(page)
+  const draft = [
+    { productNo: 'BATCH-OPS-1', skuNo: 'BATCH-OPS-SKU-1', name: '运营批次一', unitPrice: 100, currency: 'CNY' },
+    { productNo: 'BATCH-OPS-2', skuNo: 'BATCH-OPS-SKU-2', name: '运营批次二', unitPrice: 200, currency: 'CNY' },
+  ]
+  const importDrafts = (rows: typeof draft) => api(page, '/admin/products/bulk-import', {
+    method: 'POST', headers: { 'Idempotency-Key': 'integration-product-bulk-import' }, body: JSON.stringify({ items: rows }),
+  })
+  const imported = await importDrafts(draft)
+  expect(imported.status).toBe(200)
+  expect(imported.body.items).toEqual(draft.map(({ productNo }) => ({ reference: productNo, state: 'COMPLETED' })))
+  expect((await importDrafts(draft)).body).toEqual(imported.body)
+  expect((await importDrafts(draft.slice(1))).status).toBe(409)
+
+  const read = async (productNo: string) => (await api(page, `/admin/numbered-pages/products?productNo=${productNo}`)).body.items[0]
+  const first = await read(draft[0].productNo)
+  const second = await read(draft[1].productNo)
+  const img = await api(page, `/admin/products/${first.productId}/image`, {
+    method: 'PATCH', headers: { 'Idempotency-Key': 'integration-product-image' },
+    body: JSON.stringify({ version: first.version, imageUrl: 'https://assets.example.test/product.png' }),
+  })
+  expect(img.status).toBe(200)
+  const withImage = await read(draft[0].productNo)
+  expect(withImage.imageUrl).toBe('https://assets.example.test/product.png')
+  expect(withImage.version).toBe(first.version + 1)
+  const updateBatch = (version: number, key: string) => api(page, '/admin/products/bulk-state', {
+    method: 'POST', headers: { 'Idempotency-Key': key },
+    body: JSON.stringify({ action: 'PUBLISH', items: [
+      { productId: first.productId, version: withImage.version },
+      { productId: second.productId, version },
+    ] }),
+  })
+  expect((await updateBatch(second.version + 1000, 'integration-product-stale')).status).toBe(409)
+  expect((await read(draft[0].productNo)).status).toBe('DRAFT')
+  expect((await updateBatch(second.version, 'integration-product-publish')).status).toBe(200)
+  expect((await read(draft[1].productNo)).status).toBe('PUBLISHED')
+
+  const path = `/admin/inventory-alerts?warehouseId=${data.warehouseId}&skuId=${data.skuId}`
+  const before = (await api(page, path)).body.rows.items[0]
+  const patch = await api(page, `/admin/inventory-alerts/${data.warehouseId}/${data.skuId}`, {
+    method: 'PATCH', headers: { 'Idempotency-Key': 'integration-threshold' },
+    body: JSON.stringify({ revision: before.revision, reorderThreshold: before.available }),
+  })
+  expect(patch.status).toBe(200)
+  const after = (await api(page, path)).body
+  expect(after.rows.items[0]).toMatchObject({ available: before.available, reorderThreshold: before.available,
+    state: before.available === 0 ? 'OUT_OF_STOCK' : 'LOW', revision: before.revision + 1 })
+  expect(after.totals).toEqual([{ state: after.rows.items[0].state, count: 1 }])
+
+  const csv = await api(page, `/admin/exports/orders?orderNo=${data.paidOrder}`)
+  expect(csv.status).toBe(200)
+  expect(csv.contentType).toContain('text/csv')
+  expect(csv.body.split('\r\n').filter(Boolean)).toHaveLength(2)
+  const order = await api(page, `/admin/orders/${data.paidOrder}`)
+  expect(csv.body).toContain(order.body.businessNo ?? data.paidOrder)
+
+  await page.goto(`/inventory?warehouseId=${data.warehouseId}&skuId=${data.skuId}`)
+  await page.getByRole('button', { name: '查看预警与补货阈值' }).click()
+  await expect(page.getByRole('region', { name: '库存预警列表' })).toBeVisible()
+  await page.getByRole('button', { name: '设置阈值', exact: true }).click()
+  const reorder = page.getByRole('dialog', { name: '设置补货阈值' })
+  await expect(reorder.getByLabel('补货阈值', { exact: true })).toHaveValue(String(before.available))
+  await reorder.getByRole('button', { name: '关闭' }).click()
+
+  await page.goto(`/products?productNo=${draft[0].productNo}`)
+  await page.getByRole('button', { name: '编辑展示图' }).click()
+  await expect(page.getByRole('dialog', { name: '编辑商品展示图' }).getByLabel('HTTPS 图片地址')).toHaveValue(withImage.imageUrl)
+})
+
 test('diagnostic scopes show evidence and jobs; ordinary admin cannot read them', async ({ page }) => {
   await login(page, 'diagnostic', `/orders/${data.paidOrder}`)
   await expect(page.getByRole('heading', { name: data.paidOrder, exact: true })).toBeVisible()
@@ -301,6 +431,7 @@ test('diagnostic scopes show evidence and jobs; ordinary admin cannot read them'
 test('ordinary admin scope denial and genuine rate-limit response', async ({ page }) => {
   await login(page)
   expect((await api(page, '/admin/jobs')).status).toBe(403)
+  expect((await api(page, '/admin/operations/linked-checkouts')).status).toBe(403)
   expect((await api(page, `/admin/orders/${data.paidOrder}/referral-evidence`)).status).toBe(403)
   expect((await api(page, '/admin/orders', { headers: { Authorization: 'Bearer invalid' } })).status).toBe(401)
   const statuses = await page.evaluate(async () => {

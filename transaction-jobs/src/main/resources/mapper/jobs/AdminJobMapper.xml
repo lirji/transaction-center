@@ -18,9 +18,9 @@
   <sql id="columns">r.id AS `cursor`, r.id AS jobId, r.job_type AS jobType, r.status AS status, r.attempts AS attempts, r.next_run_at AS nextRunAt, r.lease_until AS leaseUntil, (r.status='RUNNING' AND r.lease_until &lt;= #{at}) AS leaseExpired, r.last_error AS lastError, r.created_at AS createdAt, r.updated_at AS updatedAt, r.version AS version</sql>
   <sql id="source">FROM tc_job_lease r </sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
-  <select id="page" resultMap="View" useCache="false" timeout="3">
-    SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+  <sql id="pageScope">
+    <include refid="source"/>
+    WHERE r.tenant_id=#{tenant}
     <if test="q.filters.jobType != null">AND r.job_type=#{q.filters.jobType}</if>
     <if test="q.filters.callbackNo != null">AND (
       (r.job_type='PAYMENT_CALLBACK' AND EXISTS (
@@ -35,7 +35,18 @@
     <if test="q.filters.status != null">AND r.status=#{q.filters.status}</if>
     <if test="q.filters.leaseExpired != null">AND (r.status='RUNNING' AND r.lease_until &lt;= #{at})=#{q.filters.leaseExpired}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+  </sql>
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="pageScope"/>
+    AND r.id &gt; #{q.after}
     ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="pageCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="pageScope"/>
+  </select>
+  <select id="pageAtOffset" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="pageScope"/>
+    ORDER BY r.id ASC LIMIT #{q.limit} OFFSET #{offset}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>

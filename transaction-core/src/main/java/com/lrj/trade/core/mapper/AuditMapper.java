@@ -38,9 +38,23 @@ public interface AuditMapper {
     /** 重放以已提交的租户、退款及动作定位原证据。 */
     Long findRefundEffect(@Param("tenant") long tenant,@Param("resource") String resource,@Param("action") String action);
     /** 有界读取授权父资源的实际效果和请求结果。 */
-    List<Row> refundHistory(@Param("tenant") long tenant,@Param("resource") String resource,@Param("before") Instant before,
-                            @Param("cursor") String cursor,@Param("limit") int limit);
+    default List<Row> refundHistory(long tenant, String resource, Instant before, String cursor, int limit) {
+        return refundHistory(tenant, resource, before, cursor, limit, null, limit);
+    }
+
+    /** 游标模式扫描一页，编号模式扫描足以为合并后的目标页排序的记录。 */
+    List<Row> refundHistory(@Param("tenant") long tenant, @Param("resource") String resource,
+            @Param("before") Instant before, @Param("cursor") String cursor, @Param("limit") int limit,
+            @Param("offset") Long offset, @Param("scanLimit") long scanLimit);
+
+    /** 对相同父退款及两个证据来源计算准确总量。 */
+    long refundHistoryCount(@Param("tenant") long tenant, @Param("resource") String resource);
+
     /** 限定租户，按统一时间顺序合并已提交业务操作和已留痕退款请求结果。 */
     List<Entry> operationHistory(@Param("tenant") long tenant, @Param("query") AdminQuery query,
-                                 @Param("position") Position position);
+            @Param("position") Position position, @Param("limit") int limit,
+            @Param("offset") Long offset, @Param("scanLimit") long scanLimit);
+
+    /** 与全局日志列表复用证据权限及筛选口径。 */
+    long operationHistoryCount(@Param("tenant") long tenant, @Param("query") AdminQuery query);
 }

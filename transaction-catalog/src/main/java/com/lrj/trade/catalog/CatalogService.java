@@ -1,6 +1,11 @@
 package com.lrj.trade.catalog;
 
 import com.lrj.trade.core.query.AdminQuery;
+import com.lrj.trade.core.query.AdminNumberedPage;
+import java.time.Instant;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import com.lrj.trade.core.*;
 import java.util.List;
 import com.lrj.trade.catalog.mapper.CatalogMapper;
@@ -14,10 +19,40 @@ public class CatalogService implements CatalogPort {
     private final Commands commands;
     private final CatalogCachePort cache;
     private final Outbox outbox;
+    /** 使用同一只读快照读取总量与指定页，并复用列表投影。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<AdminProduct> numberedPage(long tenant, AdminQuery query, long page) {
+        Checks.positive(tenant);
+        var at = Instant.now();
+        return AdminNumberedPage.of(page, query.limit(), mapper.listAdminProductsCount(tenant, query), at,
+                offset -> mapper.listAdminProductsAtOffset(tenant, query, offset));
+    }
+
     /** 管理端按已校验条件读取当前租户数据，保留原交易入口查询。 */
     public List<AdminProduct> adminList(long tenant,AdminQuery query) {
         Checks.positive(tenant);
         return mapper.listAdminProducts(tenant,query);
+    }
+
+    /** 商品图是运营元数据，保存 URL 不触发服务端远程图片请求。 */
+    public long setImage(Actor actor, String key, long product, long version, String imageUrl) {
+        Checks.positive(product);
+        if (version < 0) throw AdminQuery.invalid();
+        if (imageUrl != null) {
+            Checks.text(imageUrl, 1024);
+            try {
+                var uri = java.net.URI.create(imageUrl);
+                if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null
+                        || uri.getUserInfo() != null || uri.getFragment() != null) throw AdminQuery.invalid();
+            } catch (IllegalArgumentException badUrl) {
+                throw AdminQuery.invalid();
+            }
+        }
+        return Long.parseLong(commands.run(actor, "product.image.set", key, Checks.hash(product, version, imageUrl), () -> {
+            if (mapper.setImage(actor.tenantId(), product, version, imageUrl) != 1)
+                throw mutationFailure(actor.tenantId(), product, version);
+            return Long.toString(version + 1);
+        }));
     }
 
     /** 商品写命令统一经过事务幂等执行器。 */

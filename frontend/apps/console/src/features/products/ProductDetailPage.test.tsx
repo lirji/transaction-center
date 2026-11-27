@@ -30,6 +30,7 @@ describe('ProductDetailPage', () => {
 
   it('allows adding and editing SKUs only while the product is a draft', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       const url = String(input)
       if (url.endsWith('/skus') || url.includes('/skus?')) {
         return json([{
@@ -53,6 +54,7 @@ describe('ProductDetailPage', () => {
 
   it('hides SKU writes after publish', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       if (String(input).includes('/skus')) return json([])
       return json(published)
     })

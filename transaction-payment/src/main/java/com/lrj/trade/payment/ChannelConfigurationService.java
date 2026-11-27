@@ -1,5 +1,9 @@
 package com.lrj.trade.payment;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import com.lrj.trade.core.*;
 import com.lrj.trade.order.MerchantTradingPort;
 import com.lrj.trade.payment.mapper.ChannelMapper;
@@ -18,6 +22,15 @@ public class ChannelConfigurationService {
     private final Commands commands;
     private final AuditWriter audit;
     private final Clock clock;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<ChannelView> numberedChannels(long tenant, int limit, long page) {
+        Checks.positive(tenant);
+        return AdminNumberedPage.of(page, limit, mapper.listCount(tenant), clock.instant(),
+                offset -> mapper.listAtOffset(tenant, limit, offset).stream()
+                        .map(ChannelConfigurationService::safeView).toList());
+    }
+
     /** 渠道绑定与审计共用本地事务，引用所属商户Port。 */
     public ChannelConfigurationService(ChannelMapper mapper,MerchantTradingPort merchants,Commands commands,AuditWriter audit,Clock clock) {
         this.mapper=mapper; this.merchants=merchants; this.commands=commands; this.audit=audit; this.clock=clock;
@@ -45,7 +58,11 @@ public class ChannelConfigurationService {
     public List<ChannelView> list(long tenant,long after,int limit) {
         Checks.positive(tenant);
         if(after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","分页参数无效");
-        return mapper.list(tenant,after,limit).stream().map(c->new ChannelView(c.channelId(),c.merchantNo(),c.channelCode(),
-            c.channelMerchantNo(),c.currency(),c.returnUrlId(),c.status(),c.version())).toList();
+        return mapper.list(tenant,after,limit).stream().map(ChannelConfigurationService::safeView).toList();
+    }
+
+    private static ChannelView safeView(ChannelConfiguration c) {
+        return new ChannelView(c.channelId(), c.merchantNo(), c.channelCode(), c.channelMerchantNo(),
+                c.currency(), c.returnUrlId(), c.status(), c.version());
     }
 }

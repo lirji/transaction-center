@@ -313,6 +313,23 @@ class CheckoutPilotQuoteTest {
         assertEquals(fundingApplication, binding.path("fundingApplicationId").asString());
         assertFalse(evidenceProjection.body().contains("ownerRef"));
         assertFalse(evidenceProjection.body().contains(proofHash));
+        var created = java.time.Instant.parse(projection.path("createdAt").asString());
+        String sourcePath = "/api/v1/trade/admin/operations/linked-checkouts?currency=CNY&storeRef=lc02-store-a"
+                + "&createdFrom=" + created.minusSeconds(1) + "&createdTo=" + created.plusSeconds(60);
+        var sourceResponse = http.send(api("audit-reader", sourcePath).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, sourceResponse.statusCode(), sourceResponse.body());
+        var source = json.readTree(sourceResponse.body());
+        assertEquals(1, source.path("rows").path("totalCount").asInt());
+        assertEquals(1, source.path("fundingCount").asInt());
+        assertEquals("1000", source.path("frozenDiscount").asString());
+        var linked = source.path("rows").path("items").get(0);
+        assertEquals(no, linked.path("orderBusinessNo").asString());
+        assertEquals(fundingApplication, linked.path("fundingApplicationId").asString());
+        assertEquals(ELIGIBLE_QUOTE, linked.path("commerceQuoteId").asString());
+        assertFalse(sourceResponse.body().contains(proofHash));
+        var foreignSources = http.send(api("audit-reader-other", sourcePath).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(0, json.readTree(foreignSources.body()).path("rows").path("totalCount").asInt());
+
         var cancel = post("buyer", "/api/v1/trade/orders/" + no + ":cancel", "abort", Map.of("reason", "未预留预算"));
         assertEquals("CANCELLED", json.readTree(http.send(cancel, HttpResponse.BodyHandlers.ofString()).body()).path("status").asString());
         assertEquals(0, inventory.balances(tenant, 0, 5).getFirst().reserved());

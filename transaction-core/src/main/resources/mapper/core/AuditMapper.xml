@@ -60,33 +60,44 @@
       <arg column="after_state" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
-  <select useCache="false" id="refundHistory" resultMap="auditRow">
+  <sql id="refundEffectScope">
+    FROM tc_operation_audit a
+       LEFT JOIN tc_audit_operation_attempt r ON r.tenant_id=a.tenant_id AND r.id=a.audit_attempt_id
+       WHERE a.tenant_id=#{tenant} AND a.resource_type='REFUND' AND a.resource_id=#{resource}
+  </sql>
+  <sql id="refundOutcomeScope">
+    FROM tc_audit_attempt_outcome o
+       JOIN tc_audit_operation_attempt r ON r.tenant_id=o.tenant_id AND r.id=o.attempt_id
+       WHERE o.tenant_id=#{tenant} AND o.resource_id=#{resource} AND r.action_code &lt;&gt; 'refund.audit.list'
+  </sql>
+  <select useCache="false" id="refundHistoryCount" resultType="long" timeout="3">
+    SELECT (SELECT COUNT(*) <include refid="refundEffectScope"/>)
+      + (SELECT COUNT(*) <include refid="refundOutcomeScope"/>)
+  </select>
+  <select useCache="false" id="refundHistory" resultMap="auditRow" timeout="3">
     SELECT * FROM (
       (SELECT CONCAT('E',a.id) AS id,r.request_id,COALESCE(a.audit_trace_id,r.trace_id) AS trace_id,
         a.action,a.actor_key AS actor_id,a.resource_id,a.created_at AS occurred_at,'SUCCEEDED' AS result,
         NULL AS error_code,CAST(a.id AS CHAR) AS effect_id,a.before_version,a.after_version,
         a.audit_order_ref AS order_no,a.audit_refund_display_no AS business_no,CAST(a.audit_amount_minor AS CHAR) AS amount_minor,
         a.audit_currency AS currency,a.audit_before_state AS before_state,a.audit_after_state AS after_state
-       FROM tc_operation_audit a
-       LEFT JOIN tc_audit_operation_attempt r ON r.tenant_id=a.tenant_id AND r.id=a.audit_attempt_id
-       WHERE a.tenant_id=#{tenant} AND a.resource_type='REFUND' AND a.resource_id=#{resource}
+       <include refid="refundEffectScope"/>
        <if test="cursor != null">
          AND (a.created_at &lt; #{before} OR (a.created_at=#{before} AND CONCAT('E',a.id) &lt; #{cursor}))
        </if>
-       ORDER BY occurred_at DESC,id DESC LIMIT #{limit})
+       ORDER BY occurred_at DESC,id DESC LIMIT #{scanLimit})
       UNION ALL
       (SELECT CONCAT('R',o.id) AS id,r.request_id,r.trace_id,r.action_code AS action,r.actor_key AS actor_id,
         o.resource_id,r.occurred_at,o.result_code AS result,o.error_code,CAST(o.effect_id AS CHAR) AS effect_id,
         NULL AS before_version,NULL AS after_version,NULL AS order_no,NULL AS business_no,NULL AS amount_minor,
         NULL AS currency,NULL AS before_state,NULL AS after_state
-       FROM tc_audit_attempt_outcome o
-       JOIN tc_audit_operation_attempt r ON r.tenant_id=o.tenant_id AND r.id=o.attempt_id
-       WHERE o.tenant_id=#{tenant} AND o.resource_id=#{resource} AND r.action_code &lt;&gt; 'refund.audit.list'
+       <include refid="refundOutcomeScope"/>
        <if test="cursor != null">
          AND (r.occurred_at &lt; #{before} OR (r.occurred_at=#{before} AND CONCAT('R',o.id) &lt; #{cursor}))
        </if>
-       ORDER BY occurred_at DESC,id DESC LIMIT #{limit})
+       ORDER BY occurred_at DESC,id DESC LIMIT #{scanLimit})
     ) evidence ORDER BY occurred_at DESC,id DESC LIMIT #{limit}
+    <if test="offset != null">OFFSET #{offset}</if>
   </select>
   <resultMap id="operationEntry" type="com.lrj.trade.core.query.OperationAuditQuery$Entry">
     <constructor>
@@ -102,18 +113,34 @@
     </constructor>
   </resultMap>
   <!-- 各来源先按本表时间索引取一页，外层只合并至多两页。 -->
-  <select useCache="false" id="operationHistory" resultMap="operationEntry">
+  <sql id="operationEffectScope">
+    FROM tc_operation_audit a
+       WHERE a.tenant_id=#{tenant}
+       <if test="query.filters.resourceType != null">AND a.resource_type=#{query.filters.resourceType}</if>
+       <if test="query.filters.resourceRef != null">AND a.resource_id=#{query.filters.resourceRef}</if>
+       <if test="query.createdFrom != null">AND a.created_at &gt;= #{query.createdFrom} AND a.created_at &lt; #{query.createdTo}</if>
+  </sql>
+  <sql id="operationOutcomeScope">
+    FROM tc_audit_attempt_outcome o
+         JOIN tc_audit_operation_attempt r ON r.tenant_id=o.tenant_id AND r.id=o.attempt_id
+         WHERE o.tenant_id=#{tenant} AND r.action_code IN ('refund.request','refund.approved','refund.rejected')
+         <if test="query.filters.resourceRef != null">AND o.resource_id=#{query.filters.resourceRef}</if>
+         <if test="query.createdFrom != null">AND o.recorded_at &gt;= #{query.createdFrom} AND o.recorded_at &lt; #{query.createdTo}</if>
+  </sql>
+  <select useCache="false" id="operationHistoryCount" resultType="long" timeout="3">
+    SELECT (SELECT COUNT(*) <include refid="operationEffectScope"/>)
+    <if test="query.filters.resourceType == null or query.filters.resourceType == 'REFUND'">
+      + (SELECT COUNT(*) <include refid="operationOutcomeScope"/>)
+    </if>
+  </select>
+  <select useCache="false" id="operationHistory" resultMap="operationEntry" timeout="3">
     SELECT CONCAT(origin,sequence_no) AS id,occurred_at,resource_type,resource_id,action,actor_id,result,error_code,trace_id
     FROM (
       (SELECT 'E' AS origin,a.id AS sequence_no,a.created_at AS occurred_at,a.resource_type,
         a.resource_id,a.action,a.actor_key AS actor_id,
         CASE WHEN a.action='refund.approval.rejected-request' THEN 'REJECTED' ELSE 'RECORDED' END AS result,
         NULL AS error_code,a.audit_trace_id AS trace_id
-       FROM tc_operation_audit a
-       WHERE a.tenant_id=#{tenant}
-       <if test="query.filters.resourceType != null">AND a.resource_type=#{query.filters.resourceType}</if>
-       <if test="query.filters.resourceRef != null">AND a.resource_id=#{query.filters.resourceRef}</if>
-       <if test="query.createdFrom != null">AND a.created_at &gt;= #{query.createdFrom} AND a.created_at &lt; #{query.createdTo}</if>
+       <include refid="operationEffectScope"/>
        <if test="position != null">
          <choose>
            <when test="position.outcome">AND a.created_at &lt;= #{position.time}</when>
@@ -122,17 +149,13 @@
            </otherwise>
          </choose>
        </if>
-       ORDER BY a.created_at DESC,a.id DESC LIMIT #{query.fetchLimit})
+       ORDER BY a.created_at DESC,a.id DESC LIMIT #{scanLimit})
       <if test="query.filters.resourceType == null or query.filters.resourceType == 'REFUND'">
         UNION ALL
         (SELECT 'R' AS origin,o.id AS sequence_no,o.recorded_at AS occurred_at,'REFUND' AS resource_type,
           o.resource_id,r.action_code AS action,r.actor_key AS actor_id,o.result_code AS result,o.error_code,r.trace_id
-         FROM tc_audit_attempt_outcome o
-         JOIN tc_audit_operation_attempt r ON r.tenant_id=o.tenant_id AND r.id=o.attempt_id
-         WHERE o.tenant_id=#{tenant} AND r.action_code IN ('refund.request','refund.approved','refund.rejected')
-         <if test="query.filters.resourceRef != null">AND o.resource_id=#{query.filters.resourceRef}</if>
-         <if test="query.createdFrom != null">AND o.recorded_at &gt;= #{query.createdFrom} AND o.recorded_at &lt; #{query.createdTo}</if>
-         <if test="position != null">
+         <include refid="operationOutcomeScope"/>
+       <if test="position != null">
            <choose>
              <when test="position.outcome">
                AND (o.recorded_at &lt; #{position.time} OR (o.recorded_at=#{position.time} AND o.id &lt; #{position.id}))
@@ -140,9 +163,10 @@
              <otherwise>AND o.recorded_at &lt; #{position.time}</otherwise>
            </choose>
          </if>
-         ORDER BY o.recorded_at DESC,o.id DESC LIMIT #{query.fetchLimit})
+         ORDER BY o.recorded_at DESC,o.id DESC LIMIT #{scanLimit})
       </if>
     ) page_rows
-    ORDER BY occurred_at DESC,origin DESC,sequence_no DESC LIMIT #{query.fetchLimit}
+    ORDER BY occurred_at DESC,origin DESC,sequence_no DESC LIMIT #{limit}
+    <if test="offset != null">OFFSET #{offset}</if>
   </select>
 </mapper>

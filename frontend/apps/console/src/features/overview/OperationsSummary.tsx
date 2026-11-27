@@ -1,12 +1,16 @@
+import { SourceWorkspaces } from './SourceWorkspaces'
+import { OperationsAnalysis } from './OperationsAnalysis'
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useLocalListPage, useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, ArrowRight, BarChart3 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Button, Field, PagePager, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Button, Field, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api, type OperationsRange } from '../../shared/api/client'
 import { beijingRange } from '../../shared/api/businessTime'
-import { type OperationsScope } from '../../shared/api/schemas'
+import { type OperationsScope, operationsFinancialFactSchema } from '../../shared/api/schemas'
 import { parseCurrencyCode, parseTimeWindow } from '../../shared/api/validate'
 import { FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { PageQueryGate, QueryGate } from '../../shared/ui/QueryGate'
@@ -186,19 +190,21 @@ export function OperationsSummary() {
           }}
         </QueryGate>
       </Panel>
+      <OperationsAnalysis range={range} />
+      <SourceWorkspaces range={range} />
       {scope && <section ref={factSection} id="financial-facts"><FinancialFacts key={scope} range={range} scope={scope} /></section>}
     </div>
   )
 }
 
 function FinancialFacts({ range, scope }: { range: OperationsRange; scope: OperationsScope }) {
-  const [after, setAfter] = useState('0')
+  const [after, setAfter, page, setPage] = useLocalListPage<string>('0')
   const [pageSize, setPageSize] = usePageSize('operations-financial-facts', 20, () => setAfter('0'))
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['operations-financial-facts', range, scope, after, pageSize],
     queryFn: ({ signal }) => api.operationsFinancialFacts({ ...range, scope, after, limit: pageSize }, signal),
     retry: false,
-  })
+  }, { path: 'operations/financial-fact-pages', schema: operationsFinancialFactSchema, after: after, page: page, pageSize: pageSize, filters: { ...range, scope } }, pageProjection)
 
   return (
     <Panel className="table-panel">
@@ -226,7 +232,7 @@ function FinancialFacts({ range, scope }: { range: OperationsRange; scope: Opera
           </>
         )}
       </PageQueryGate>
-      <PagePager scope={['operations-financial-facts', range, scope]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+      <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['operations-financial-facts', range, scope]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
         result={query.isSuccess ? query.data : undefined} />
     </Panel>
   )

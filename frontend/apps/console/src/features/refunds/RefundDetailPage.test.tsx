@@ -38,11 +38,11 @@ describe('RefundDetailPage', () => {
     vi.mocked(fetch).mockResolvedValueOnce(json({
       items: [{ id: 'E1', action: 'refund.request', occurredAt: '2026-09-08T12:00:00Z',
         result: 'SUCCEEDED', effectId: '1', beforeState: null, afterState: 'PENDING_APPROVAL' }],
-      nextCursor: null,
+      page: 1, pageSize: 50, totalCount: 1, totalPages: 1, observedAt: '2026-09-08T12:00:00Z',
     }))
     fireEvent.click(screen.getByRole('button', { name: '查看操作日志' }))
     expect(await screen.findByText('申请退款')).toBeInTheDocument()
     expect(screen.getByText('已提交')).toBeInTheDocument()
-    expect(vi.mocked(fetch).mock.calls[1][0]).toMatch(/RF-9\/operation-audits$/)
+    expect(vi.mocked(fetch).mock.calls[1][0]).toMatch(/numbered-operations\/refund-audits\/RF-9\?/)
   })
 })

@@ -55,5 +55,9 @@ public interface MemberMapper {
     List<LockedMember> lockOwn(@Param("tenant") long tenant, @Param("identityHash") String identityHash, @Param("issuer") String issuer, @Param("subject") String subject);
     /** 管理查询在本租户的完整数据范围执行筛选，先过滤再按主键分页。 */
     List<Member> listAdminMembers(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+    /** 查询总量使用与游标列表相同的租户及筛选条件。 */
+    long listAdminMembersCount(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+    /** 在服务端核对过总量后对同一查询范围取指定页。 */
+    List<Member> listAdminMembersAtOffset(@Param("tenant") long tenant,@Param("q") AdminQuery query, @Param("offset") long offset);
 
 }

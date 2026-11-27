@@ -1,9 +1,12 @@
+import { ProductImageEditor, ProductOperations, ProductThumbnail, PRODUCT_BATCH_LIMIT, type ProductSelection } from './ProductOperations'
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState, type FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { Badge, Button, DataTable, Field, Modal, PageHeader, PagePager, Panel, CopyValue } from '../../components/ui'
+import { Badge, Button, DataTable, Field, Modal, PageHeader, Panel, CopyValue } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { formatMinorAmount, parseInteger } from '../../shared/api/money'
@@ -11,17 +14,28 @@ import { parseCurrencyCode } from '../../shared/api/validate'
 
 import { EmptySelect, FilterBar } from '../../shared/ui/FilterBar'
 import { useAdminListSearch } from '../../shared/ui/useAdminListSearch'
-import { productStatusSchema } from '../../shared/api/schemas'
+import { productStatusSchema, adminProductSchema, type AdminProduct } from '../../shared/api/schemas'
 import { productStatusLabels } from './productDisplay'
 
 export function ProductsPage() {
   const { search } = useLocation()
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
     productNo: params.get('productNo') || undefined,
     skuNo: params.get('skuNo') || undefined,
     name: params.get('name') || undefined,
     status: params.get('status') || undefined,
+  }
+  const selectionScope = JSON.stringify(filters)
+  const [selection, setSelection] = useState<{ scope: string; items: ProductSelection[] }>({ scope: selectionScope, items: [] })
+  const selected = selection.scope === selectionScope ? selection.items : []
+  const [imageProduct, setImageProduct] = useState<AdminProduct>()
+  const clearSelection = () => setSelection({ scope: selectionScope, items: [] })
+  function toggleSelection(row: AdminProduct) {
+    const previous = selected.some((item) => item.productId === row.productId)
+    const items = previous ? selected.filter((item) => item.productId !== row.productId)
+      : [...selected, { productId: row.productId, version: row.version }]
+    if (items.length <= PRODUCT_BATCH_LIMIT) setSelection({ scope: selectionScope, items })
   }
   const [productNoFilter, setProductNoFilter] = useState(filters.productNo ?? '')
   const [skuNoFilter, setSkuNoFilter] = useState(filters.skuNo ?? '')
@@ -35,7 +49,7 @@ export function ProductsPage() {
   const [currency, setCurrency] = useState('CNY')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['products', after, pageSize, filters], queryFn: () => api.searchProducts({ after, limit: pageSize, ...filters }) })
+  const query = useNumberedList({ queryKey: ['products', after, pageSize, filters], queryFn: () => api.searchProducts({ after, limit: pageSize, ...filters }) }, { path: 'numbered-pages/products', schema: adminProductSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageItems)
   const create = useMutation({
     mutationFn: api.createProduct,
     onSuccess: async () => {
@@ -84,7 +98,8 @@ export function ProductsPage() {
       <PageHeader
         title="商品"
         description="查询目录价和发布状态，维护商品与 SKU。"
-        actions={<Button tone="primary" aria-haspopup="dialog" onClick={openCreate}><Plus size={16} aria-hidden="true" />创建草稿</Button>}
+        actions={<><ProductOperations selected={selected} clear={clearSelection} resetPage={() => setAfter('0')} />
+          <Button tone="primary" aria-haspopup="dialog" onClick={openCreate}><Plus size={16} aria-hidden="true" />创建草稿</Button></>}
       />
       <FilterBar applied={appliedFilters(params, remove, [
           ['商品编号', 'productNo', () => setProductNoFilter('')],
@@ -110,13 +125,19 @@ export function ProductsPage() {
           {(rows) => (
             <>
               <DataTable label="商品列表" className="trade-list-table pin-key">
-                <thead><tr><th className="key-cell">商品</th><th>发布状态</th><th className="numeric-cell">目录价</th><th>币种</th><th>主 SKU ID</th><th>商品 ID</th><th>发布修订</th><th>版本</th></tr></thead>
+                <thead><tr><th className="key-cell">商品</th><th>发布状态</th><th className="numeric-cell">目录价</th><th>币种</th><th>主 SKU ID</th><th>商品 ID</th><th>发布修订</th><th>版本</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.productId}>
                       <td>
-                        <Link to={`/products/${row.productId}`} state={{ listSearch: search }}>{row.name}</Link>
-                        <small><CopyValue value={row.productNo} name="商品编号" /></small>
+                        <div className="product-identity">
+                          <input type="checkbox" aria-label={`选择 ${row.name}`} checked={selected.some((item) => item.productId === row.productId)}
+                            disabled={selected.length === PRODUCT_BATCH_LIMIT && !selected.some((item) => item.productId === row.productId)}
+                            onChange={() => toggleSelection(row)} />
+                          <ProductThumbnail url={row.imageUrl} />
+                          <div><Link to={`/products/${row.productId}`} state={{ listSearch: search }}>{row.name}</Link>
+                            <small><CopyValue value={row.productNo} name="商品编号" /></small></div>
+                        </div>
                       </td>
                       <td><Badge tone={row.status === productStatusSchema.enum.PUBLISHED ? 'good' : row.status === productStatusSchema.enum.OFFLINE ? 'neutral' : 'warn'}>{productStatusLabels[row.status]}</Badge></td>
                       <td className="numeric-cell">{formatMinorAmount(row.unitPrice)}</td>
@@ -125,6 +146,7 @@ export function ProductsPage() {
                       <td><CopyValue value={row.productId} name="商品 ID" /></td>
                       <td>{row.publishedRevision ?? '—'}</td>
                       <td className="mono">{row.version}</td>
+                      <td><Button tone="ghost" aria-haspopup="dialog" onClick={() => setImageProduct(row)}>编辑展示图</Button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -132,9 +154,10 @@ export function ProductsPage() {
             </>
           )}
         </QueryGate>
-        <PagePager scope={['products', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+        <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['products', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.productId ?? null, hasMore: query.data.length === pageSize } : undefined} />
       </Panel>
+      {imageProduct && <ProductImageEditor product={imageProduct} close={() => setImageProduct(undefined)} />}
       {createOpen && (
         <Modal title="创建商品草稿" description="填写商品信息和主 SKU。创建后可在商品详情维护规格并发布。"
           pending={create.isPending} onClose={() => setCreateOpen(false)}>

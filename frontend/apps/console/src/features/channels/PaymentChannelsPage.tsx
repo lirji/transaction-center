@@ -1,13 +1,16 @@
+import { NumberedCursorPager } from '../../components/NumberedPager'
+import { channelViewSchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Badge, Button, Field, PageHeader, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseChannelCode, parseCurrencyCode, parseHttpsUrl } from '../../shared/api/validate'
 
 export function PaymentChannelsPage() {
-  const [after, setAfter] = useState(0)
+  const [after, setAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('payment-channels', 20, () => setAfter(0))
   const [channelCode, setChannelCode] = useState('')
   const [channelMerchantNo, setChannelMerchantNo] = useState('')
@@ -17,7 +20,7 @@ export function PaymentChannelsPage() {
   const [returnUrl, setReturnUrl] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['payment-channels', after, pageSize], queryFn: () => api.paymentChannels(after, pageSize) })
+  const query = useNumberedList({ queryKey: ['payment-channels', after, pageSize], queryFn: () => api.paymentChannels(after, pageSize) }, { path: 'numbered-pages/payment-channels', schema: channelViewSchema, after: after, page: page, pageSize: pageSize }, pageItems)
   const create = useMutation({
     mutationFn: api.createPaymentChannel,
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['payment-channels'] }) },
@@ -72,7 +75,7 @@ export function PaymentChannelsPage() {
               </>
             )}
           </QueryGate>
-          <CursorPager scope={['payment-channels']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+          <NumberedCursorPager numbered={query.numbered} onNumber={setPage} scope={['payment-channels']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.channelId} />
         </Panel>
         <Panel>

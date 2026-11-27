@@ -17,4 +17,8 @@ public interface ChannelMapper {
     List<ChannelConfiguration> findById(@Param("tenant") long tenant,@Param("channel") long channel);
     /** 管理端有界分页，仅当前租户配置。 */
     List<ChannelConfiguration> list(@Param("tenant") long tenant,@Param("after") long after,@Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long listCount(@Param("tenant") long tenant);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<ChannelConfiguration> listAtOffset(@Param("tenant") long tenant, @Param("limit") int limit, @Param("offset") long offset);
 }

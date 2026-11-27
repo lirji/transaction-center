@@ -59,7 +59,8 @@ export const productSchema = z.object({
   publishedRevision: z.number().int().nullable(),
 })
 export type Product = z.infer<typeof productSchema>
-export const adminProductSchema = productSchema.extend({ productNo: z.string() })
+export const adminProductSchema = productSchema.extend({ productNo: z.string(), imageUrl: z.string().nullish() })
+export type AdminProduct = z.infer<typeof adminProductSchema>
 
 export const stockTypeSchema = z.enum(['PHYSICAL', 'SERVICE'])
 export const specificationSchema = z.record(z.string(), z.string())
@@ -438,7 +439,7 @@ export const adminRefundDetailSchema = adminRefundViewSchema.extend({
 })
 export type AdminRefundDetail = z.infer<typeof adminRefundDetailSchema>
 
-const operationAuditEntrySchema = z.object({
+export const operationAuditEntrySchema = z.object({
   id: z.string(),
   occurredAt: isoDateTime,
   resourceType: z.string(),
@@ -456,8 +457,7 @@ export const operationAuditPageSchema = z.object({
   nextCursor: z.string().nullable(),
 })
 
-export const refundAuditHistorySchema = z.object({
-  items: z.array(z.object({
+export const refundAuditEntrySchema = z.object({
     id: z.string(),
     requestId: z.string().nullish(),
     traceId: z.string().nullish(),
@@ -468,7 +468,10 @@ export const refundAuditHistorySchema = z.object({
     effectId: z.string().nullish(),
     beforeState: z.string().nullish(),
     afterState: z.string().nullish(),
-  })),
+})
+
+export const refundAuditHistorySchema = z.object({
+  items: z.array(refundAuditEntrySchema),
   nextCursor: z.string().nullish(),
 })
 
@@ -582,6 +585,29 @@ export const operationsSummarySchema = z.object({
 })
 const operationsFactKind = z.enum(['NORMAL_RECEIPT', 'ABNORMAL_RECEIPT', 'NORMAL_REFUND', 'ABNORMAL_REFUND'])
 export type OperationsScope = z.infer<typeof operationsFactKind> | 'NET'
+export const operationsAnalysisSchema = z.object({
+  from: isoDateTime,
+  to: isoDateTime,
+  observedAt: isoDateTime,
+  currency: currencyCode,
+  payableCount: z.int().nonnegative(),
+  convertedCount: z.int().nonnegative(),
+  orderStates: z.array(z.object({
+    status: orderStatusSchema,
+    count: z.int().nonnegative(),
+    payableCount: z.int().nonnegative(),
+    convertedCount: z.int().nonnegative(),
+  })),
+  daily: z.array(z.object({
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    orderCount: z.int().nonnegative(),
+    paidOrderCount: z.int().nonnegative(),
+    normalReceipt: z.string().regex(/^\d+$/),
+    normalRefund: z.string().regex(/^\d+$/),
+    netReceipt: z.string().regex(/^-?\d+$/),
+  })),
+})
+
 export const operationsFinancialFactSchema = z.object({
   orderBusinessNo: z.string().nullish(),
   receiptBusinessNo: z.string().nullish(),
@@ -590,14 +616,54 @@ export const operationsFinancialFactSchema = z.object({
   kind: operationsFactKind, amount: z.number().int().positive(), currency: currencyCode, confirmedAt: isoDateTime,
 })
 
-export const numberedOrderPageSchema = z.object({
-  items: z.array(adminOrderViewSchema),
+export function numberedPageSchema<T extends z.ZodType>(item: T) {
+  return numberedPageMetadataSchema.extend({ items: z.array(item) })
+}
+
+const numberedPageMetadataSchema = z.object({
   page: z.int().positive(),
   pageSize: z.int().min(1).max(100),
   totalCount: z.int().nonnegative(),
   totalPages: z.int().nonnegative(),
   observedAt: isoDateTime,
 })
+
+export type NumberedPageMetadata = z.infer<typeof numberedPageMetadataSchema>
+export type NumberedPage<T> = NumberedPageMetadata & { items: T[] }
+export const inventoryAlertStateSchema = z.enum(['OUT_OF_STOCK', 'LOW', 'UNCONFIGURED', 'NORMAL'])
+export const inventoryAlertSchema = z.object({
+  warehouseId: z.string(), skuId: z.string(), available: z.int().nonnegative(),
+  reorderThreshold: z.int().nonnegative().nullable(), revision: z.int().nonnegative(), state: inventoryAlertStateSchema,
+})
+export const inventoryAlertsSchema = z.object({
+  rows: numberedPageSchema(inventoryAlertSchema),
+  totals: z.array(z.object({ state: inventoryAlertStateSchema, count: z.int().nonnegative() })),
+})
+export const updateVersionSchema = z.object({ version: z.int().nonnegative() })
+export const bulkCatalogResultSchema = z.object({
+  items: z.array(z.object({ reference: z.string(), state: z.literal('COMPLETED') })),
+})
+export const catalogDraftImportSchema = z.object({
+  productNo: z.string().trim().min(1).max(64),
+  name: z.string().trim().min(1).max(200),
+  skuNo: z.string().trim().min(1).max(64),
+  unitPrice: z.int().nonnegative(),
+  currency: currencyCode,
+}).strict()
+export type CatalogDraftImport = z.infer<typeof catalogDraftImportSchema>
+export type InventoryAlert = z.infer<typeof inventoryAlertSchema>
+export type InventoryAlertState = z.infer<typeof inventoryAlertStateSchema>
+
+export const linkedCheckoutsSchema = z.object({
+  rows: numberedPageSchema(z.object({
+    orderNo: z.string(), orderBusinessNo: z.string().nullable(), commerceTenant: z.string(), storeId: z.string(),
+    commerceQuoteId: z.string(), fundingApplicationId: z.string().nullable(), createdAt: isoDateTime,
+  })),
+  fundingCount: z.int().nonnegative(),
+  frozenDiscount: z.string().regex(/^\d+$/),
+})
+
+export const numberedOrderPageSchema = numberedPageSchema(adminOrderViewSchema)
 
 export function pageSchema<T extends z.ZodType>(item: T) {
   return z.object({

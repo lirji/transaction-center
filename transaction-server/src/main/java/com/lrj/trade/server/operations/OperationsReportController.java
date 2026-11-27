@@ -2,6 +2,8 @@ package com.lrj.trade.server.operations;
 
 import com.lrj.trade.core.TradeException;
 import com.lrj.trade.core.query.AdminPage;
+import com.lrj.trade.core.query.AdminNumberedPage;
+import com.lrj.trade.server.AdminQueryParameters;
 import com.lrj.trade.core.query.AdminQuery;
 import com.lrj.trade.server.AdminRead;
 import java.util.Arrays;
@@ -37,14 +39,45 @@ public class OperationsReportController {
         return report.summary(tenant(jwt),validatedCurrency(query),query);
     }
 
+    /** 输出全量日趋势、订单状态和创建订单转化口径。 */
+    @GetMapping("/analysis")
+    public OperationsReport.Analysis analysis(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam MultiValueMap<String, String> params) {
+        if (params.containsKey("after") || params.containsKey("limit")) throw invalid();
+        AdminQuery query = AdminQuery.parse(params, AdminQuery.fields("currency"), true);
+        return report.analysis(tenant(jwt), validatedCurrency(query), query);
+    }
+
+    /** 来源关联沿用试点审计权限，独立来源系统自行鉴权。 */
+    @GetMapping("/linked-checkouts")
+    public OperationsReport.LinkedCheckouts linked(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam MultiValueMap<String, String> params) {
+        var request = AdminQueryParameters.numbered(params,
+                input -> AdminQuery.parse(input, AdminQuery.fields("currency", "storeRef"), true));
+        return report.linked(tenant(jwt), validatedCurrency(request.query()), request.query(), request.page());
+    }
+
+    /** 资金明细提供适合人工定位的编号页，保留原游标接口。 */
+    @GetMapping("/financial-fact-pages")
+    public AdminNumberedPage<OperationsReport.Fact> factPages(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam MultiValueMap<String, String> params) {
+        var request = AdminQueryParameters.numbered(params, OperationsReportController::parseFacts);
+        String currency = validatedCurrency(request.query());
+        return report.numberedFacts(tenant(jwt), currency, request.query(), request.page());
+    }
+
     /** 明细限定为一种资金范围，可按主键继续翻页。 */
     @GetMapping("/financial-facts")
     public AdminPage<OperationsReport.Fact> facts(@AuthenticationPrincipal Jwt jwt,
                                                     @RequestParam MultiValueMap<String,String> params) {
-        AdminQuery query=AdminQuery.parse(params,Map.of("currency",Set.of(),"scope",SCOPES,"ledgerNo",Set.of()),true);
-        String currency=validatedCurrency(query);
+        AdminQuery query = parseFacts(params);
+        return report.facts(tenant(jwt), validatedCurrency(query), query);
+    }
+
+    private static AdminQuery parseFacts(MultiValueMap<String, String> params) {
+        AdminQuery query = AdminQuery.parse(params, Map.of("currency", Set.of(), "scope", SCOPES, "ledgerNo", Set.of()), true);
         if (!query.filters().containsKey("scope")) throw invalid();
-        return report.facts(tenant(jwt),currency,query);
+        return query;
     }
 
     private static long tenant(Jwt jwt) { return AdminQuery.number(jwt.getClaimAsString("tenant_id"),false); }

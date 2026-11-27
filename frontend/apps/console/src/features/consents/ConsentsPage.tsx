@@ -1,12 +1,15 @@
+import { NumberedCursorPager } from '../../components/NumberedPager'
+import { consentDocumentSchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, CursorPager, Field, PageHeader, Panel, StackForm, DataTable } from '../../components/ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Button, Field, PageHeader, Panel, StackForm, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 
 export function ConsentsPage() {
-  const [after, setAfter] = useState(0)
+  const [after, setAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('consent-documents', 20, () => setAfter(0))
   const [purpose, setPurpose] = useState('')
   const [documentVersion, setDocumentVersion] = useState('')
@@ -15,7 +18,7 @@ export function ConsentsPage() {
   const [contentHash, setContentHash] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['consent-documents', after, pageSize], queryFn: () => api.consentDocuments(after, pageSize) })
+  const query = useNumberedList({ queryKey: ['consent-documents', after, pageSize], queryFn: () => api.consentDocuments(after, pageSize) }, { path: 'numbered-pages/consent-documents', schema: consentDocumentSchema, after: after, page: page, pageSize: pageSize }, pageItems)
   const publish = useMutation({
     mutationFn: api.publishConsentDocument,
     onSuccess: async () => {
@@ -76,7 +79,7 @@ export function ConsentsPage() {
               </>
             )}
           </QueryGate>
-          <CursorPager scope={['consent-documents']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+          <NumberedCursorPager numbered={query.numbered} onNumber={setPage} scope={['consent-documents']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.id} />
         </Panel>
         <Panel>

@@ -44,9 +44,17 @@ public interface InventoryMapper {
 
     /** 租户内有界分页仓库，前端无需硬编码编号。 */
     List<Warehouse> listWarehouses(@Param("tenant") long tenant, @Param("after") long after, @Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long listWarehousesCount(@Param("tenant") long tenant);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<Warehouse> listWarehousesAtOffset(@Param("tenant") long tenant, @Param("limit") int limit, @Param("offset") long offset);
 
     /** 强制仓库及规格过滤，使用索引有界查询流水。 */
     List<LedgerEntry> listLedgerEntries(@Param("tenant") long tenant, @Param("warehouseId") long warehouseId, @Param("skuId") long skuId, @Param("after") long after, @Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long listLedgerEntriesCount(@Param("tenant") long tenant, @Param("warehouseId") long warehouseId, @Param("skuId") long skuId);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<LedgerEntry> listLedgerEntriesAtOffset(@Param("tenant") long tenant, @Param("warehouseId") long warehouseId, @Param("skuId") long skuId, @Param("limit") int limit, @Param("offset") long offset);
 
     /** 业务已持余额锁后读取本次更新的快照，不使用旧一致性读。 */
     List<Balance> lockBalance(@Param("tenant") long tenant,@Param("warehouseId") long warehouseId,@Param("skuId") long skuId);
@@ -57,5 +65,9 @@ public interface InventoryMapper {
     int insertLedger(@Param("tenant") long tenant, @Param("operationRef") String operationRef, @Param("warehouseId") long warehouseId, @Param("skuId") long skuId, @Param("operationType") String operationType, @Param("availableDelta") long availableDelta, @Param("reservedDelta") long reservedDelta, @Param("soldDelta") long soldDelta, @Param("totalDelta") long totalDelta, @Param("reason") String reason, @Param("actorKey") String actorKey);
     /** 管理查询在本租户的完整数据范围执行筛选，先过滤再按主键分页。 */
     List<Balance> listAdminBalances(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+    /** 查询总量使用与游标列表相同的租户及筛选条件。 */
+    long listAdminBalancesCount(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+    /** 在服务端核对过总量后对同一查询范围取指定页。 */
+    List<Balance> listAdminBalancesAtOffset(@Param("tenant") long tenant,@Param("q") AdminQuery query, @Param("offset") long offset);
 
 }

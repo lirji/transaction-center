@@ -29,7 +29,18 @@ VALUES(#{tenant},#{merchant},#{code},#{channelMerchant},#{currency},#{credential
     SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version FROM tc_merchant_channel WHERE tenant_id=#{tenant} AND id=#{channel}
   </select>
   <!-- 管理端有界分页，仅当前租户配置。 -->
+  <sql id="listScope">
+    FROM tc_merchant_channel WHERE tenant_id=#{tenant}
+  </sql>
   <select id="list" resultMap="ChannelConfiguration" useCache="false">
-    SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version FROM tc_merchant_channel WHERE tenant_id=#{tenant} AND id &gt; #{after} ORDER BY id LIMIT #{limit}
+    SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version <include refid="listScope"/>
+    AND id &gt; #{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="listCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listScope"/>
+  </select>
+  <select id="listAtOffset" resultMap="ChannelConfiguration" useCache="false" timeout="3">
+    SELECT id,merchant_no,channel_code,channel_merchant_no,currency,credential_ref,return_url_id,return_url,status,version <include refid="listScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
   </select>
 </mapper>

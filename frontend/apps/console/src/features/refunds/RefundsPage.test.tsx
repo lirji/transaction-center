@@ -18,6 +18,7 @@ describe('RefundsPage', () => {
 
   it('shows the queue as read-only without approve actions', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       const url = String(input)
       if (url.includes('refund-policy')) return json({ currency: 'CNY', autoApproveLimit: 0, version: 0 })
       return json([{
@@ -43,6 +44,7 @@ describe('RefundsPage', () => {
   it('puts status=ALL on the request when selected', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       if (String(input).includes('refund-policy')) return json({ currency: 'CNY', autoApproveLimit: 0, version: 0 })
       return json([])
     })
@@ -58,6 +60,7 @@ describe('RefundsPage', () => {
   it('loads the policy on demand and preserves its currency when editing the amount', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       if (String(input).includes('refund-policy')) return json({ currency: 'USD', autoApproveLimit: 200, version: 1 })
       return json([])
     })
@@ -78,6 +81,7 @@ describe('RefundsPage', () => {
 
   it('shows an error when the refund policy cannot be loaded', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       if (String(input).includes('refund-policy')) {
         return new Response(JSON.stringify({ code: 'DOWN', message: '政策不可用', traceId: 't', retryable: false }), {
           status: 503,

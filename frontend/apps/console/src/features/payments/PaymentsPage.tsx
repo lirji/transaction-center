@@ -1,8 +1,9 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
+import { Badge, Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminPaymentView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
@@ -10,7 +11,7 @@ import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch, useListLinkState } from '../../shared/ui/useAdminListSearch'
 import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
-import { paymentStatusSchema } from '../../shared/api/schemas'
+import { paymentStatusSchema, adminPaymentViewSchema } from '../../shared/api/schemas'
 
 const PAYMENT_STATUSES = paymentStatusSchema.options
 const paymentLabels: Record<(typeof PAYMENT_STATUSES)[number], string> = {
@@ -47,7 +48,7 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
 }
 
 export function PaymentsPage() {
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [paymentNo, setPaymentNo] = useState(() => params.get('paymentNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
@@ -69,12 +70,12 @@ export function PaymentsPage() {
   })() : ''
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
 
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['admin-payments', after, pageSize, filters],
     queryFn: () => api.payments({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
-  })
+  }, { path: 'numbered-pages/payments', schema: adminPaymentViewSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageProjection)
 
   function submit() {
     setFormError('')
@@ -139,7 +140,7 @@ export function PaymentsPage() {
             <PageQueryGate query={query} emptyTitle="没有支付意图" emptyDetail="当前筛选没有支付记录。">
               {(page) => <PaymentRows rows={page.items} />}
             </PageQueryGate>
-            <PagePager scope={['payments', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+            <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['payments', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

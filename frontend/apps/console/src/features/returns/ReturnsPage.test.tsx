@@ -7,7 +7,8 @@ import { adminPage, json } from '../../test/admin-fixtures'
 
 describe('ReturnsPage', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn(async () => json(adminPage([]))))
+    vi.stubGlobal('fetch', vi.fn(async (input) => /\/admin\/numbered-(pages|operations)\//.test(String(input))
+      ? json({}, 404) : json(adminPage([]))))
   })
   afterEach(() => {
     vi.unstubAllGlobals()

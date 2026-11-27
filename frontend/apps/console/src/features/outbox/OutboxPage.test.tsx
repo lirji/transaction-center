@@ -19,6 +19,7 @@ describe('OutboxPage', () => {
   it('refetches tasks after a successful replay', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockImplementation(async (input, init) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       const url = String(input)
       if (url.includes(':replay') && (init as RequestInit | undefined)?.method === 'POST') {
         return json({ eventId: 'evt-1', version: 4, replayCount: 2 })

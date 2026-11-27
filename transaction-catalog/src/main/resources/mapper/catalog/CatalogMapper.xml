@@ -26,6 +26,7 @@
       <arg column="currency" javaType="java.lang.String"/>
       <arg column="publishedRevision" javaType="java.lang.Long"/>
       <arg column="productNo" javaType="java.lang.String"/>
+      <arg column="imageUrl" javaType="java.lang.String"/>
     </constructor>
   </resultMap>
 
@@ -102,11 +103,9 @@
   </select>
 
   <!-- 规格编码匹配所有规格；列表价格仍取主规格，避免分页重复。 -->
-  <select id="listAdminProducts" resultMap="AdminProduct" useCache="false" timeout="3">
-    SELECT p.id AS productId,s.id AS skuId,p.name AS name,p.status AS status,p.version AS version,
-      s.unit_price AS unitPrice,s.currency AS currency,p.published_revision AS publishedRevision,p.product_no AS productNo
+  <sql id="listAdminProductsScope">
     FROM tc_product p JOIN tc_sku s ON s.tenant_id=p.tenant_id AND s.product_id=p.id
-    WHERE p.tenant_id=#{tenant} AND p.id &gt; #{q.after}
+    WHERE p.tenant_id=#{tenant}
       AND s.id=(SELECT MIN(primary_sku.id) FROM tc_sku primary_sku WHERE primary_sku.tenant_id=p.tenant_id AND primary_sku.product_id=p.id)
     <if test="q.filters.productNo != null">AND p.product_no=#{q.filters.productNo}</if>
     <if test="q.filters.name != null">AND p.name=#{q.filters.name}</if>
@@ -114,7 +113,22 @@
     <if test="q.filters.skuNo != null">
       AND EXISTS (SELECT 1 FROM tc_sku match_sku WHERE match_sku.tenant_id=p.tenant_id AND match_sku.product_id=p.id AND match_sku.sku_no=#{q.filters.skuNo})
     </if>
+  </sql>
+  <select id="listAdminProducts" resultMap="AdminProduct" useCache="false" timeout="3">
+    SELECT p.id AS productId,s.id AS skuId,p.name AS name,p.status AS status,p.version AS version,
+      s.unit_price AS unitPrice,s.currency AS currency,p.published_revision AS publishedRevision,p.product_no AS productNo,p.image_url AS imageUrl
+    <include refid="listAdminProductsScope"/>
+    AND p.id &gt; #{q.after}
     ORDER BY p.id LIMIT #{q.limit}
+  </select>
+  <select id="listAdminProductsCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listAdminProductsScope"/>
+  </select>
+  <select id="listAdminProductsAtOffset" resultMap="AdminProduct" useCache="false" timeout="3">
+    SELECT p.id AS productId,s.id AS skuId,p.name AS name,p.status AS status,p.version AS version,
+      s.unit_price AS unitPrice,s.currency AS currency,p.published_revision AS publishedRevision,p.product_no AS productNo,p.image_url AS imageUrl
+    <include refid="listAdminProductsScope"/>
+    ORDER BY p.id LIMIT #{q.limit} OFFSET #{offset}
   </select>
 
   <!-- 读取主规格展示视图，会员只允许读取已发布商品。 -->
@@ -138,4 +152,8 @@
   <select id="lockMutationVersion" resultType="java.lang.Long" useCache="false">
     SELECT version FROM tc_product WHERE tenant_id=#{tenant} AND id=#{productId} FOR UPDATE
   </select>
+  <update id="setImage">
+    UPDATE tc_product SET image_url=#{imageUrl,jdbcType=VARCHAR},version=version+1
+    WHERE tenant_id=#{tenant} AND id=#{product} AND version=#{version}
+  </update>
 </mapper>

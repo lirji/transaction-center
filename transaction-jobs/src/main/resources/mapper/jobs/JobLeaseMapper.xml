@@ -90,8 +90,19 @@
     <arg column="status" javaType="java.lang.String"/><arg column="attempts" javaType="_long"/>
     <arg column="next_run_at" javaType="java.time.Instant"/><arg column="last_error" javaType="java.lang.String"/>
   </constructor></resultMap>
+  <sql id="publicationTasksScope">
+    FROM tc_job_lease
+    WHERE tenant_id=#{tenant} AND job_type='OUTBOX_PUBLISH' AND status=#{state}
+  </sql>
   <select id="publicationTasks" resultMap="publicationTask" useCache="false">
-    SELECT id,business_key,status,attempts,next_run_at,last_error FROM tc_job_lease
-    WHERE tenant_id=#{tenant} AND job_type='OUTBOX_PUBLISH' AND status=#{state} AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+    SELECT id,business_key,status,attempts,next_run_at,last_error <include refid="publicationTasksScope"/>
+    AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="publicationTasksCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="publicationTasksScope"/>
+  </select>
+  <select id="publicationTasksAtOffset" resultMap="publicationTask" useCache="false" timeout="3">
+    SELECT id,business_key,status,attempts,next_run_at,last_error <include refid="publicationTasksScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
   </select>
 </mapper>

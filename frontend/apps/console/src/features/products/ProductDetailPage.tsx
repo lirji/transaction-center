@@ -1,16 +1,18 @@
+import { NumberedCursorPager } from '../../components/NumberedPager'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { Badge, Button, ConfirmDialog, CursorPager, DataTable, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, ConfirmDialog, DataTable, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type Sku } from '../../shared/api/client'
 import { MutationBanner } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
 import { formatMinor, formatMinorAmount, parseInteger } from '../../shared/api/money'
 import { describeProblem } from '../../shared/api/client'
 import { parseCurrencyCode } from '../../shared/api/validate'
-import { productStatusSchema } from '../../shared/api/schemas'
+import { productStatusSchema, skuSchema } from '../../shared/api/schemas'
 import { productStatusLabels, stockTypeLabels } from './productDisplay'
 
 export function ProductDetailPage() {
@@ -23,9 +25,9 @@ function ProductDetail({ id }: { id: string }) {
   const location = useLocation()
   const list = { pathname: '/products', search: typeof location.state?.listSearch === 'string' ? location.state.listSearch : '' }
   const product = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) })
-  const [skuAfter, setSkuAfter] = useState(0)
+  const [skuAfter, setSkuAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('product-skus', 20, () => setSkuAfter(0))
-  const skus = useQuery({ queryKey: ['product-skus', id, skuAfter, pageSize], queryFn: () => api.productSkus(id, skuAfter, pageSize), enabled: Boolean(id) })
+  const skus = useNumberedList({ queryKey: ['product-skus', id, skuAfter, pageSize], queryFn: () => api.productSkus(id, skuAfter, pageSize), enabled: Boolean(id) }, { path: `numbered-pages/product-skus/${encodeURIComponent(id)}`, schema: skuSchema, after: skuAfter, page: page, pageSize: pageSize }, pageItems)
   const [name, setName] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [currency, setCurrency] = useState('')
@@ -217,7 +219,7 @@ function ProductDetail({ id }: { id: string }) {
               </DataTable>
             </>
           ) : skus.data ? <div className="panel-inset"><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
-          <CursorPager scope={['product-skus', id]} after={skuAfter} onPage={setSkuAfter} pageSize={pageSize} onPageSize={setPageSize}
+          <NumberedCursorPager numbered={skus.numbered} onNumber={setPage} scope={['product-skus', id]} after={skuAfter} onPage={setSkuAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={skus.isSuccess ? skus.data : undefined} getCursor={(row) => row.skuId} />
         </Panel>
         {draft ? (

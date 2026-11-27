@@ -35,6 +35,20 @@ public class AdminOrderQueryService {
                 offset -> mapper.numberedPage(tenant, filters, offset));
     }
 
+    /** 单次快照顺序遍历所有匹配订单。内存、文件格式和下载响应由调用者掌管。 */
+    public void scan(long tenant, AdminQuery request, java.util.function.Consumer<AdminOrderView> rowConsumer) {
+        Checks.positive(tenant);
+        var query = orderNumberSearch(request);
+        long after = 0;
+        for (;;) {
+            var window = new AdminQuery(after, AdminQuery.MAX_LIMIT, query.createdFrom(), query.createdTo(), query.filters());
+            var page = AdminPage.of(mapper.page(tenant, window), window.limit(), clock.instant());
+            page.items().forEach(rowConsumer);
+            if (!page.hasMore()) return;
+            after = AdminQuery.number(page.nextAfter(), false);
+        }
+    }
+
     /** 仅接受业务日与四位尾号，固定前缀用于索引且不开放输入通配符。 */
     private static AdminQuery orderNumberSearch(AdminQuery query) {
         if (!(query.filters().get("orderNo") instanceof String orderNo)) return query;

@@ -1,7 +1,10 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { refundAuditEntrySchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, auditProjection } from '../../shared/ui/useNumberedList'
 import { Link, useParams } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, PageHeader, PagePager, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Button, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -13,9 +16,9 @@ import { refundLabels } from './refundStatus'
 /** 按已授权的原退款读取独立操作流水，部分日志故障不影响退款详情。 */
 function RefundAuditHistory({ refundNo }: { refundNo: string }) {
   const [shown, setShown] = useState(false)
-  const [cursor, setCursor] = useState('0')
+  const [cursor, setCursor, page, setPage] = useLocalListPage<string>('0')
   const [pageSize, setPageSize] = usePageSize('refund-operation-audits', 50, () => setCursor('0'))
-  const history = useQuery({
+  const history = useNumberedList({
     queryKey: ['refund-operation-audits', refundNo, cursor, pageSize],
     queryFn: ({ signal }) => api.refundAudit(refundNo, {
       cursor: cursor === '0' ? undefined : cursor,
@@ -23,7 +26,7 @@ function RefundAuditHistory({ refundNo }: { refundNo: string }) {
     }, signal),
     enabled: shown,
     retry: false,
-  })
+  }, { path: `numbered-operations/refund-audits/${encodeURIComponent(refundNo)}`, schema: refundAuditEntrySchema, after: cursor, page: page, pageSize: pageSize }, auditProjection)
   return (
     <Panel className="table-panel">
       <h2 className="table-title">操作日志</h2>
@@ -59,7 +62,7 @@ function RefundAuditHistory({ refundNo }: { refundNo: string }) {
           <Button onClick={() => void history.refetch()}>重试</Button>
         </div>
       )}
-      {shown && <PagePager scope={['refund-operation-audits', refundNo]} after={cursor} onPage={setCursor} pageSize={pageSize} onPageSize={setPageSize}
+      {shown && <NumberedPagePager numbered={history.numbered} onNumber={setPage} scope={['refund-operation-audits', refundNo]} after={cursor} onPage={setCursor} pageSize={pageSize} onPageSize={setPageSize}
         result={history.isSuccess ? history.data : undefined} />}
     </Panel>
   )

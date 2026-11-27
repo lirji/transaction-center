@@ -2,14 +2,14 @@ import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { NumberedPager } from '../../components/NumberedPager'
 import { Select } from '../../components/Select'
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowDownUp } from 'lucide-react'
+import { ArrowDown, ArrowDownUp, Download } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Badge, Button, DataTable, Field, PageHeader, PagePager, Panel, CopyValue } from '../../components/ui'
 import { api, type AdminOrderView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseCurrencyCode, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
-import { PageQueryGate } from '../../shared/ui/QueryGate'
+import { MutationBanner, PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
 import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
@@ -102,6 +102,18 @@ export function OrdersPage() {
     enabled: !memberUrlError && !incompleteWindow,
   })
 
+  const exportOrders = useMutation({
+    mutationFn: () => api.exportOrders(filters),
+    onSuccess: (file) => {
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'orders.csv'
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+  })
+
   const result = query.isSuccess ? query.data : undefined
   const numberedResult = result && 'totalCount' in result ? result : undefined
   const cursorResult = result && 'nextAfter' in result ? result : undefined
@@ -156,6 +168,8 @@ export function OrdersPage() {
       <PageHeader
         title="订单"
         description="按订单号、会员或状态查询，可按创建时间查看最近订单。"
+        actions={<Button loading={exportOrders.isPending} disabled={Boolean(memberUrlError) || incompleteWindow}
+          onClick={() => exportOrders.mutate()}><Download size={16} aria-hidden="true" />导出筛选结果</Button>}
       />
       <Panel>
         <h2>查询订单</h2>
@@ -192,6 +206,7 @@ export function OrdersPage() {
           <Field label="订单状态"><EmptySelect value={status} onChange={setStatus} options={ORDER_STATUSES} optionLabel={(value) => orderLabels[value as keyof typeof orderLabels]} /></Field>
         </FilterBar>
       </Panel>
+      <MutationBanner error={exportOrders.error} />
       <Panel className="table-panel">
         <h2 className="table-title">订单列表</h2>
         {memberUrlError || incompleteWindow ? (

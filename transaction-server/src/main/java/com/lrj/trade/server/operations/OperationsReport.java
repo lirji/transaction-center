@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.lrj.trade.core.query.AdminPage;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 
 /** 经营投影来自交易本地事实，对外不返回渠道账号与验签材料。 */
 public final class OperationsReport {
@@ -32,6 +34,37 @@ public final class OperationsReport {
 
         private static String minor(BigDecimal amount) { return amount.toBigIntegerExact().toString(); }
     }
+
+    /** 订单状态是观察时快照，两个转化计数都来自同一批创建订单。 */
+    public record OrderState(String status, long count, long payableCount, long convertedCount) {}
+
+    /** 订单按创建日，资金按本地确认日，对外金额以最小币种单位返回。 */
+    public record Daily(LocalDate day, long orderCount, long paidOrderCount, String normalReceipt,
+                        String normalRefund, String netReceipt) {}
+
+    /** 仓储使用十进制接收聚合值，避免在聚合时丢失资金精度。 */
+    public record DailyTotals(LocalDate day, long orderCount, long paidOrderCount, BigDecimal normalReceipt,
+                              BigDecimal normalRefund) {
+        Daily toView() {
+            return new Daily(day, orderCount, paidOrderCount, Summary.minor(normalReceipt), Summary.minor(normalRefund),
+                    Summary.minor(normalReceipt.subtract(normalRefund)));
+        }
+    }
+
+    /** 开闭窗口沿用原经营汇总，金额只能在该单币种范围内比较。 */
+    public record Analysis(Instant from, Instant to, Instant observedAt, String currency,
+                           long payableCount, long convertedCount, List<OrderState> orderStates, List<Daily> daily) {}
+
+    /** 只包含结算时已持久化的关联，不表示来源系统预算消耗或权益发放。 */
+    public record LinkedCheckout(String orderNo, String orderBusinessNo, String commerceTenant, String storeId,
+                                 String commerceQuoteId, String fundingApplicationId, Instant createdAt) {}
+
+    /** 当前交易查询范围内的关联条数与预算回执绑定条数。 */
+    public record LinkedTotals(long linkedCount, long fundingCount, BigDecimal discount) {}
+
+    /** 关联明细附带整体计数及交易确认的冻结优惠金额。 */
+    public record LinkedCheckouts(com.lrj.trade.core.query.AdminNumberedPage<LinkedCheckout> rows,
+                                  long fundingCount, String frozenDiscount) {}
 
     /** 以账本主键推进明细，真实业务号用于打开订单、退款和实收详情。 */
     public record Fact(@JsonIgnore String cursor, String ledgerNo, String businessNo, String orderNo, String receiptNo,

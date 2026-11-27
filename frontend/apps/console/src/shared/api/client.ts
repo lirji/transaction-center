@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod'
 import { runtimeConfig } from '../config/runtime'
 import {
   adminAttemptViewSchema,
@@ -28,8 +29,12 @@ import {
   merchantSchema,
   operationAuditPageSchema,
   numberedOrderPageSchema,
+  numberedPageSchema,
+  type NumberedPage,
   operationsFinancialFactSchema,
   operationsSummarySchema,
+  operationsAnalysisSchema,
+  linkedCheckoutsSchema,
   type OperationsScope,
   outboxPublicationSchema,
   outboxReplayResultSchema,
@@ -38,6 +43,10 @@ import {
   parsePage,
   parseWith,
   adminProductSchema,
+  inventoryAlertsSchema,
+  bulkCatalogResultSchema,
+  updateVersionSchema,
+  type CatalogDraftImport,
   productSchema,
   reconciliationCaseSchema,
   reconciliationOperationSchema,
@@ -144,7 +153,7 @@ function mergeHeaders(init?: RequestInit): Headers {
   return headers
 }
 
-async function request<T>(path: string, init: RequestInit | undefined, parse: (value: unknown) => T): Promise<T> {
+async function request<T>(path: string, init: RequestInit | undefined, parse: (value: unknown) => T, format: 'json' | 'blob' = 'json'): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), runtimeConfig.requestTimeoutMs)
@@ -167,6 +176,7 @@ async function request<T>(path: string, init: RequestInit | undefined, parse: (v
       throw new ApiProblem(parsed.success ? parsed.data : fallbackFailure(response.status, response.statusText), response.status, retryAfterSeconds)
     }
     if (response.status === 204) return undefined as T
+    if (format === 'blob') return parse(await response.blob())
     const text = await response.text()
     if (!text) return parse(undefined)
     return parse(JSON.parse(text) as unknown)
@@ -287,6 +297,24 @@ export const api = {
       headers: commandHeaders(`product:create:${body.productNo}`, body),
       body: JSON.stringify(body),
     }, (value) => parseWith(resourceSchema, value)),
+  saveProductImage: (id: string, body: { version: number; imageUrl: string | null }) =>
+    request(`${admin}/products/${encodeURIComponent(id)}/image`, {
+      method: 'PATCH',
+      headers: commandHeaders(`product:image:${id}`, body, body.version),
+      body: JSON.stringify(body),
+    }, (value) => parseWith(updateVersionSchema, value)),
+  importProductDrafts: (items: CatalogDraftImport[]) =>
+    request(`${admin}/products/bulk-import`, {
+      method: 'POST',
+      headers: commandHeaders('product:batch-import', items),
+      body: JSON.stringify({ items }),
+    }, (value) => parseWith(bulkCatalogResultSchema, value)),
+  changeProductBatch: (body: { action: 'PUBLISH' | 'OFFLINE'; items: { productId: string; version: number }[] }) =>
+    request(`${admin}/products/bulk-state`, {
+      method: 'POST',
+      headers: commandHeaders('product:batch-state', body),
+      body: JSON.stringify(body),
+    }, (value) => parseWith(bulkCatalogResultSchema, value)),
   editProduct: (id: string, body: { expectedVersion: number; name: string; unitPrice: number; currency: string }) =>
     request(`${admin}/products/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -328,6 +356,14 @@ export const api = {
       headers: commandHeaders(`warehouse:${body.warehouseNo}`, body),
       body: JSON.stringify(body),
     }, (value) => parseWith(resourceSchema, value)),
+  inventoryAlerts: (page: number, limit: number, filters: Record<string, QueryScalar>, signal?: AbortSignal) =>
+    request(`${admin}/inventory-alerts${numberedPageQuery(page, limit, filters)}`, { signal },
+      (value) => parseWith(inventoryAlertsSchema, value)),
+  saveInventoryRule: (warehouse: string, sku: string, body: { reorderThreshold: number | null; revision: number }) =>
+    request(`${admin}/inventory-alerts/${encodeURIComponent(warehouse)}/${encodeURIComponent(sku)}`, {
+      method: 'PATCH', headers: commandHeaders(`inventory:reorder:${warehouse}:${sku}`, body, body.revision),
+      body: JSON.stringify(body),
+    }, (value) => parseWith(updateVersionSchema, value)),
   inventories: (query: { after?: string; limit?: number; warehouseId?: string; skuId?: string; maxAvailable?: string } = {}) =>
     request(`${admin}/inventories${pageQuery(query)}`, undefined, (value) => parseArray(balanceSchema, value)),
   inventoryLedgers: (warehouseId: number, skuId: number, after = 0, limit = 20) =>
@@ -430,10 +466,33 @@ export const api = {
 
   operationsSummary: (range: OperationsRange, signal?: AbortSignal) =>
     request(`${admin}/operations/summary?${new URLSearchParams(range)}`, { signal }, (value) => parseWith(operationsSummarySchema, value)),
+  operationsAnalysis: (range: OperationsRange, signal?: AbortSignal) =>
+    request(`${admin}/operations/analysis?${new URLSearchParams(range)}`, { signal }, (value) => parseWith(operationsAnalysisSchema, value)),
+  operationsLinkedCheckouts: (range: OperationsRange, page: number, limit: number,
+      storeRef?: string, signal?: AbortSignal) =>
+    request(`${admin}/operations/linked-checkouts${numberedPageQuery(page, limit, { ...range, storeRef })}`, { signal },
+      (value) => parseWith(linkedCheckoutsSchema, value)),
   operationsFinancialFacts: (query: OperationsRange & { scope: OperationsScope; after: string; limit?: number }, signal?: AbortSignal) =>
     request(`${admin}/operations/financial-facts${pageQuery(query)}`, { signal }, (value) => parsePage(operationsFinancialFactSchema, value)),
+  exportOrders: (filters: Record<string, QueryScalar>) => {
+    const query = new URLSearchParams()
+    for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== '') query.set(key, String(value))
+    return request(`${admin}/exports/orders?${query}`, undefined, (value) => value as Blob, 'blob')
+  },
   orders: (query: Record<string, QueryScalar> = {}) =>
     request(`${admin}/orders${pageQuery(query)}`, undefined, (value) => parsePage(adminOrderViewSchema, value)),
+  numberedList: async <T>(path: string, schema: ZodType<T>, page: number, limit: number,
+      filters: Record<string, QueryScalar>, signal?: AbortSignal): Promise<NumberedPage<T> | undefined> => {
+    try {
+      return await request(`${admin}/${path}${numberedPageQuery(page, limit, filters)}`, { signal },
+        (value) => parseWith(numberedPageSchema(schema), value))
+    } catch (cause) {
+      if (cause instanceof ApiProblem && (cause.status === HTTP_NOT_FOUND || cause.status === HTTP_METHOD_NOT_ALLOWED)) {
+        return undefined
+      }
+      throw cause
+    }
+  },
   numberedOrders: async (page: number, limit: number, filters: Record<string, QueryScalar>, signal?: AbortSignal) => {
     try {
       return await request(`${admin}/order-pages${numberedPageQuery(page, limit, filters)}`,

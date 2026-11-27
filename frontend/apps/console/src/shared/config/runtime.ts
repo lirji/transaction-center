@@ -10,6 +10,7 @@ export type RuntimeConfig = {
   oidcOrganization: string
   oidcScope: string
   requestTimeoutMs: number
+  workspaces: { commerce?: string; marketing?: string; benefit?: string }
 }
 
 export class RuntimeConfigError extends Error {
@@ -33,6 +34,21 @@ export function originFromAuthority(authority: string): string {
     return new URL(authority).origin
   } catch {
     return ''
+  }
+}
+
+function sourceWorkspace(configured: string | undefined, localPort: number) {
+  const loopback = (host: string) => host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+  const value = configured ?? (loopback(window.location.hostname) ? `http://localhost:${localPort}/` : undefined)
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    if (url.username || url.password || (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback(url.hostname)))) {
+      return undefined
+    }
+    return url.toString()
+  } catch {
+    return undefined
   }
 }
 
@@ -65,6 +81,11 @@ function parseConfig(): RuntimeConfig {
     oidcOrganization: injected?.OIDC_ORGANIZATION ?? import.meta.env.VITE_OIDC_ORGANIZATION ?? '',
     oidcScope: injected?.OIDC_SCOPE ?? import.meta.env.VITE_OIDC_SCOPE ?? 'openid profile',
     requestTimeoutMs: 30_000,
+    workspaces: {
+      commerce: sourceWorkspace(injected?.COMMERCE_WORKSPACE_URL ?? import.meta.env.VITE_COMMERCE_WORKSPACE_URL, 8602),
+      marketing: sourceWorkspace(injected?.MARKETING_WORKSPACE_URL ?? import.meta.env.VITE_MARKETING_WORKSPACE_URL, 8084),
+      benefit: sourceWorkspace(injected?.BENEFIT_WORKSPACE_URL ?? import.meta.env.VITE_BENEFIT_WORKSPACE_URL, 8083),
+    },
   })
 }
 
@@ -78,6 +99,7 @@ const placeholder: RuntimeConfig = Object.freeze({
   oidcOrganization: '',
   oidcScope: 'openid',
   requestTimeoutMs: 30_000,
+  workspaces: {},
 })
 
 let parsed: RuntimeConfig = placeholder

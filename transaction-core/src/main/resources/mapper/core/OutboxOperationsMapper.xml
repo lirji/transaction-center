@@ -40,9 +40,22 @@
     UPDATE tc_outbox SET status='PENDING',publish_attempt_base=#{base},replay_count=replay_count+1,last_replayed_at=UTC_TIMESTAMP(3),version=version+1
     WHERE tenant_id=#{tenant} AND event_id=#{eventId} AND status='REVIEW' AND version=#{version}
   </update>
+  <sql id="pageScope">
+    FROM tc_outbox WHERE tenant_id=#{tenant} AND status=#{state}
+  </sql>
   <select id="page" resultMap="Publication" useCache="false">
     SELECT id,event_id,event_type,aggregate_id,status,version,publish_attempt_base,replay_count,failure_count,last_publish_error,
       first_failure_at,last_failure_at,published_at,published_topic,published_partition,published_offset
-    FROM tc_outbox WHERE tenant_id=#{tenant} AND status=#{state} AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+    <include refid="pageScope"/>
+    AND id&gt;#{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="pageCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="pageScope"/>
+  </select>
+  <select id="pageAtOffset" resultMap="Publication" useCache="false" timeout="3">
+    SELECT id,event_id,event_type,aggregate_id,status,version,publish_attempt_base,replay_count,failure_count,last_publish_error,
+      first_failure_at,last_failure_at,published_at,published_topic,published_partition,published_offset
+    <include refid="pageScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
   </select>
 </mapper>

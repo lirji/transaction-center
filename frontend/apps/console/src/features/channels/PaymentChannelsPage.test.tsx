@@ -18,7 +18,7 @@ describe('PaymentChannelsPage', () => {
 
   it('rejects a lowercase channelCode before calling the API', async () => {
     const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue(json([]))
+    fetchMock.mockImplementation(async (input) => /\/admin\/numbered-(pages|operations)\//.test(String(input)) ? new Response(null, { status: 404 }) : json([]))
     renderWithApp(<PaymentChannelsPage />)
     await screen.findByText('没有渠道')
     await userEvent.type(screen.getByLabelText('渠道编码'), 'wechat')
@@ -43,6 +43,7 @@ describe('PaymentChannelsPage', () => {
       version: 1,
     })
     vi.mocked(fetch).mockImplementation(async (input) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       return json(String(input).includes('after=20')
         ? [channel(21)]
         : Array.from({ length: 20 }, (_, index) => channel(index + 1)))

@@ -100,14 +100,24 @@
     ]]>
   </select>
 
-  <select id="listAdminMembers" resultMap="Member" useCache="false" timeout="3">
-    SELECT m.id AS memberId,m.display_name AS displayName,m.status AS status,m.registered_at AS registeredAt,f.ever_paid AS everPaid,m.version AS version
+  <sql id="listAdminMembersScope">
     FROM tc_member m JOIN tc_member_trade_fact f ON f.tenant_id=m.tenant_id AND f.member_id=m.id
-    WHERE m.tenant_id=#{tenant} AND m.id &gt; #{q.after}
+    WHERE m.tenant_id=#{tenant}
     <if test="q.filters.memberId != null">AND m.id=#{q.filters.memberId}</if>
     <if test="q.filters.status != null">AND m.status=#{q.filters.status}</if>
     <if test="q.filters.registeredFrom != null">AND m.registered_at &gt;= #{q.filters.registeredFrom} AND m.registered_at &lt; #{q.filters.registeredTo}</if>
+  </sql>
+  <select id="listAdminMembers" resultMap="Member" useCache="false" timeout="3">
+    SELECT m.id AS memberId,m.display_name AS displayName,m.status AS status,m.registered_at AS registeredAt,f.ever_paid AS everPaid,m.version AS version <include refid="listAdminMembersScope"/>
+    AND m.id &gt; #{q.after}
     ORDER BY m.id LIMIT #{q.limit}
+  </select>
+  <select id="listAdminMembersCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listAdminMembersScope"/>
+  </select>
+  <select id="listAdminMembersAtOffset" resultMap="Member" useCache="false" timeout="3">
+    SELECT m.id AS memberId,m.display_name AS displayName,m.status AS status,m.registered_at AS registeredAt,f.ever_paid AS everPaid,m.version AS version <include refid="listAdminMembersScope"/>
+    ORDER BY m.id LIMIT #{q.limit} OFFSET #{offset}
   </select>
 
   <!-- 查找不可变条款版本，未发布版本返回空列表。 -->

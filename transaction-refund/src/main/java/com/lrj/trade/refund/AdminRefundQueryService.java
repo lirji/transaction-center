@@ -12,6 +12,15 @@ import org.springframework.transaction.annotation.*;
 @Transactional(readOnly=true,timeout=3,isolation=Isolation.REPEATABLE_READ,propagation=Propagation.REQUIRES_NEW)
 public class AdminRefundQueryService {
     private final AdminRefundMapper mapper;private final Clock clock;private final AdminProcessingReasonPort reasons;
+    /** 使用同一只读快照读取总量与指定页，并复用列表投影。 */
+    public AdminNumberedPage<RefundQueueItem> numberedPage(long tenant, AdminQuery query, long page) {
+        Checks.positive(tenant);
+        var at = clock.instant();
+        return AdminNumberedPage.of(page, query.limit(), mapper.pageCount(tenant, query), at,
+                offset -> mapper.pageAtOffset(tenant, query, offset)
+                        .stream().map(AdminRefundQueryService::queueItem).toList());
+    }
+
     /** 仅注入本领域只读仓储；不调用网络渠道或任务写端口。 */
     public AdminRefundQueryService(AdminRefundMapper mapper,Clock clock,AdminProcessingReasonPort reasons) { this.mapper=mapper;this.clock=clock;this.reasons=reasons; }
     /** 父资源校验和分页共用同一快照，不以有无子项推断父资源归属。 */
@@ -37,6 +46,10 @@ public class AdminRefundQueryService {
     public List<RefundQueueItem> queue(long tenant,AdminQuery query) {
         Checks.positive(tenant);
         return mapper.page(tenant,query).stream().limit(query.limit())
-            .map(v->new RefundQueueItem(v.cursor(),v.refundNo(),v.orderNo(),v.amount(),v.currency(),v.status(),v.approvalRef(),v.approvalDeadline(),v.version(),v.businessNo(),v.orderBusinessNo(),v.approvalBusinessNo())).toList();
+            .map(AdminRefundQueryService::queueItem).toList();
+    }
+
+    private static RefundQueueItem queueItem(AdminRefundView v) {
+        return new RefundQueueItem(v.cursor(),v.refundNo(),v.orderNo(),v.amount(),v.currency(),v.status(),v.approvalRef(),v.approvalDeadline(),v.version(),v.businessNo(),v.orderBusinessNo(),v.approvalBusinessNo());
     }
 }

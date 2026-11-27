@@ -7,6 +7,7 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 聚合现有业务审计，不读取原因原文、请求载荷或专岗证据。 */
@@ -24,10 +25,18 @@ public class OperationAuditQuery {
     /** 用一条探测记录判断是否有下一页，不扫描全租户计数。 */
     @Transactional(readOnly = true, timeout = 3)
     public Page page(long tenant, AdminQuery query, String cursor) {
-        List<Entry> rows = mapper.operationHistory(tenant, query, parseCursor(cursor));
+        List<Entry> rows = mapper.operationHistory(tenant, query, parseCursor(cursor), query.fetchLimit(), null, query.fetchLimit());
         List<Entry> items = rows.stream().limit(query.limit()).toList();
         String nextCursor = rows.size() > query.limit() ? cursorFor(items.getLast()) : null;
         return new Page(items, nextCursor);
+    }
+
+    /** 编号页采用与原游标相同的合并顺序，计数与数据来自同一快照。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ)
+    public AdminNumberedPage<Entry> numberedPage(long tenant, AdminQuery query, long page) {
+        Instant observedAt = Instant.now();
+        return AdminNumberedPage.of(page, query.limit(), mapper.operationHistoryCount(tenant, query), observedAt,
+                offset -> mapper.operationHistory(tenant, query, null, query.limit(), offset, offset + query.limit()));
     }
 
     /** 只暴露业务定位字段和可信身份摘要。通用旧记录可能没有追踪编号。 */

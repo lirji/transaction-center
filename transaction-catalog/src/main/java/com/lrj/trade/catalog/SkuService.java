@@ -1,5 +1,8 @@
 package com.lrj.trade.catalog;
 
+import org.springframework.transaction.annotation.Isolation;
+import java.time.Instant;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import com.lrj.trade.core.*;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +18,15 @@ public class SkuService {
     private final SkuMapper mapper;
     private final Commands commands;
     private final AuditWriter audit;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<Sku> numberedDraftSkus(long tenant, long product, int limit, long page) {
+        Checks.positive(tenant);
+        Checks.positive(product);
+        return AdminNumberedPage.of(page, limit, mapper.listDraftSkusCount(tenant, product), Instant.now(),
+                offset -> mapper.listDraftSkusAtOffset(tenant, product, limit, offset));
+    }
+
     /** 所有SKU写操作与商品版本及审计同事务。 */
     public SkuService(SkuMapper mapper,Commands commands,AuditWriter audit) {
         this.mapper=mapper; this.commands=commands; this.audit=audit;

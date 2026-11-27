@@ -10,6 +10,10 @@ import org.apache.ibatis.annotations.Param;
 public interface JobLeaseMapper {
     /** 固定发布类型的租户内队列，包括坏事件键任务。 */
     List<com.lrj.trade.jobs.model.PublicationTask> publicationTasks(@Param("tenant") long tenant,@Param("state") String state,@Param("after") long after,@Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long publicationTasksCount(@Param("tenant") long tenant, @Param("state") String state);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<com.lrj.trade.jobs.model.PublicationTask> publicationTasksAtOffset(@Param("tenant") long tenant, @Param("state") String state, @Param("limit") int limit, @Param("offset") long offset);
     /** 事件锁之后当前锁读隔离任务，不能从RR历史快照选重试基数。 */
     List<JobLease> lockReviewedPublication(@Param("tenant") long tenant,@Param("eventId") String eventId);
     /** 只重启发布隔离任务，不重置全局令牌和累计次数。 */

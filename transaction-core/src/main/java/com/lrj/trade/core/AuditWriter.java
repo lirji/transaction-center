@@ -4,6 +4,7 @@ import com.lrj.trade.core.mapper.AuditMapper;
 import com.lrj.trade.core.mapper.AuditMapper.Attempt;
 import com.lrj.trade.core.mapper.AuditMapper.Row;
 import com.lrj.trade.core.query.AdminQuery;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -34,6 +35,7 @@ public class AuditWriter {
 
     private final AuditMapper mapper;
     private final TransactionTemplate independent;
+    private final TransactionTemplate historySnapshot;
 
     /** 复用本地事务数据源，独立的尝试事务有短超时。 */
     public AuditWriter(AuditMapper mapper,PlatformTransactionManager manager) {
@@ -41,6 +43,11 @@ public class AuditWriter {
         this.independent=new TransactionTemplate(manager);
         this.independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.independent.setTimeout(3);
+        this.historySnapshot = new TransactionTemplate(manager);
+        this.historySnapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.historySnapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        this.historySnapshot.setReadOnly(true);
+        this.historySnapshot.setTimeout(3);
     }
 
     /** 既有调用只保留动作、资源、原因及版本。 */
@@ -109,6 +116,18 @@ public class AuditWriter {
             String next=rows.size()>limit?items.getLast().occurredAt()+","+items.getLast().id():null;
             expectWritten(mapper.insertOutcome(actor.tenantId(),attempt,"SUCCEEDED",null,refundNo,null));
             return new History(items,next);
+        });
+    }
+
+    /** 授权后先读取一致快照，再记录查阅成功，查阅自身不会混入退款历史。 */
+    public AdminNumberedPage<Row> numberedRefundHistory(Actor actor, String refundNo, int limit, long page) {
+        return capture(actor, READ_REFUND_AUDIT, refundNo, attempt -> {
+            var observedAt = Instant.now();
+            var result = historySnapshot.execute(status -> AdminNumberedPage.of(page, limit,
+                    mapper.refundHistoryCount(actor.tenantId(), refundNo), observedAt,
+                    offset -> mapper.refundHistory(actor.tenantId(), refundNo, null, null, limit, offset, offset + limit)));
+            expectWritten(mapper.insertOutcome(actor.tenantId(), attempt, "SUCCEEDED", null, refundNo, null));
+            return result;
         });
     }
 

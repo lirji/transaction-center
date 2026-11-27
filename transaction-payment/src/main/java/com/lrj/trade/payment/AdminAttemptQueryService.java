@@ -12,6 +12,17 @@ import org.springframework.transaction.annotation.*;
 @Transactional(readOnly=true,timeout=3,isolation=Isolation.REPEATABLE_READ,propagation=Propagation.REQUIRES_NEW)
 public class AdminAttemptQueryService {
     private final AdminAttemptMapper mapper;private final Clock clock;private final AdminPaymentMapper payments;
+    /** 使用同一只读快照读取总量与指定页，并复用列表投影。 */
+    public AdminNumberedPage<AdminAttemptView> numberedPage(long tenant, AdminQuery query, long page, String paymentNo) {
+        Checks.positive(tenant);
+        if (payments.find(tenant, paymentNo).isEmpty()) {
+            throw new TradeException("NOT_FOUND", "支付不存在");
+        }
+        var at = clock.instant();
+        return AdminNumberedPage.of(page, query.limit(), mapper.pageCount(tenant, query, paymentNo), at,
+                offset -> mapper.pageAtOffset(tenant, query, paymentNo, offset));
+    }
+
     /** 仅注入本领域只读仓储；不调用网络渠道或任务写端口。 */
     public AdminAttemptQueryService(AdminAttemptMapper mapper,Clock clock,AdminPaymentMapper payments) { this.mapper=mapper;this.clock=clock;this.payments=payments; }
     /** 父资源校验和分页共用同一快照，不以有无子项推断父资源归属。 */

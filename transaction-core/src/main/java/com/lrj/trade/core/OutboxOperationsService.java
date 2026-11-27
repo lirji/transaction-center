@@ -1,4 +1,10 @@
 package com.lrj.trade.core;
+import com.lrj.trade.core.query.AdminQuery;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
+import java.time.Instant;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import com.lrj.trade.core.mapper.OutboxOperationsMapper;
 import java.util.*;
 import org.springframework.stereotype.Service;
@@ -6,10 +12,20 @@ import org.springframework.transaction.annotation.*;
 /** 受控重放仅恢复原消息，永久凭证、事件、调度和审计同事务提交。 */
 @Service
 public class OutboxOperationsService {
+    private static final Set<String> QUEUE_STATES = Set.of("PENDING", "SENT", "REVIEW");
     private final OutboxOperationsMapper mapper;
     private final OutboxDeliveryPort delivery;
     private final OutboxReplaySchedulePort jobs;
     private final AuditWriter audit;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<OutboxPublication> numberedPage(long tenant, String state, int limit, long page) {
+        Checks.positive(tenant);
+        if (state == null || !QUEUE_STATES.contains(state)) throw AdminQuery.invalid();
+        return AdminNumberedPage.of(page, limit, mapper.pageCount(tenant, state), Instant.now(),
+                offset -> mapper.pageAtOffset(tenant, state, limit, offset));
+    }
+
     /** 持久凭证替代可淘汰的命令缓存，不引入网络或外部审批等待。 */
     public OutboxOperationsService(OutboxOperationsMapper mapper,OutboxDeliveryPort delivery,OutboxReplaySchedulePort jobs,AuditWriter audit) {
         this.mapper=mapper;this.delivery=delivery;this.jobs=jobs;this.audit=audit;
@@ -18,7 +34,7 @@ public class OutboxOperationsService {
     @Transactional(readOnly=true,timeout=5)
     public List<OutboxPublication> page(long tenant,String state,long after,int limit) {
         Checks.positive(tenant);
-        if(state==null || !Set.of("PENDING","SENT","REVIEW").contains(state) || after<0 || limit<1 || limit>100)
+        if(state==null || !QUEUE_STATES.contains(state) || after<0 || limit<1 || limit>100)
             throw new TradeException("INVALID_ARGUMENT","发布队列筛选或游标无效");
         return List.copyOf(mapper.page(tenant,state,after,limit));
     }

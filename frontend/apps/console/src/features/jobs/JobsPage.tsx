@@ -1,16 +1,17 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
+import { Badge, Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminJobView } from '../../shared/api/client'
 import { FormValidationError, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
 import { isoFromSearch, useAdminListSearch, useListLinkState } from '../../shared/ui/useAdminListSearch'
 import { statusTone, formatBeijingTime } from '../../shared/ui/display'
-import { jobStatusSchema, jobTypeSchema } from '../../shared/api/schemas'
+import { jobStatusSchema, jobTypeSchema, adminJobViewSchema } from '../../shared/api/schemas'
 
 const JOB_TYPES = jobTypeSchema.options
 const JOB_STATUSES = jobStatusSchema.options
@@ -37,7 +38,7 @@ export function JobRows({ rows }: { rows: AdminJobView[] }) {
 }
 
 export function JobsPage() {
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [callbackNo, setCallbackNo] = useState(() => params.get('callbackNo') ?? '')
   const [jobType, setJobType] = useState(() => params.get('jobType') ?? '')
   const [status, setStatus] = useState(() => params.get('status') ?? '')
@@ -54,12 +55,12 @@ export function JobsPage() {
     createdTo: params.get('createdTo') || undefined,
   }
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['admin-jobs', after, pageSize, filters],
     queryFn: () => api.jobs({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !incompleteWindow,
-  })
+  }, { path: 'numbered-pages/jobs', schema: adminJobViewSchema, after: after, page: page, pageSize: pageSize, filters: filters }, pageProjection)
 
   function submit() {
     setFormError('')
@@ -130,7 +131,7 @@ export function JobsPage() {
             <PageQueryGate query={query} emptyTitle="没有任务" emptyDetail="当前筛选没有任务记录。">
               {(page) => <JobRows rows={page.items} />}
             </PageQueryGate>
-            <PagePager scope={['jobs', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+            <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['jobs', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

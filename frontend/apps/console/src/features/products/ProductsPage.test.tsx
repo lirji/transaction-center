@@ -19,6 +19,7 @@ describe('ProductsPage', () => {
   it('refreshes the list after creating a draft', async () => {
     let rows: unknown[] = []
     vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       if (String(input).includes('/admin/products') && (init as RequestInit | undefined)?.method === 'POST') {
         rows = [{
           productId: '9',

@@ -23,4 +23,8 @@ public interface ReconciliationOperationMapper {
     int mark(@Param("tenant") long tenant,@Param("id") long id,@Param("status") String status,@Param("code") String code,@Param("terminal") boolean terminal);
     /** 管理视图基于持久执行状态，不返回幂等键与凭据。 */
     List<ReconciliationOperation> page(@Param("tenant") long tenant,@Param("state") String state,@Param("after") long after,@Param("limit") int limit,@Param("number") String number);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long pageCount(@Param("tenant") long tenant, @Param("state") String state, @Param("number") String number);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<ReconciliationOperation> pageAtOffset(@Param("tenant") long tenant, @Param("state") String state, @Param("number") String number, @Param("limit") int limit, @Param("offset") long offset);
 }

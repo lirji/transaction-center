@@ -1,8 +1,10 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { useNumberedList, auditProjection } from '../../shared/ui/useNumberedList'
+import { operationAuditEntrySchema } from '../../shared/api/schemas'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
+import { Badge, Field, PageHeader, Panel, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import type { OperationAuditEntry } from '../../shared/api/schemas'
 import { parseTimeWindow } from '../../shared/api/validate'
@@ -160,18 +162,18 @@ function OperationFilters({ params, apply, remove }: { params: URLSearchParams; 
 }
 
 export function OperationLogsPage() {
-  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after, page, setPage, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
     resourceType: params.get('resourceType') || undefined,
     resourceRef: params.get('resourceRef') || undefined,
     createdFrom: params.get('createdFrom') || undefined,
     createdTo: params.get('createdTo') || undefined,
   }
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['operation-logs', after, pageSize, filters],
     queryFn: ({ signal }) => api.operationAudits({ ...filters, limit: pageSize === 20 ? undefined : pageSize, cursor: after === '0' ? undefined : after }, signal),
     retry: false,
-  })
+  }, { path: 'numbered-operations/operation-audits', schema: operationAuditEntrySchema, after: after, page: page, pageSize: pageSize, filters: filters }, auditProjection)
 
   return (
     <div className="workspace">
@@ -183,7 +185,7 @@ export function OperationLogsPage() {
           <PageQueryGate query={query} emptyTitle="暂无操作日志" emptyDetail="当前筛选范围没有操作记录。">
             {(page) => <OperationRows rows={page.items} />}
           </PageQueryGate>
-          <PagePager scope={['operation-logs', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+          <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={['operation-logs', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             result={query.isSuccess ? query.data : undefined} />
         </Panel>
       </div>

@@ -1,6 +1,11 @@
 package com.lrj.trade.inventory;
 
 import com.lrj.trade.core.query.AdminQuery;
+import com.lrj.trade.core.query.AdminNumberedPage;
+import java.time.Instant;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import com.lrj.trade.catalog.CatalogPort;
 import com.lrj.trade.core.*;
 import java.util.List;
@@ -18,6 +23,33 @@ public class InventoryService implements InventoryTradingPort {
     private final CatalogPort catalog;
     private final Outbox outbox;
     private final InventoryEventWriter events;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<Warehouse> numberedWarehouses(long tenant, int limit, long page) {
+        Checks.positive(tenant);
+        return AdminNumberedPage.of(page, limit, mapper.listWarehousesCount(tenant), Instant.now(),
+                offset -> mapper.listWarehousesAtOffset(tenant, limit, offset));
+    }
+
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<LedgerEntry> numberedLedger(long tenant, long warehouse, long sku, int limit, long page) {
+        Checks.positive(tenant);
+        Checks.positive(warehouse);
+        Checks.positive(sku);
+        return AdminNumberedPage.of(page, limit, mapper.listLedgerEntriesCount(tenant, warehouse, sku), Instant.now(),
+                offset -> mapper.listLedgerEntriesAtOffset(tenant, warehouse, sku, limit, offset));
+    }
+
+    /** 使用同一只读快照读取总量与指定页，并复用列表投影。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<Balance> numberedPage(long tenant, AdminQuery query, long page) {
+        Checks.positive(tenant);
+        var at = Instant.now();
+        return AdminNumberedPage.of(page, query.limit(), mapper.listAdminBalancesCount(tenant, query), at,
+                offset -> mapper.listAdminBalancesAtOffset(tenant, query, offset));
+    }
+
     /** 管理端按已校验条件读取当前租户数据，保留原交易入口查询。 */
     public List<Balance> adminList(long tenant,AdminQuery query) {
         Checks.positive(tenant);

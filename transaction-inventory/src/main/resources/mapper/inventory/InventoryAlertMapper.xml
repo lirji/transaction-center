@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.inventory.mapper.InventoryAlertMapper">
+  <resultMap id="Alert" type="com.lrj.trade.inventory.InventoryAlertService$Alert">
+    <constructor>
+      <arg column="warehouse_id" javaType="java.lang.String"/>
+      <arg column="sku_id" javaType="java.lang.String"/>
+      <arg column="available" javaType="_long"/>
+      <arg column="reorder_threshold" javaType="java.lang.Long"/>
+      <arg column="reorder_revision" javaType="_long"/>
+      <arg column="stock_state" javaType="com.lrj.trade.inventory.InventoryAlertService$StockState"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="Totals" type="com.lrj.trade.inventory.InventoryAlertService$Totals">
+    <constructor>
+      <arg column="stock_state" javaType="com.lrj.trade.inventory.InventoryAlertService$StockState"/>
+      <arg column="total" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <sql id="stockState">
+    CASE WHEN available=0 THEN 'OUT_OF_STOCK'
+         WHEN reorder_threshold IS NULL THEN 'UNCONFIGURED'
+         WHEN available &lt;= reorder_threshold THEN 'LOW'
+         ELSE 'NORMAL' END
+  </sql>
+  <sql id="scope">
+    FROM tc_inventory_balance WHERE tenant_id=#{tenant}
+    <if test="q.filters.warehouseId != null">AND warehouse_id=#{q.filters.warehouseId}</if>
+    <if test="q.filters.skuId != null">AND sku_id=#{q.filters.skuId}</if>
+  </sql>
+  <sql id="identity">tenant_id=#{tenant} AND warehouse_id=#{warehouse} AND sku_id=#{sku}</sql>
+  <select id="totals" resultMap="Totals" timeout="3" useCache="false">
+    SELECT <include refid="stockState"/> AS stock_state, COUNT(*) AS total
+    <include refid="scope"/>
+    GROUP BY stock_state
+  </select>
+  <select id="page" resultMap="Alert" timeout="3" useCache="false">
+    SELECT warehouse_id,sku_id,available,reorder_threshold,reorder_revision,<include refid="stockState"/> AS stock_state
+    <include refid="scope"/>
+    <if test="q.filters.state != null">AND (<include refid="stockState"/>)=#{q.filters.state}</if>
+    ORDER BY id LIMIT #{q.limit} OFFSET #{offset}
+  </select>
+  <update id="set">
+    UPDATE tc_inventory_balance SET reorder_threshold=#{threshold,jdbcType=BIGINT},reorder_revision=reorder_revision+1
+    WHERE <include refid="identity"/> AND reorder_revision=#{revision}
+  </update>
+  <select id="exists" resultType="boolean" useCache="false" timeout="3">
+    SELECT EXISTS(SELECT 1 FROM tc_inventory_balance WHERE <include refid="identity"/>)
+  </select>
+</mapper>

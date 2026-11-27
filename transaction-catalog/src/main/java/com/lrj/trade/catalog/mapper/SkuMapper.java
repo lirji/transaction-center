@@ -22,6 +22,10 @@ public interface SkuMapper {
 
     /** 后台有界读取规格草稿，版本为整体商品版本。 */
     List<Sku> listDraftSkus(@Param("tenant") long tenant, @Param("productId") long productId, @Param("after") long after, @Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long listDraftSkusCount(@Param("tenant") long tenant, @Param("productId") long productId);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<Sku> listDraftSkusAtOffset(@Param("tenant") long tenant, @Param("productId") long productId, @Param("limit") int limit, @Param("offset") long offset);
 
     /** 会员只读取已发布版本快照，不暴露未发布草稿。 */
     List<Sku> listPublishedSkus(@Param("tenant") long tenant, @Param("productId") long productId, @Param("after") long after, @Param("limit") int limit);

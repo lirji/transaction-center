@@ -9,6 +9,10 @@ import org.apache.ibatis.annotations.*;
 public interface AdminJobMapper {
     /** 租户限定的根记录分页，多读一条用于判断末页。 */
     List<AdminJobView> page(@Param("tenant") long tenant,@Param("q") AdminQuery q,@Param("at") Instant at);
+    /** 查询总量使用与游标列表相同的租户及筛选条件。 */
+    long pageCount(@Param("tenant") long tenant,@Param("q") AdminQuery q,@Param("at") Instant at);
+    /** 在服务端核对过总量后对同一查询范围取指定页。 */
+    List<AdminJobView> pageAtOffset(@Param("tenant") long tenant,@Param("q") AdminQuery q,@Param("at") Instant at, @Param("offset") long offset);
     /** 精确查询仍必须限定租户，外租户与不存在相同。 */
     List<AdminJobView> find(@Param("tenant") long tenant,@Param("number") String number,@Param("at") Instant at);
     /** 所有租约标志共用本次主库时间，避免应用机器时钟偏差。 */

@@ -15,7 +15,7 @@ describe('ReceiptsPage', () => {
 
   it('does not request when abnormalOnly conflicts with NORMAL', async () => {
     const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue(json(adminPage([])))
+    fetchMock.mockImplementation(async (input) => /\/admin\/numbered-(pages|operations)\//.test(String(input)) ? json({}, 404) : json(adminPage([])))
     renderWithApp(<ReceiptsPage />, { route: '/receipts' })
     await userEvent.click(screen.getByRole('combobox', { name: '实收分类' }))
     await userEvent.click(screen.getByRole('option', { name: '正常实收' }))

@@ -1,10 +1,14 @@
+import { InventoryAlerts } from './InventoryAlerts'
+import { NumberedPagePager, NumberedCursorPager } from '../../components/NumberedPager'
+import { balanceSchema, warehouseSchema, ledgerEntrySchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { formatInteger } from '../../shared/ui/display'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, ConfirmDialog, CursorPager, Field, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable, CopyValue } from '../../components/ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Badge, Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner, DataTable, CopyValue } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseInteger, parsePositiveId } from '../../shared/api/money'
@@ -14,9 +18,9 @@ import { useAdminListSearch } from '../../shared/ui/useAdminListSearch'
 import { formatBeijingTime } from '../../shared/ui/display'
 
 export function InventoryPage() {
-  const [whAfter, setWhAfter] = useState(0)
+  const [whAfter, setWhAfter, warehousePage, setWarehousePage] = useLocalListPage<number>(0)
   const [warehouseSize, setWarehouseSize] = usePageSize('warehouses', 20, () => setWhAfter(0))
-  const { params, after: balAfter, apply, remove, setAfter: setBalAfter, pageSize, setPageSize } = useAdminListSearch()
+  const { params, after: balAfter, page: balPage, setPage: setBalPage, apply, remove, setAfter: setBalAfter, pageSize, setPageSize } = useAdminListSearch()
   const balanceFilters = {
     warehouseId: params.get('warehouseId') || undefined,
     skuId: params.get('skuId') || undefined,
@@ -34,22 +38,22 @@ export function InventoryPage() {
   const [reason, setReason] = useState('')
   const [ledgerWarehouse, setLedgerWarehouse] = useState('')
   const [ledgerSku, setLedgerSku] = useState('')
-  const [ledgerAfter, setLedgerAfter] = useState(0)
+  const [ledgerAfter, setLedgerAfter, ledgerPage, setLedgerPage] = useLocalListPage<number>(0)
   const [ledgerSize, setLedgerSize] = usePageSize('inventory-ledger', 20, () => setLedgerAfter(0))
   const [ledgerSelection, setLedgerSelection] = useState<{ warehouseId: number; skuId: number }>()
   const [ledgerError, setLedgerError] = useState('')
   const [formError, setFormError] = useState('')
   const [confirmAdjust, setConfirmAdjust] = useState(false)
   const queryClient = useQueryClient()
-  const warehouses = useQuery({ queryKey: ['warehouses', whAfter, warehouseSize], queryFn: () => api.warehouses(whAfter, warehouseSize) })
-  const balances = useQuery({ queryKey: ['inventories', balAfter, pageSize, balanceFilters], queryFn: () => api.inventories({ after: balAfter, limit: pageSize, ...balanceFilters }) })
-  const ledgers = useQuery({
+  const warehouses = useNumberedList({ queryKey: ['warehouses', whAfter, warehouseSize], queryFn: () => api.warehouses(whAfter, warehouseSize) }, { path: 'numbered-pages/warehouses', schema: warehouseSchema, after: whAfter, page: warehousePage, pageSize: warehouseSize }, pageItems)
+  const balances = useNumberedList({ queryKey: ['inventories', balAfter, pageSize, balanceFilters], queryFn: () => api.inventories({ after: balAfter, limit: pageSize, ...balanceFilters }) }, { path: 'numbered-pages/inventories', schema: balanceSchema, after: balAfter, page: balPage, pageSize: pageSize, filters: balanceFilters }, pageItems)
+  const ledgers = useNumberedList({
     queryKey: ['ledgers', ledgerSelection, ledgerAfter, ledgerSize],
     queryFn: () => ledgerSelection
       ? api.inventoryLedgers(ledgerSelection.warehouseId, ledgerSelection.skuId, ledgerAfter, ledgerSize)
       : Promise.reject(new Error('请先选择仓库和 SKU')),
     enabled: Boolean(ledgerSelection),
-  })
+  }, { path: 'numbered-pages/inventory-ledger', schema: ledgerEntrySchema, after: ledgerAfter, page: ledgerPage, pageSize: ledgerSize, filters: ledgerSelection }, pageItems)
   const createWh = useMutation({
     mutationFn: api.createWarehouse,
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['warehouses'] }) },
@@ -59,6 +63,7 @@ export function InventoryPage() {
     onSuccess: async () => {
       setConfirmAdjust(false)
       await queryClient.invalidateQueries({ queryKey: ['inventories'] })
+      await queryClient.invalidateQueries({ queryKey: ['inventory-alerts'] })
       await queryClient.invalidateQueries({ queryKey: ['ledgers'] })
     },
   })
@@ -186,10 +191,12 @@ export function InventoryPage() {
               </>
             )}
           </QueryGate>
-          <PagePager scope={['inventory-balances', balanceFilters]} after={balAfter} onPage={setBalAfter} pageSize={pageSize} onPageSize={setPageSize}
+          <NumberedPagePager numbered={balances.numbered} onNumber={setBalPage} scope={['inventory-balances', balanceFilters]} after={balAfter} onPage={setBalAfter} pageSize={pageSize} onPageSize={setPageSize}
             result={balances.isSuccess ? { items: balances.data, nextAfter: balances.data.at(-1)?.id ?? null, hasMore: balances.data.length === pageSize } : undefined} />
         </Panel>
-        <Panel className="table-panel">
+        <InventoryAlerts key={`${balanceFilters.warehouseId ?? ''}:${balanceFilters.skuId ?? ''}`}
+        filters={{ warehouseId: balanceFilters.warehouseId, skuId: balanceFilters.skuId }} />
+      <Panel className="table-panel">
           <h2 className="table-title">仓库</h2>
           <QueryGate query={warehouses} emptyTitle="没有仓库" emptyDetail="先创建仓库，再做盘点。">
             {(rows) => (
@@ -205,7 +212,7 @@ export function InventoryPage() {
               </>
             )}
           </QueryGate>
-          <CursorPager scope={['warehouses']} after={whAfter} onPage={setWhAfter} pageSize={warehouseSize} onPageSize={setWarehouseSize}
+          <NumberedCursorPager numbered={warehouses.numbered} onNumber={setWarehousePage} scope={['warehouses']} after={whAfter} onPage={setWhAfter} pageSize={warehouseSize} onPageSize={setWarehouseSize}
             rows={warehouses.isSuccess ? warehouses.data : undefined} getCursor={(row) => row.id} />
         </Panel>
         <div className="page-grid">
@@ -281,7 +288,7 @@ export function InventoryPage() {
                     </>
                   )}
                 </QueryGate>
-                <CursorPager scope={['inventory-ledger', ledgerSelection]} after={ledgerAfter} onPage={setLedgerAfter} pageSize={ledgerSize} onPageSize={setLedgerSize}
+                <NumberedCursorPager numbered={ledgers.numbered} onNumber={setLedgerPage} scope={['inventory-ledger', ledgerSelection]} after={ledgerAfter} onPage={setLedgerAfter} pageSize={ledgerSize} onPageSize={setLedgerSize}
                   rows={ledgers.isSuccess ? ledgers.data : undefined} getCursor={(row) => row.id} />
               </>
             ) : null}

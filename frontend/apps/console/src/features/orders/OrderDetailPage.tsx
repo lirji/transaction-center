@@ -1,13 +1,16 @@
+import { NumberedPagePager, NumberedCursorPager } from '../../components/NumberedPager'
+import { useLocalListPage, useNumberedList, pageProjection, pageItems } from '../../shared/ui/useNumberedList'
+import type { ZodType } from 'zod'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, DataTable, PageHeader, PagePager, Panel, StateBanner } from '../../components/ui'
+import { Badge, Button, DataTable, PageHeader, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
 import { PageQueryGate, QueryError, QueryGate } from '../../shared/ui/QueryGate'
 import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
-import { financialStatusSchema, orderStatusSchema } from '../../shared/api/schemas'
+import { financialStatusSchema, orderStatusSchema, adminPaymentViewSchema, adminReceiptViewSchema, adminReturnViewSchema, refundQueueItemSchema } from '../../shared/api/schemas'
 import { useAuth } from '../../shared/auth/useAuth'
 import { TRADE_ADMIN_EVIDENCE_READ, TRADE_FULFILLMENT_WRITE } from '../../shared/auth/auth-context'
 import { PaymentRows } from '../payments/PaymentsPage'
@@ -150,18 +153,18 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
           </DataTable>
         </Panel> : null}
         {active === 'payments' && !detail.isFetching ? (
-          <OrderRecords key="payments" orderNo={order.orderNo} resource="admin-payments" title="支付意图" emptyTitle="本单无支付意图" read={api.payments}>
+          <OrderRecords key="payments" orderNo={order.orderNo} resource="admin-payments" numberedPath="numbered-pages/payments" schema={adminPaymentViewSchema} title="支付意图" emptyTitle="本单无支付意图" read={api.payments}>
             {(rows) => <PaymentRows rows={rows} />}
           </OrderRecords>
         ) : null}
         {active === 'receipts' && !detail.isFetching ? (
-          <OrderRecords key="receipts" orderNo={order.orderNo} resource="admin-receipts" title="实收" emptyTitle="本单无实收" read={api.paymentReceipts}>
+          <OrderRecords key="receipts" orderNo={order.orderNo} resource="admin-receipts" numberedPath="numbered-pages/payment-receipts" schema={adminReceiptViewSchema} title="实收" emptyTitle="本单无实收" read={api.paymentReceipts}>
             {(rows) => <ReceiptRows rows={rows} />}
           </OrderRecords>
         ) : null}
         {active === 'refunds' && !detail.isFetching ? <OrderRefunds orderNo={order.orderNo} /> : null}
         {active === 'returns' && !detail.isFetching ? (
-          <OrderRecords key="returns" orderNo={order.orderNo} resource="admin-returns" title="退货" emptyTitle="本单无退货" read={api.returns}>
+          <OrderRecords key="returns" orderNo={order.orderNo} resource="admin-returns" numberedPath="numbered-pages/returns" schema={adminReturnViewSchema} title="退货" emptyTitle="本单无退货" read={api.returns}>
             {(rows) => <ReturnRows rows={rows} />}
           </OrderRecords>
         ) : null}
@@ -172,9 +175,11 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
 }
 
 // 只挂载当前分区，关闭时由查询层取消不再需要的读取。
-function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children }: {
+function OrderRecords<T>({ orderNo, resource, numberedPath, schema, title, emptyTitle, read, children }: {
   orderNo: string
   resource: string
+  numberedPath: string
+  schema: ZodType<T>
   title: string
   emptyTitle: string
   read: (query: { orderNo: string; after: string; limit: number }, signal: AbortSignal) => Promise<{
@@ -182,40 +187,40 @@ function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children 
   }>
   children: (rows: T[]) => ReactNode
 }) {
-  const [after, setAfter] = useState('0')
+  const [after, setAfter, page, setPage] = useLocalListPage<string>('0')
   const [pageSize, setPageSize] = usePageSize('order-detail-records', 20, () => setAfter('0'))
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: [resource, orderNo, after, pageSize],
     queryFn: ({ signal }) => read({ orderNo, after, limit: pageSize }, signal),
     retry: false,
-  })
+  }, { path: numberedPath, schema: schema, after: after, page: page, pageSize: pageSize, filters: { orderNo } }, pageProjection)
   return (
     <Panel className="table-panel">
       <h2 className="table-title">{title}</h2>
       <PageQueryGate query={query} emptyTitle={emptyTitle} emptyDetail="当前订单没有匹配记录。">
         {(page) => children(page.items)}
       </PageQueryGate>
-      <PagePager scope={[`order-detail-${resource}`, orderNo]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+      <NumberedPagePager numbered={query.numbered} onNumber={setPage} scope={[`order-detail-${resource}`, orderNo]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
         result={query.isSuccess ? query.data : undefined} />
     </Panel>
   )
 }
 
 function OrderRefunds({ orderNo }: { orderNo: string }) {
-  const [after, setAfter] = useState(0)
+  const [after, setAfter, refundPage, setRefundPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('order-detail-refunds', 20, () => setAfter(0))
-  const query = useQuery({
+  const query = useNumberedList({
     queryKey: ['admin-refunds', orderNo, 'ALL', after, pageSize],
     queryFn: ({ signal }) => api.refunds({ orderNo, status: 'ALL', after, limit: pageSize }, signal),
     retry: false,
-  })
+  }, { path: 'numbered-pages/refunds', schema: refundQueueItemSchema, after: after, page: refundPage, pageSize: pageSize, filters: { orderNo, status: 'ALL' } }, pageItems)
   return (
     <Panel className="table-panel">
       <h2 className="table-title">退款</h2>
       <QueryGate query={query} emptyTitle="本单无退款" emptyDetail="当前订单没有退款记录。">
         {(rows) => <RefundRows rows={rows} />}
       </QueryGate>
-      <CursorPager scope={['order-detail-refunds', orderNo]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+      <NumberedCursorPager numbered={query.numbered} onNumber={setRefundPage} scope={['order-detail-refunds', orderNo]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
         rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.cursor} />
     </Panel>
   )

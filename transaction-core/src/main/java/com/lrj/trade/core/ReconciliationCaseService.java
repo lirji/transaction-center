@@ -1,4 +1,10 @@
 package com.lrj.trade.core;
+import com.lrj.trade.core.query.AdminQuery;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
+import java.time.Instant;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import com.lrj.trade.core.mapper.ReconciliationCaseMapper;
 import java.time.*;
 import java.util.*;
@@ -7,7 +13,18 @@ import org.springframework.transaction.annotation.*;
 /** 可信报告只建立待核对差异，不能修改资金、审批或后台租约。 */
 @Service
 public class ReconciliationCaseService {
+    private static final Set<String> QUEUE_STATES = Set.of("OPEN", "PROCESSING", "CLOSED");
     private final ReconciliationCaseMapper mapper;private final ReconciliationOwnershipPort ownership;private final AuditWriter audit;private final Clock clock;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<Summary> numberedPage(long tenant, String state, int limit, long page, String number) {
+        Checks.positive(tenant);
+        if (state == null || !QUEUE_STATES.contains(state)) throw AdminQuery.invalid();
+        if (number != null) Checks.text(number, 64);
+        return AdminNumberedPage.of(page, limit, mapper.pageCount(tenant, state, number), Instant.now(),
+                offset -> mapper.pageAtOffset(tenant, state, number, limit, offset).stream().map(ReconciliationCaseService::safeView).toList());
+    }
+
     /** 来源凭证与差异审计共享数据库事务，无外部网络调用。 */
     public ReconciliationCaseService(ReconciliationCaseMapper mapper,ReconciliationOwnershipPort ownership,AuditWriter audit,Clock clock) {this.mapper=mapper;this.ownership=ownership;this.audit=audit;this.clock=clock;}
     /** 来源由可信入口配置传入；新传输事件可指向同一不可变业务内容。 */
@@ -51,10 +68,12 @@ public class ReconciliationCaseService {
     @Transactional(readOnly=true,timeout=5)
     public List<Summary> page(long tenant,String state,long after,int limit,String number) {
         Checks.positive(tenant);
-        if(state==null || !Set.of("OPEN","PROCESSING","CLOSED").contains(state) || after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","差异队列参数无效");
+        if(state==null || !QUEUE_STATES.contains(state) || after<0 || limit<1 || limit>100) throw new TradeException("INVALID_ARGUMENT","差异队列参数无效");
         if(number!=null) Checks.text(number,64);
-        return mapper.page(tenant,state,after,limit,number).stream().map(c->new Summary(c.id(),c.caseNo(),Long.toString(c.channelId()),c.statementDate(),c.differenceType(),c.status(),c.version(),c.businessNo())).toList();
+        return mapper.page(tenant,state,after,limit,number).stream().map(ReconciliationCaseService::safeView).toList();
     }
+    private static Summary safeView(ReconciliationCase c) { return new Summary(c.id(),c.caseNo(),Long.toString(c.channelId()),c.statementDate(),c.differenceType(),c.status(),c.version(),c.businessNo()); }
+
     /** 财务可信入口才可读取证据引用，普通管理列表不能取得此详情。 */
     @Transactional(readOnly=true,timeout=5)
     public Detail read(long tenant,String number) {

@@ -16,14 +16,25 @@
   <sql id="columns">r.id AS `cursor`, r.id AS quoteId, r.member_id AS memberId, r.payable_amount AS payableAmount, r.currency AS currency, r.pricing_policy AS pricingPolicy, r.created_at AS createdAt, r.expires_at AS expiresAt, r.version AS version,r.business_no AS businessNo</sql>
   <sql id="source">FROM tc_quote r </sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
-  <select id="page" resultMap="View" useCache="false" timeout="3">
-    SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+  <sql id="pageScope">
+    <include refid="source"/>
+    WHERE r.tenant_id=#{tenant}
     <if test="q.filters.quoteId != null">AND r.id=#{q.filters.quoteId}</if>
     <if test="q.filters.businessNo != null">AND r.business_no=#{q.filters.businessNo}</if>
     <if test="q.filters.memberId != null">AND r.member_id=#{q.filters.memberId}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
+  </sql>
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="pageScope"/>
+    AND r.id &gt; #{q.after}
     ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="pageCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="pageScope"/>
+  </select>
+  <select id="pageAtOffset" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="pageScope"/>
+    ORDER BY r.id ASC LIMIT #{q.limit} OFFSET #{offset}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>

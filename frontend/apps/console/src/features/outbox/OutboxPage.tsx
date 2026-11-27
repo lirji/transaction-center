@@ -1,9 +1,12 @@
+import { NumberedCursorPager } from '../../components/NumberedPager'
+import { outboxPublicationSchema, outboxTaskSchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Badge, Button, Field, Modal, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api, type OutboxPublication } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -19,16 +22,16 @@ export function OutboxPage() {
   const [params, setParams] = useSearchParams()
   const state = queueStates.find((value) => value === params.get('state')) ?? 'REVIEW'
   const [taskState, setTaskState] = useState<'READY' | 'RUNNING' | 'DONE' | 'REVIEW'>('REVIEW')
-  const [after, setAfter] = useState(0)
+  const [after, setAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('outbox', 50, () => setAfter(0))
-  const [taskAfter, setTaskAfter] = useState(0)
+  const [taskAfter, setTaskAfter, taskPage, setTaskPage] = useLocalListPage<number>(0)
   const [taskSize, setTaskSize] = usePageSize('outbox-tasks', 50, () => setTaskAfter(0))
   const [selected, setSelected] = useState<OutboxPublication>()
   const [reason, setReason] = useState('')
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
-  const publications = useQuery({ queryKey: ['outbox', state, after, pageSize], queryFn: () => api.outboxPublications(state, after, pageSize) })
-  const tasks = useQuery({ queryKey: ['outbox-tasks', taskState, taskAfter, taskSize], queryFn: () => api.outboxTasks(taskState, taskAfter, taskSize) })
+  const publications = useNumberedList({ queryKey: ['outbox', state, after, pageSize], queryFn: () => api.outboxPublications(state, after, pageSize) }, { path: 'numbered-operations/outbox-publications', schema: outboxPublicationSchema, after: after, page: page, pageSize: pageSize, filters: { state } }, pageItems)
+  const tasks = useNumberedList({ queryKey: ['outbox-tasks', taskState, taskAfter, taskSize], queryFn: () => api.outboxTasks(taskState, taskAfter, taskSize) }, { path: 'numbered-operations/outbox-tasks', schema: outboxTaskSchema, after: taskAfter, page: taskPage, pageSize: taskSize, filters: { state: taskState } }, pageItems)
   const replay = useMutation({
     mutationFn: (payload: { eventId: string; expectedVersion: number; reason: string; ticketRef: string }) =>
       api.replayOutbox(payload.eventId, { expectedVersion: payload.expectedVersion, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -87,7 +90,7 @@ export function OutboxPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['outbox', state]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+        <NumberedCursorPager numbered={publications.numbered} onNumber={setPage} scope={['outbox', state]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           rows={publications.isSuccess ? publications.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       <Panel className="table-panel">
@@ -119,7 +122,7 @@ export function OutboxPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['outbox-tasks', taskState]} after={taskAfter} onPage={setTaskAfter} pageSize={taskSize} onPageSize={setTaskSize}
+        <NumberedCursorPager numbered={tasks.numbered} onNumber={setTaskPage} scope={['outbox-tasks', taskState]} after={taskAfter} onPage={setTaskAfter} pageSize={taskSize} onPageSize={setTaskSize}
           rows={tasks.isSuccess ? tasks.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       {selected && (

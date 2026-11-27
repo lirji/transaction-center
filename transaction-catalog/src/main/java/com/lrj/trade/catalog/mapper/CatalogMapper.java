@@ -45,5 +45,12 @@ public interface CatalogMapper {
     List<Long> lockMutationVersion(@Param("tenant") long tenant,@Param("productId") long productId);
     /** 管理查询在本租户的完整数据范围执行筛选，先过滤再按主键分页。 */
     List<AdminProduct> listAdminProducts(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+    /** 查询总量使用与游标列表相同的租户及筛选条件。 */
+    long listAdminProductsCount(@Param("tenant") long tenant,@Param("q") AdminQuery query);
+    /** 在服务端核对过总量后对同一查询范围取指定页。 */
+    List<AdminProduct> listAdminProductsAtOffset(@Param("tenant") long tenant,@Param("q") AdminQuery query, @Param("offset") long offset);
 
+    /** 更新运营展示元数据，已冻结报价和 SKU 版本保持各自原有事实。 */
+    int setImage(@Param("tenant") long tenant, @Param("product") long product, @Param("version") long version,
+            @Param("imageUrl") String imageUrl);
 }

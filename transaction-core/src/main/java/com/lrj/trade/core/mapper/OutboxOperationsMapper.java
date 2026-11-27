@@ -15,4 +15,8 @@ public interface OutboxOperationsMapper {
     int replay(@Param("tenant") long tenant,@Param("eventId") String eventId,@Param("version") long version,@Param("base") long base);
     /** 租户内有界队列，不包含敏感载荷。 */
     List<OutboxPublication> page(@Param("tenant") long tenant,@Param("state") String state,@Param("after") long after,@Param("limit") int limit);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long pageCount(@Param("tenant") long tenant, @Param("state") String state);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<OutboxPublication> pageAtOffset(@Param("tenant") long tenant, @Param("state") String state, @Param("limit") int limit, @Param("offset") long offset);
 }

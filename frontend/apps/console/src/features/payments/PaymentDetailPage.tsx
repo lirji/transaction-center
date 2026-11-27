@@ -1,9 +1,12 @@
+import { NumberedPagePager } from '../../components/NumberedPager'
+import { adminAttemptViewSchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, PageHeader, PagePager, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Badge, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -12,7 +15,7 @@ import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
 
 export function PaymentDetailPage() {
   const { paymentNo = '' } = useParams()
-  const [after, setAfter] = useState('0')
+  const [after, setAfter, page, setPage] = useLocalListPage<string>('0')
   const [pageSize, setPageSize] = usePageSize('payment-attempts', 20, () => setAfter('0'))
   const [status, setStatus] = useState('')
   const detail = useQuery({
@@ -21,12 +24,12 @@ export function PaymentDetailPage() {
     retry: false,
     enabled: Boolean(paymentNo),
   })
-  const attempts = useQuery({
+  const attempts = useNumberedList({
     queryKey: ['admin-attempts', paymentNo, after, pageSize, status],
     queryFn: () => api.paymentAttempts(paymentNo, { after, limit: pageSize, status: status || undefined }),
     retry: false,
     enabled: Boolean(paymentNo),
-  })
+  }, { path: `numbered-pages/payment-attempts/${encodeURIComponent(paymentNo)}`, schema: adminAttemptViewSchema, after: after, page: page, pageSize: pageSize, filters: { status: status || undefined } }, pageProjection)
 
   if (detail.isLoading) {
     return <div className="workspace"><StateBanner tone="loading" title="正在读取支付" detail="正在获取当前记录。" /></div>
@@ -96,7 +99,7 @@ export function PaymentDetailPage() {
               </>
             )}
           </PageQueryGate>
-          <PagePager scope={['payment-attempts', paymentNo, status]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+          <NumberedPagePager numbered={attempts.numbered} onNumber={setPage} scope={['payment-attempts', paymentNo, status]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             result={attempts.isSuccess ? attempts.data : undefined} />
         </Panel>
       </div>

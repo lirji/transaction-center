@@ -59,7 +59,13 @@ public final class AdminQueryParameters {
         };
     }
     /** 页码和游标是两种定位方式，只接受单一页码且沿用原订单筛选校验。 */
-    public static OrderPage orderPage(MultiValueMap<String, String> params) {
+    public static Numbered orderPage(MultiValueMap<String, String> params) {
+        return numbered(params, input -> parse("order", input));
+    }
+
+    /** 把公用页码输入与各资源独立校验组合，旧接口继续只消费原参数。 */
+    public static Numbered numbered(MultiValueMap<String, String> params,
+            java.util.function.Function<MultiValueMap<String, String>, AdminQuery> parseFilters) {
         Map<String, List<String>> input = new HashMap<>(params);
         var pages = input.remove("page");
         if (input.containsKey("after") || pages != null && pages.size() != 1) {
@@ -69,11 +75,11 @@ public final class AdminQueryParameters {
         if (page > AdminNumbers.MAX_SAFE_INTEGER) {
             throw AdminQuery.invalid();
         }
-        return new OrderPage(parse("order", new LinkedMultiValueMap<>(input)), page);
+        return new Numbered(parseFilters.apply(new LinkedMultiValueMap<>(input)), page);
     }
 
     /** 页码和筛选条件独立，查询总量始终基于完整筛选范围。 */
-    public record OrderPage(AdminQuery query, long page) {}
+    public record Numbered(AdminQuery query, long page) {}
 
     /** 审计使用时间游标，拒绝混入通用的主键游标或重复条件。 */
     public static AdminQuery operationAudit(MultiValueMap<String,String> params) {

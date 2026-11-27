@@ -12,6 +12,14 @@ import org.springframework.transaction.annotation.*;
 @Transactional(readOnly=true,timeout=3,isolation=Isolation.REPEATABLE_READ,propagation=Propagation.REQUIRES_NEW)
 public class AdminQuoteQueryService {
     private final AdminQuoteMapper mapper;private final Clock clock;private final QuoteMapper quotes;
+    /** 使用同一只读快照读取总量与指定页，并复用列表投影。 */
+    public AdminNumberedPage<AdminQuoteView> numberedPage(long tenant, AdminQuery query, long page) {
+        Checks.positive(tenant);
+        var at = clock.instant();
+        return AdminNumberedPage.of(page, query.limit(), mapper.pageCount(tenant, query), at,
+                offset -> mapper.pageAtOffset(tenant, query, offset));
+    }
+
     /** 仅注入本领域只读仓储；不调用网络渠道或任务写端口。 */
     public AdminQuoteQueryService(AdminQuoteMapper mapper,Clock clock,QuoteMapper quotes) { this.mapper=mapper;this.clock=clock;this.quotes=quotes; }
     /** 父资源校验和分页共用同一快照，不以有无子项推断父资源归属。 */

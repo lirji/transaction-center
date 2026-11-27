@@ -1,5 +1,10 @@
 package com.lrj.trade.member;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Isolation;
+import java.time.Instant;
+import com.lrj.trade.core.query.AdminNumberedPage;
 import com.lrj.trade.core.*;
 import java.net.URI;
 import java.util.List;
@@ -13,6 +18,14 @@ public class ConsentDocumentService {
     private final ConsentDocumentMapper mapper;
     private final Commands commands;
     private final AuditWriter audit;
+    /** 使用同一快照读取准确条数和页内记录，沿用当前租户与允许的业务筛选。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<Document> numberedDocuments(long tenant, int limit, long page) {
+        Checks.positive(tenant);
+        return AdminNumberedPage.of(page, limit, mapper.listDocumentsCount(tenant), Instant.now(),
+                offset -> mapper.listDocumentsAtOffset(tenant, limit, offset));
+    }
+
     /** 使用业务幂等和审计，已发布的版本不提供覆盖接口。 */
     public ConsentDocumentService(ConsentDocumentMapper mapper,Commands commands,AuditWriter audit) {
         this.mapper=mapper; this.commands=commands; this.audit=audit;

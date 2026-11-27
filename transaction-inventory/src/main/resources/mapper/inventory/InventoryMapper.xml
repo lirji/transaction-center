@@ -133,30 +133,59 @@
     ]]>
   </select>
 
-  <select id="listAdminBalances" resultMap="Balance" useCache="false" timeout="3">
-    SELECT id AS id,warehouse_id AS warehouseId,sku_id AS skuId,stock_total AS stockTotal,available AS available,reserved AS reserved,sold AS sold,version AS version
-    FROM tc_inventory_balance WHERE tenant_id=#{tenant} AND id &gt; #{q.after}
+  <sql id="listAdminBalancesScope">
+    FROM tc_inventory_balance WHERE tenant_id=#{tenant}
     <if test="q.filters.warehouseId != null">AND warehouse_id=#{q.filters.warehouseId}</if>
     <if test="q.filters.skuId != null">AND sku_id=#{q.filters.skuId}</if>
     <if test="q.filters.maxAvailable != null">AND available &lt;= #{q.filters.maxAvailable}</if>
+  </sql>
+  <select id="listAdminBalances" resultMap="Balance" useCache="false" timeout="3">
+    SELECT id AS id,warehouse_id AS warehouseId,sku_id AS skuId,stock_total AS stockTotal,available AS available,reserved AS reserved,sold AS sold,version AS version <include refid="listAdminBalancesScope"/>
+    AND id &gt; #{q.after}
     ORDER BY id LIMIT #{q.limit}
+  </select>
+  <select id="listAdminBalancesCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listAdminBalancesScope"/>
+  </select>
+  <select id="listAdminBalancesAtOffset" resultMap="Balance" useCache="false" timeout="3">
+    SELECT id AS id,warehouse_id AS warehouseId,sku_id AS skuId,stock_total AS stockTotal,available AS available,reserved AS reserved,sold AS sold,version AS version <include refid="listAdminBalancesScope"/>
+    ORDER BY id LIMIT #{q.limit} OFFSET #{offset}
   </select>
 
   <!-- 租户内有界分页仓库，前端无需硬编码编号。 -->
+  <sql id="listWarehousesScope">
+    FROM tc_warehouse WHERE tenant_id=#{tenant}
+  </sql>
   <select id="listWarehouses" resultMap="Warehouse" useCache="false">
-    <![CDATA[
-      SELECT id AS id,warehouse_no AS warehouseNo,name AS name,version AS version
-      FROM tc_warehouse WHERE tenant_id=#{tenant} AND id>#{after} ORDER BY id LIMIT #{limit}
-    ]]>
+    SELECT id AS id,warehouse_no AS warehouseNo,name AS name,version AS version
+      <include refid="listWarehousesScope"/>
+    AND id>#{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="listWarehousesCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listWarehousesScope"/>
+  </select>
+  <select id="listWarehousesAtOffset" resultMap="Warehouse" useCache="false" timeout="3">
+    SELECT id AS id,warehouse_no AS warehouseNo,name AS name,version AS version
+      <include refid="listWarehousesScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
   </select>
 
   <!-- 强制仓库及规格过滤，使用索引有界查询流水。 -->
+  <sql id="listLedgerEntriesScope">
+    FROM tc_inventory_ledger WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId}
+  </sql>
   <select id="listLedgerEntries" resultMap="LedgerEntry" useCache="false">
-    <![CDATA[
-      SELECT id AS id,operation_ref AS operationRef,warehouse_id AS warehouseId,sku_id AS skuId,operation_type AS operationType,available_delta AS availableDelta,reserved_delta AS reservedDelta,sold_delta AS soldDelta,total_delta AS totalDelta,reason AS reason,created_at AS occurredAt
-      FROM tc_inventory_ledger WHERE tenant_id=#{tenant} AND warehouse_id=#{warehouseId} AND sku_id=#{skuId} AND id>#{after}
-      ORDER BY id LIMIT #{limit}
-    ]]>
+    SELECT id AS id,operation_ref AS operationRef,warehouse_id AS warehouseId,sku_id AS skuId,operation_type AS operationType,available_delta AS availableDelta,reserved_delta AS reservedDelta,sold_delta AS soldDelta,total_delta AS totalDelta,reason AS reason,created_at AS occurredAt
+      <include refid="listLedgerEntriesScope"/>
+    AND id>#{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="listLedgerEntriesCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listLedgerEntriesScope"/>
+  </select>
+  <select id="listLedgerEntriesAtOffset" resultMap="LedgerEntry" useCache="false" timeout="3">
+    SELECT id AS id,operation_ref AS operationRef,warehouse_id AS warehouseId,sku_id AS skuId,operation_type AS operationType,available_delta AS availableDelta,reserved_delta AS reservedDelta,sold_delta AS soldDelta,total_delta AS totalDelta,reason AS reason,created_at AS occurredAt
+      <include refid="listLedgerEntriesScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
   </select>
 
   <!-- 核验目标仓库归属，防止跨租户库存调整。 -->

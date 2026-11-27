@@ -21,9 +21,9 @@
   <sql id="columns">r.id AS `cursor`, r.refund_no AS refundNo, r.order_no AS orderNo, r.member_id AS memberId, r.amount AS amount, r.currency AS currency, r.status AS status, r.approval_ref AS approvalRef, r.approval_deadline AS approvalDeadline, r.policy_version AS policyVersion, r.version AS version, r.created_at AS createdAt, r.business_no AS businessNo, o.business_no AS orderBusinessNo,r.approval_business_no AS approvalBusinessNo</sql>
   <sql id="source">FROM tc_refund r JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id</sql>
   <!-- 列名及关联均为静态白名单，任何分支都保留租户条件。 -->
-  <select id="page" resultMap="View" useCache="false" timeout="3">
-    SELECT <include refid="columns"/> <include refid="source"/>
-    WHERE r.tenant_id=#{tenant} AND r.id &gt; #{q.after}
+  <sql id="pageScope">
+    <include refid="source"/>
+    WHERE r.tenant_id=#{tenant}
     <if test="q.filters.refundNo != null">AND <choose><when test='q.filters.refundNo.startsWith("TRD-RFD-")'>r.business_no=#{q.filters.refundNo}</when><otherwise>r.refund_no=#{q.filters.refundNo}</otherwise></choose></if>
     <if test="q.filters.orderNo != null">AND <choose><when test='q.filters.orderNo.startsWith("TRD-ORD-")'>o.business_no=#{q.filters.orderNo}</when><otherwise>r.order_no=#{q.filters.orderNo}</otherwise></choose></if>
     <if test="q.filters.approvalNo != null">AND <choose>
@@ -34,7 +34,18 @@
     <if test="q.filters.status != null and q.filters.status != 'ALL'">AND r.status=#{q.filters.status}</if>
     <if test="q.createdFrom != null">AND r.created_at &gt;= #{q.createdFrom} AND r.created_at &lt; #{q.createdTo}</if>
     <if test="q.filters.approvalDeadlineFrom != null">AND r.approval_deadline &gt;= #{q.filters.approvalDeadlineFrom} AND r.approval_deadline &lt; #{q.filters.approvalDeadlineTo}</if>
+  </sql>
+  <select id="page" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="pageScope"/>
+    AND r.id &gt; #{q.after}
     ORDER BY r.id ASC LIMIT #{q.fetchLimit}
+  </select>
+  <select id="pageCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="pageScope"/>
+  </select>
+  <select id="pageAtOffset" resultMap="View" useCache="false" timeout="3">
+    SELECT <include refid="columns"/> <include refid="pageScope"/>
+    ORDER BY r.id ASC LIMIT #{q.limit} OFFSET #{offset}
   </select>
   <select id="find" resultMap="View" useCache="false" timeout="3">
     SELECT <include refid="columns"/> <include refid="source"/>

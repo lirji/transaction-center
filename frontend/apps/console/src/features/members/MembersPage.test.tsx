@@ -18,7 +18,8 @@ describe('MembersPage', () => {
   })
 
   it('renders members from the admin API', async () => {
-    vi.mocked(fetch).mockResolvedValue(json([{
+    vi.mocked(fetch).mockImplementation(async (input) => String(input).includes('/numbered-pages/')
+      ? json({}, 404) : json([{
       memberId: '11',
       displayName: '林若',
       status: 'ACTIVE',
@@ -35,6 +36,7 @@ describe('MembersPage', () => {
   it('submits freeze with expectedVersion and If-Match', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockImplementation(async (input, init) => {
+      if (/\/admin\/numbered-(pages|operations)\//.test(String(input))) return new Response(null, { status: 404 })
       if (String(input).includes(':change-status') && (init as RequestInit | undefined)?.method === 'POST') {
         return json({ resourceId: '11' })
       }
@@ -64,7 +66,7 @@ describe('MembersPage', () => {
   })
 
   it('hides eligibility without evidence scope', async () => {
-    vi.mocked(fetch).mockResolvedValue(json([]))
+    vi.mocked(fetch).mockImplementation(async (input) => /\/admin\/numbered-(pages|operations)\//.test(String(input)) ? json({}, 404) : json([]))
     renderWithApp(<MembersPage />, { scopes: [TRADE_ADMIN] })
     await screen.findByText('会员')
     expect(screen.queryByText('资格评估')).not.toBeInTheDocument()
@@ -72,7 +74,7 @@ describe('MembersPage', () => {
 
   it('does not POST campaign eligibility without campaignStartAt', async () => {
     const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue(json([]))
+    fetchMock.mockImplementation(async (input) => /\/admin\/numbered-(pages|operations)\//.test(String(input)) ? json({}, 404) : json([]))
     renderWithApp(<MembersPage />, { scopes: [TRADE_ADMIN, TRADE_ADMIN_EVIDENCE_READ] })
     await screen.findByText('资格评估')
     await userEvent.type(screen.getByLabelText('memberId'), '11')

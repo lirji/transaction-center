@@ -1,9 +1,12 @@
+import { NumberedCursorPager } from '../../components/NumberedPager'
+import { reconciliationCaseSchema, reconciliationOperationSchema } from '../../shared/api/schemas'
+import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Badge, Button, Field, Modal, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api, type ReconciliationCase } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -19,9 +22,9 @@ export function ReconciliationPage() {
   const [params, setParams] = useSearchParams()
   const state = queueStates.find((value) => value === params.get('state')) ?? 'OPEN'
   const [opState, setOpState] = useState<'QUEUED' | 'RUNNING' | 'RESULT_ACCEPTED' | 'REVIEW'>('REVIEW')
-  const [after, setAfter] = useState(0)
+  const [after, setAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('recon-cases', 50, () => setAfter(0))
-  const [opAfter, setOpAfter] = useState(0)
+  const [opAfter, setOpAfter, operationPage, setOperationPage] = useLocalListPage<number>(0)
   const [operationSize, setOperationSize] = usePageSize('recon-operations', 50, () => setOpAfter(0))
   const [queryNumber, setQueryNumber] = useState('')
   const [number, setNumber] = useState('')
@@ -30,8 +33,8 @@ export function ReconciliationPage() {
   const [reason, setReason] = useState('')
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
-  const cases = useQuery({ queryKey: ['recon-cases', state, after, pageSize, number], queryFn: () => api.reconciliationCases(state, after, pageSize, number || undefined) })
-  const operations = useQuery({ queryKey: ['recon-ops', opState, opAfter, operationSize, number], queryFn: () => api.reconciliationOperations(opState, opAfter, operationSize, number || undefined) })
+  const cases = useNumberedList({ queryKey: ['recon-cases', state, after, pageSize, number], queryFn: () => api.reconciliationCases(state, after, pageSize, number || undefined) }, { path: 'numbered-operations/reconciliation-cases', schema: reconciliationCaseSchema, after: after, page: page, pageSize: pageSize, filters: { state, number: number || undefined } }, pageItems)
+  const operations = useNumberedList({ queryKey: ['recon-ops', opState, opAfter, operationSize, number], queryFn: () => api.reconciliationOperations(opState, opAfter, operationSize, number || undefined) }, { path: 'numbered-operations/reconciliation-operations', schema: reconciliationOperationSchema, after: opAfter, page: operationPage, pageSize: operationSize, filters: { state: opState, number: number || undefined } }, pageItems)
   const queryCase = useMutation({
     mutationFn: (payload: { caseNo: string; expectedVersion: number; action: 'QUERY_PAYMENT' | 'QUERY_REFUND'; reason: string; ticketRef: string }) =>
       api.queryReconciliationCase(payload.caseNo, { expectedVersion: payload.expectedVersion, action: payload.action, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -94,7 +97,7 @@ export function ReconciliationPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['recon-cases', state, number]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+        <NumberedCursorPager numbered={cases.numbered} onNumber={setPage} scope={['recon-cases', state, number]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           rows={cases.isSuccess ? cases.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       <Panel className="table-panel">
@@ -126,7 +129,7 @@ export function ReconciliationPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['recon-operations', opState, number]} after={opAfter} onPage={setOpAfter} pageSize={operationSize} onPageSize={setOperationSize}
+        <NumberedCursorPager numbered={operations.numbered} onNumber={setOperationPage} scope={['recon-operations', opState, number]} after={opAfter} onPage={setOpAfter} pageSize={operationSize} onPageSize={setOperationSize}
           rows={operations.isSuccess ? operations.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       {selected && (

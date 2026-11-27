@@ -19,4 +19,8 @@ public interface ReconciliationCaseMapper {
     int finish(@Param("tenant") long tenant,@Param("id") long id,@Param("number") String number);
     /** 租户状态队列有界遍历。 */
     List<ReconciliationCase> page(@Param("tenant") long tenant,@Param("state") String state,@Param("after") long after,@Param("limit") int limit,@Param("number") String number);
+    /** 与旧列表共享查询范围，计算指定条件下的全量条数。 */
+    long pageCount(@Param("tenant") long tenant, @Param("state") String state, @Param("number") String number);
+    /** 取准确总量已核对后的页内安全投影。 */
+    List<ReconciliationCase> pageAtOffset(@Param("tenant") long tenant, @Param("state") String state, @Param("number") String number, @Param("limit") int limit, @Param("offset") long offset);
 }

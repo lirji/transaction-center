@@ -1,13 +1,16 @@
 package com.lrj.trade.member;
 
 import com.lrj.trade.core.query.AdminQuery;
+import com.lrj.trade.core.query.AdminNumberedPage;
+import java.time.Instant;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import com.lrj.trade.core.*;
 import java.util.List;
 import com.lrj.trade.member.mapper.MemberMapper;
 import com.lrj.trade.member.model.*;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 /** 业务会员服务，不存储密码且不替代登录系统。 */
 @Service
@@ -17,6 +20,15 @@ public class MemberService implements MemberTradingPort {
     private final Outbox outbox;
     private final AuditWriter audit;
     private final java.time.Clock clock;
+    /** 使用同一只读快照读取总量与指定页，并复用列表投影。 */
+    @Transactional(readOnly = true, timeout = 3, isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+    public AdminNumberedPage<Member> numberedPage(long tenant, AdminQuery query, long page) {
+        Checks.positive(tenant);
+        var at = Instant.now();
+        return AdminNumberedPage.of(page, query.limit(), mapper.listAdminMembersCount(tenant, query), at,
+                offset -> mapper.listAdminMembersAtOffset(tenant, query, offset));
+    }
+
     /** 管理端按已校验条件读取当前租户数据，保留原交易入口查询。 */
     public List<Member> adminList(long tenant,AdminQuery query) {
         Checks.positive(tenant);

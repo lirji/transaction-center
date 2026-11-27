@@ -3,6 +3,8 @@ import { test, expect, type Locator } from '@playwright/test'
 test.beforeEach(async ({ page }) => {
   // 其余契约用例继续覆盖旧服务、旧链接和已知游标。
   await page.route('**/api/v1/trade/admin/order-pages?**', (route) => route.fulfill({ status: 404 }))
+  await page.route('**/api/v1/trade/admin/numbered-*/**', (route) => route.fulfill({ status: 404 }))
+  await page.route('**/api/v1/trade/admin/operations/financial-fact-pages?**', (route) => route.fulfill({ status: 404 }))
 })
 
 async function choose(control: Locator, label: string) {
@@ -190,7 +192,7 @@ test.describe('transaction console', () => {
     refuseRefundRead = false
     await page.getByRole('button', { name: '重试', exact: true }).click()
     await expect(page.getByRole('heading', { name: '本单无退款' })).toBeVisible()
-    expect([...new Set(requests)]).toEqual(['orders', 'orders/ORD-1', 'refunds'])
+    expect([...new Set(requests)]).toEqual(['orders', 'orders/ORD-1', 'numbered-pages/refunds', 'refunds'])
     await page.getByRole('link', { name: '返回订单列表' }).click()
     await expect(page).toHaveURL(/\/orders\?status=PAID&after=10$/)
   })

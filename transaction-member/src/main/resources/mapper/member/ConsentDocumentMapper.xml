@@ -28,11 +28,21 @@
   </select>
 
   <!-- 有界查询已发布条款，不跨租户合并版本。 -->
+  <sql id="listDocumentsScope">
+    FROM tc_consent_document
+      WHERE tenant_id=#{tenant}
+  </sql>
   <select id="listDocuments" resultMap="Document" useCache="false">
-    <![CDATA[
-      SELECT id AS id,purpose AS purpose,document_version AS documentVersion,title AS title,content_url AS contentUrl,content_hash AS contentHash
-      FROM tc_consent_document
-      WHERE tenant_id=#{tenant} AND id>#{after} ORDER BY id LIMIT #{limit}
-    ]]>
+    SELECT id AS id,purpose AS purpose,document_version AS documentVersion,title AS title,content_url AS contentUrl,content_hash AS contentHash
+      <include refid="listDocumentsScope"/>
+    AND id>#{after} ORDER BY id LIMIT #{limit}
+  </select>
+  <select id="listDocumentsCount" resultType="long" useCache="false" timeout="3">
+    SELECT COUNT(*) <include refid="listDocumentsScope"/>
+  </select>
+  <select id="listDocumentsAtOffset" resultMap="Document" useCache="false" timeout="3">
+    SELECT id AS id,purpose AS purpose,document_version AS documentVersion,title AS title,content_url AS contentUrl,content_hash AS contentHash
+      <include refid="listDocumentsScope"/>
+    ORDER BY id LIMIT #{limit} OFFSET #{offset}
   </select>
 </mapper>

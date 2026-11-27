@@ -10796,6 +10796,2611 @@
           }
         }
       }
+    },
+    "/api/v1/trade/admin/numbered-pages/{resource}": {
+      "get": {
+        "operationId": "numberedTradeList",
+        "summary": "按页码定位管理列表",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "页码和总数基于本次只读快照。筛选按资源限定，原游标接口继续有效。jobs 额外检查 trade.admin.jobs.read。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "payments",
+                "payment-receipts",
+                "returns",
+                "quotes",
+                "refunds",
+                "jobs",
+                "products",
+                "members",
+                "inventories",
+                "warehouses",
+                "payment-channels",
+                "consent-documents",
+                "inventory-ledger"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "financialStatus",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "warehouseId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skuId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "maxAvailable",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "productNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skuNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "returnNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderItemId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paymentNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "receiptNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "channelCode",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "disposition",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "abnormalOnly",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalDeadlineFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalDeadlineTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refundNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approvalNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quoteId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "businessNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "jobType",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "leaseExpired",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "callbackNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirmedFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirmedTo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "registeredFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "registeredTo",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NumberedPageMetadata"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/AdminPaymentView"
+                              },
+                              {
+                                "$ref": "#/components/schemas/AdminReceiptView"
+                              },
+                              {
+                                "$ref": "#/components/schemas/AdminReturnView"
+                              },
+                              {
+                                "$ref": "#/components/schemas/AdminQuoteView"
+                              },
+                              {
+                                "$ref": "#/components/schemas/RefundQueueItem"
+                              },
+                              {
+                                "$ref": "#/components/schemas/AdminJobView"
+                              },
+                              {
+                                "$ref": "#/components/schemas/AdminProduct"
+                              },
+                              {
+                                "$ref": "#/components/schemas/Member"
+                              },
+                              {
+                                "$ref": "#/components/schemas/Balance"
+                              },
+                              {
+                                "$ref": "#/components/schemas/Warehouse"
+                              },
+                              {
+                                "$ref": "#/components/schemas/ChannelView"
+                              },
+                              {
+                                "$ref": "#/components/schemas/ConsentDocument"
+                              },
+                              {
+                                "$ref": "#/components/schemas/LedgerEntry"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/numbered-operations/{resource}": {
+      "get": {
+        "operationId": "numberedOperationalList",
+        "summary": "按页码定位管理列表",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "页码和总数基于本次只读快照。筛选按资源限定，原游标接口继续有效。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "operation-audits",
+                "outbox-publications",
+                "outbox-tasks",
+                "reconciliation-cases",
+                "reconciliation-operations"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "number",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resourceType",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resourceRef",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NumberedPageMetadata"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/OperationAuditEntry"
+                              },
+                              {
+                                "$ref": "#/components/schemas/OutboxPublication"
+                              },
+                              {
+                                "$ref": "#/components/schemas/OutboxTaskView"
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "caseNo": {
+                                    "type": "string"
+                                  },
+                                  "channelId": {
+                                    "type": "string"
+                                  },
+                                  "statementDate": {
+                                    "type": "string"
+                                  },
+                                  "differenceType": {
+                                    "type": "string"
+                                  },
+                                  "status": {
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "caseNo",
+                                  "channelId",
+                                  "statementDate",
+                                  "differenceType",
+                                  "status",
+                                  "version"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "operationNo": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "caseNo": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "action": {
+                                    "type": "string",
+                                    "enum": [
+                                      "QUERY_PAYMENT",
+                                      "QUERY_REFUND"
+                                    ]
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "QUEUED",
+                                      "RUNNING",
+                                      "RESULT_ACCEPTED",
+                                      "REVIEW"
+                                    ]
+                                  },
+                                  "lastCode": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "acceptedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "operationNo",
+                                  "caseNo",
+                                  "action",
+                                  "status",
+                                  "lastCode",
+                                  "version",
+                                  "acceptedAt"
+                                ]
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/numbered-pages/payment-attempts/{paymentNo}": {
+      "get": {
+        "operationId": "numberedPaymentAttempts",
+        "summary": "父资源内的编号分页",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "保持原父资源租户约束、原顺序及安全投影。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "paymentNo",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NumberedPageMetadata"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AdminAttemptView"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/numbered-pages/product-skus/{productId}": {
+      "get": {
+        "operationId": "numberedProductSkus",
+        "summary": "父资源内的编号分页",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "保持原父资源租户约束、原顺序及安全投影。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NumberedPageMetadata"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Sku"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/numbered-operations/refund-audits/{refundNo}": {
+      "get": {
+        "operationId": "numberedRefundAudits",
+        "summary": "父资源内的编号分页",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "保持原父资源租户约束、原顺序及安全投影。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "refundNo",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NumberedPageMetadata"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "action",
+                              "actorId",
+                              "resourceId",
+                              "occurredAt",
+                              "result"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "requestId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "traceId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "actorId": {
+                                "type": "string"
+                              },
+                              "resourceId": {
+                                "type": "string"
+                              },
+                              "occurredAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "result": {
+                                "type": "string"
+                              },
+                              "errorCode": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "effectId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "beforeVersion": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "afterVersion": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "orderNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "businessNo": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "amountMinor": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "currency": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "beforeState": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "afterState": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/operations/financial-fact-pages": {
+      "get": {
+        "operationId": "numberedFinancialFacts",
+        "summary": "资金事实编号分页",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "与经营汇总共用资金确认口径，使用同快照读取准确总量。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NORMAL_RECEIPT",
+                "ABNORMAL_RECEIPT",
+                "NORMAL_REFUND",
+                "ABNORMAL_REFUND",
+                "NET"
+              ]
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "ledgerNo",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/NumberedPageMetadata"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OperationsFinancialFact"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/operations/analysis": {
+      "get": {
+        "operationId": "tradeOperationsAnalysis",
+        "summary": "订单状态与日趋势",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "北京时间自然日，按订单创建或资金确认时刻归组。转化分子是本期创建有应付额订单中、结束时点前已确认正常实收的订单。状态为快照时的状态。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeOperationsAnalysis"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/products/{productId}/image": {
+      "patch": {
+        "operationId": "setProductDisplayImage",
+        "summary": "保存商品展示图。空地址清除图片，使用商品版本和幂等键。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "保存商品展示图。空地址清除图片，使用商品版本和幂等键。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "imageUrl": {
+                    "type": [
+                      "null",
+                      "string"
+                    ],
+                    "format": "uri",
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "version",
+                  "imageUrl"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/inventory-alerts": {
+      "get": {
+        "operationId": "inventoryAlerts",
+        "summary": "实际库存预警，按仓库与 SKU 读取全量状态统计和编号页。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "实际库存预警，按仓库与 SKU 读取全量状态统计和编号页。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "warehouseId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skuId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OUT_OF_STOCK",
+                "LOW",
+                "UNCONFIGURED",
+                "NORMAL"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/NumberedPageMetadata"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "warehouseId": {
+                                    "type": "string"
+                                  },
+                                  "skuId": {
+                                    "type": "string"
+                                  },
+                                  "available": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "reorderThreshold": {
+                                    "type": [
+                                      "null",
+                                      "integer"
+                                    ],
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "revision": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OUT_OF_STOCK",
+                                      "LOW",
+                                      "UNCONFIGURED",
+                                      "NORMAL"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "warehouseId",
+                                  "skuId",
+                                  "available",
+                                  "reorderThreshold",
+                                  "revision",
+                                  "state"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "items"
+                          ]
+                        }
+                      ]
+                    },
+                    "totals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "OUT_OF_STOCK",
+                              "LOW",
+                              "UNCONFIGURED",
+                              "NORMAL"
+                            ]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "rows",
+                    "totals"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/inventory-alerts/{warehouseId}/{skuId}": {
+      "patch": {
+        "operationId": "saveInventoryAlertThreshold",
+        "summary": "保存独立阈值版本，留空表示清除规则。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "保存独立阈值版本，留空表示清除规则。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "warehouseId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "skuId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "version"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reorderThreshold": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ],
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "revision",
+                  "reorderThreshold"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/products/bulk-import": {
+      "post": {
+        "operationId": "bulkImportProductDrafts",
+        "summary": "导入 1 至 100 个草稿。同一批在同一事务提交或回滚。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "导入 1 至 100 个草稿。同一批在同一事务提交或回滚。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "reference": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "const": "COMPLETED"
+                          }
+                        },
+                        "required": [
+                          "reference",
+                          "state"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productNo": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "skuNo": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "unitPrice": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "currency": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{3}$"
+                        }
+                      },
+                      "required": [
+                        "productNo",
+                        "name",
+                        "skuNo",
+                        "unitPrice",
+                        "currency"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "items"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/products/bulk-state": {
+      "post": {
+        "operationId": "bulkChangeProductState",
+        "summary": "按选中的商品版本批量上架或下架，每批 1 至 100 个商品。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "按选中的商品版本批量上架或下架，每批 1 至 100 个商品。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "reference": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "const": "COMPLETED"
+                          }
+                        },
+                        "required": [
+                          "reference",
+                          "state"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "PUBLISH",
+                      "OFFLINE"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "productId",
+                        "version"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "action",
+                  "items"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/exports/orders": {
+      "get": {
+        "operationId": "exportOrdersCsv",
+        "summary": "按现有筛选导出同一快照的安全订单列。超过 50,000 条或超出查询预算时返回失败，其余导出包含完整筛选结果。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "按现有筛选导出同一快照的安全订单列。超过 50,000 条或超出查询预算时返回失败，其余导出包含完整筛选结果。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orderNo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "memberId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING_PAYMENT",
+                "CLOSING",
+                "CANCELLED",
+                "PAID",
+                "FULFILLING",
+                "COMPLETED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "financialStatus",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "UNPAID",
+                "NO_PAYMENT_REQUIRED",
+                "PAID",
+                "PARTIALLY_REFUNDED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "warehouseId",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ID_ASC",
+                "CREATED_DESC"
+              ],
+              "default": "ID_ASC"
+            },
+            "description": "CREATED_DESC 按创建时间和主键降序，否则按主键升序。"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/operations/linked-checkouts": {
+      "get": {
+        "operationId": "linkedCheckoutSources",
+        "summary": "交易侧已持久化的商城订单、来源店铺和预算回执。需要业务证据读取授权。",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "交易侧已持久化的商城订单、来源店铺和预算回执。需要业务证据读取授权。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.evidence.read"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "storeRef",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/NumberedPageMetadata"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "orderNo": {
+                                    "type": "string"
+                                  },
+                                  "orderBusinessNo": {
+                                    "type": [
+                                      "null",
+                                      "string"
+                                    ]
+                                  },
+                                  "commerceTenant": {
+                                    "type": "string"
+                                  },
+                                  "storeId": {
+                                    "type": "string"
+                                  },
+                                  "commerceQuoteId": {
+                                    "type": "string"
+                                  },
+                                  "fundingApplicationId": {
+                                    "type": [
+                                      "null",
+                                      "string"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": [
+                                  "orderNo",
+                                  "orderBusinessNo",
+                                  "commerceTenant",
+                                  "storeId",
+                                  "commerceQuoteId",
+                                  "fundingApplicationId",
+                                  "createdAt"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "items"
+                          ]
+                        }
+                      ]
+                    },
+                    "fundingCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "frozenDiscount": {
+                      "type": "string",
+                      "pattern": "^[0-9]+$"
+                    }
+                  },
+                  "required": [
+                    "rows",
+                    "fundingCount",
+                    "frozenDiscount"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11245,6 +13850,14 @@
           "productNo": {
             "type": "string",
             "maxLength": 64
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri",
+            "maxLength": 1024
           }
         },
         "required": [
@@ -15235,6 +17848,157 @@
         },
         "required": [
           "items",
+          "page",
+          "pageSize",
+          "totalCount",
+          "totalPages",
+          "observedAt"
+        ]
+      },
+      "TradeOperationsAnalysis": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "payableCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "convertedCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "orderStates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "payableCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "convertedCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "status",
+                "count",
+                "payableCount",
+                "convertedCount"
+              ]
+            }
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "orderCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "paidOrderCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "normalReceipt": {
+                  "type": "string",
+                  "pattern": "^-?[0-9]+$"
+                },
+                "normalRefund": {
+                  "type": "string",
+                  "pattern": "^-?[0-9]+$"
+                },
+                "netReceipt": {
+                  "type": "string",
+                  "pattern": "^-?[0-9]+$"
+                }
+              },
+              "required": [
+                "day",
+                "orderCount",
+                "paidOrderCount",
+                "normalReceipt",
+                "normalRefund",
+                "netReceipt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "observedAt",
+          "currency",
+          "payableCount",
+          "convertedCount",
+          "orderStates",
+          "daily"
+        ]
+      },
+      "NumberedPageMetadata": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
           "page",
           "pageSize",
           "totalCount",

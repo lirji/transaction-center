@@ -1,19 +1,12 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useId, useState, type ComponentProps, type FormEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Select } from './Select'
-import { Button } from './ui'
+import { Button, CursorPager, PagePager } from './ui'
 import { pageSizes } from '../shared/ui/usePageSize'
 import { formatBeijingTime } from '../shared/ui/display'
+import type { NumberedPageMetadata } from '../shared/api/schemas'
 
 const integer = new Intl.NumberFormat('zh-CN')
-
-type PageResult = {
-  page: number
-  totalPages: number
-  totalCount: number
-  pageSize: number
-  observedAt: string
-}
 
 function JumpToPage({ page, totalPages, onPage }: {
   page: number
@@ -48,7 +41,7 @@ function JumpToPage({ page, totalPages, onPage }: {
 }
 
 export function NumberedPager({ result, onPage, onPageSize }: {
-  result: PageResult
+  result: NumberedPageMetadata
   onPage: (page: number) => void
   onPageSize: (size: number) => void
 }) {
@@ -77,4 +70,22 @@ export function NumberedPager({ result, onPage, onPageSize }: {
       </div>
     </nav>
   )
+}
+
+type NumberedNavigation = {
+  numbered?: NumberedPageMetadata
+  onNumber: (page: number) => void
+}
+
+export function NumberedPagePager({ numbered, onNumber, ...legacy }: NumberedNavigation & ComponentProps<typeof PagePager>) {
+  return numbered && legacy.onPageSize
+    ? <NumberedPager result={numbered} onPage={onNumber} onPageSize={legacy.onPageSize} />
+    : <PagePager {...legacy} />
+}
+
+export function NumberedCursorPager<Row>({ numbered, onNumber, ...legacy }:
+  NumberedNavigation & Parameters<typeof CursorPager<Row>>[0]) {
+  return numbered && legacy.onPageSize
+    ? <NumberedPager result={numbered} onPage={onNumber} onPageSize={legacy.onPageSize} />
+    : <CursorPager {...legacy} />
 }

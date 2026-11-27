@@ -69,11 +69,54 @@
     ) confirmed
   </select>
 
-  <select id="facts" resultMap="Fact" useCache="false" timeout="3">
+  <resultMap id="OrderState" type="com.lrj.trade.server.operations.OperationsReport$OrderState">
+    <constructor>
+      <arg column="status" javaType="java.lang.String"/>
+      <arg column="total" javaType="_long"/>
+      <arg column="payable_count" javaType="_long"/>
+      <arg column="converted_count" javaType="_long"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="Daily" type="com.lrj.trade.server.operations.OperationsReport$DailyTotals">
+    <constructor>
+      <arg column="business_date" javaType="java.time.LocalDate"/>
+      <arg column="order_count" javaType="_long"/>
+      <arg column="paid_order_count" javaType="_long"/>
+      <arg column="normal_receipt" javaType="java.math.BigDecimal"/>
+      <arg column="normal_refund" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <!-- 转化取实际正常实收，历史下单但在本期支付的交易不会混入本期创建的 cohort。 -->
+  <select id="orderStates" resultMap="OrderState" useCache="false" timeout="3">
+    SELECT o.status, COUNT(*) AS total, COUNT(CASE WHEN o.payable_amount &gt; 0 THEN 1 END) AS payable_count,
+      COUNT(CASE WHEN o.payable_amount &gt; 0 AND EXISTS (
+        SELECT 1 FROM tc_payment_receipt r
+        WHERE r.tenant_id=o.tenant_id AND r.order_id=o.id AND r.currency=o.currency AND r.disposition='NORMAL'
+          AND r.confirmed_at &gt;= o.created_at AND r.confirmed_at &lt; #{q.createdTo}
+      ) THEN 1 END) AS converted_count
+    FROM tc_order o WHERE o.tenant_id=#{tenant} AND o.currency=#{currency}
+      AND o.created_at &gt;= #{q.createdFrom} AND o.created_at &lt; #{q.createdTo}
+    GROUP BY o.status ORDER BY o.status
+  </select>
+  <select id="daily" resultMap="Daily" useCache="false" timeout="3">
     WITH funds AS (<include refid="confirmedFunds"/>)
-    SELECT f.ledger_id,f.ledger_no,f.business_no,o.order_no,f.receipt_no,f.refund_no,
-           o.business_no AS order_business_no,f.receipt_business_no,r.business_no AS refund_business_no,
-           f.kind,f.amount,f.currency,f.confirmed_at
+    SELECT business_date, SUM(order_count) AS order_count, SUM(paid_order_count) AS paid_order_count,
+      SUM(normal_receipt) AS normal_receipt, SUM(normal_refund) AS normal_refund
+    FROM (
+      SELECT DATE(TIMESTAMPADD(HOUR,8,created_at)) AS business_date, COUNT(*) AS order_count, 0 AS paid_order_count,
+        0 AS normal_receipt, 0 AS normal_refund
+      FROM tc_order WHERE tenant_id=#{tenant} AND currency=#{currency}
+        AND created_at &gt;= #{q.createdFrom} AND created_at &lt; #{q.createdTo}
+      GROUP BY DATE(TIMESTAMPADD(HOUR,8,created_at))
+      UNION ALL
+      SELECT DATE(TIMESTAMPADD(HOUR,8,confirmed_at)), 0, COUNT(CASE WHEN kind='NORMAL_RECEIPT' THEN 1 END),
+        COALESCE(SUM(CASE WHEN kind='NORMAL_RECEIPT' THEN amount END),0),
+        COALESCE(SUM(CASE WHEN kind='NORMAL_REFUND' THEN amount END),0)
+      FROM funds GROUP BY DATE(TIMESTAMPADD(HOUR,8,confirmed_at))
+    ) by_day GROUP BY business_date ORDER BY business_date
+  </select>
+
+  <sql id="factScope">
     FROM funds f
     JOIN tc_order o ON o.tenant_id=#{tenant} AND o.id=f.order_id
     LEFT JOIN tc_refund r ON r.tenant_id=o.tenant_id AND r.order_id=o.id AND r.refund_no=f.refund_no
@@ -87,6 +130,61 @@
         <otherwise>f.ledger_no=#{q.filters.ledgerNo}</otherwise>
       </choose>
     </if>
+  </sql>
+  <select id="facts" resultMap="Fact" useCache="false" timeout="3">
+    WITH funds AS (<include refid="confirmedFunds"/>)
+    SELECT f.ledger_id,f.ledger_no,f.business_no,o.order_no,f.receipt_no,f.refund_no,
+           o.business_no AS order_business_no,f.receipt_business_no,r.business_no AS refund_business_no,
+           f.kind,f.amount,f.currency,f.confirmed_at
+    <include refid="factScope"/>
     ORDER BY f.ledger_id LIMIT #{q.fetchLimit}
+  </select>
+  <select id="factCount" resultType="long" useCache="false" timeout="3">
+    WITH funds AS (<include refid="confirmedFunds"/>)
+    SELECT COUNT(*) <include refid="factScope"/>
+  </select>
+  <select id="factsAtOffset" resultMap="Fact" useCache="false" timeout="3">
+    WITH funds AS (<include refid="confirmedFunds"/>)
+    SELECT f.ledger_id,f.ledger_no,f.business_no,o.order_no,f.receipt_no,f.refund_no,
+           o.business_no AS order_business_no,f.receipt_business_no,r.business_no AS refund_business_no,
+           f.kind,f.amount,f.currency,f.confirmed_at
+    <include refid="factScope"/>
+    ORDER BY f.ledger_id LIMIT #{q.limit} OFFSET #{offset}
+  </select>
+  <resultMap id="LinkedTotals" type="com.lrj.trade.server.operations.OperationsReport$LinkedTotals">
+    <constructor>
+      <arg column="linked_count" javaType="_long"/>
+      <arg column="funding_count" javaType="_long"/>
+      <arg column="discount" javaType="java.math.BigDecimal"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="LinkedCheckout" type="com.lrj.trade.server.operations.OperationsReport$LinkedCheckout">
+    <constructor>
+      <arg column="order_no" javaType="java.lang.String"/>
+      <arg column="business_no" javaType="java.lang.String"/>
+      <arg column="commerce_tenant" javaType="java.lang.String"/>
+      <arg column="store_id" javaType="java.lang.String"/>
+      <arg column="commerce_quote_id" javaType="java.lang.String"/>
+      <arg column="funding_application_id" javaType="java.lang.String"/>
+      <arg column="created_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <sql id="linkedScope">
+    FROM tc_order o JOIN tc_checkout_pilot_quote_ref b ON b.tenant_id=o.tenant_id AND b.native_order_id=o.id
+    WHERE o.tenant_id=#{tenant} AND o.currency=#{currency}
+      AND o.created_at &gt;= #{q.createdFrom} AND o.created_at &lt; #{q.createdTo}
+    <if test="q.filters.storeRef != null">AND b.store_id=#{q.filters.storeRef}</if>
+  </sql>
+  <select id="linkedTotals" resultMap="LinkedTotals" timeout="3" useCache="false">
+    SELECT COUNT(*) AS linked_count, COUNT(b.funding_application_id) AS funding_count,
+           COALESCE(SUM(b.discount_minor),0) AS discount
+    <include refid="linkedScope"/>
+  </select>
+  <select id="linkedRows" resultMap="LinkedCheckout" timeout="3" useCache="false">
+    SELECT o.order_no,o.business_no,
+           JSON_UNQUOTE(JSON_EXTRACT(b.evidence_json,'$.commerceTenantId')) AS commerce_tenant,
+           b.store_id,b.commerce_quote_id,b.funding_application_id,o.created_at
+    <include refid="linkedScope"/>
+    ORDER BY o.created_at DESC,o.id DESC LIMIT #{q.limit} OFFSET #{offset}
   </select>
 </mapper>

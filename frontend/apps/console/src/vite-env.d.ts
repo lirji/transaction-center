@@ -8,6 +8,9 @@ interface ImportMetaEnv {
   readonly VITE_OIDC_AUDIENCE?: string
   readonly VITE_OIDC_ORGANIZATION?: string
   readonly VITE_OIDC_SCOPE?: string
+  readonly VITE_COMMERCE_WORKSPACE_URL?: string
+  readonly VITE_MARKETING_WORKSPACE_URL?: string
+  readonly VITE_BENEFIT_WORKSPACE_URL?: string
   readonly VITE_ALLOW_TEST_AUTH?: string
 }
 
@@ -24,6 +27,9 @@ interface Window {
     OIDC_CLIENT_ID?: string
     OIDC_AUDIENCE?: string
     OIDC_ORGANIZATION?: string
+    COMMERCE_WORKSPACE_URL?: string
+    MARKETING_WORKSPACE_URL?: string
+    BENEFIT_WORKSPACE_URL?: string
     OIDC_SCOPE?: string
   }
 }
