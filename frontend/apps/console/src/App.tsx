@@ -32,6 +32,7 @@ const JobDetailPage = lazy(() => import('./features/jobs/JobDetailPage').then((m
 const OutboxPage = lazy(() => import('./features/outbox/OutboxPage').then((module) => ({ default: module.OutboxPage })))
 const ReconciliationPage = lazy(() => import('./features/reconciliation/ReconciliationPage').then((module) => ({ default: module.ReconciliationPage })))
 const AdmissionPage = lazy(() => import('./features/admission/AdmissionPage').then((module) => ({ default: module.AdmissionPage })))
+const OperationLogsPage = lazy(() => import('./features/operation-logs/OperationLogsPage').then((module) => ({ default: module.OperationLogsPage })))
 const NotFoundPage = lazy(() => import('./features/system/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
 
 function Admin({ children }: { children: ReactNode }) {
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="outbox" element={<Admin><OutboxPage /></Admin>} />
           <Route path="reconciliation" element={<Admin><ReconciliationPage /></Admin>} />
           <Route path="admission" element={<Admin><AdmissionPage /></Admin>} />
+          <Route path="operation-logs" element={<Admin><OperationLogsPage /></Admin>} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

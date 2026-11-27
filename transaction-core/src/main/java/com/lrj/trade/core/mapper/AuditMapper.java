@@ -1,6 +1,9 @@
 package com.lrj.trade.core.mapper;
 
 import com.lrj.trade.core.AuditWriter.RefundEffect;
+import com.lrj.trade.core.query.AdminQuery;
+import com.lrj.trade.core.query.OperationAuditQuery.Entry;
+import com.lrj.trade.core.query.OperationAuditQuery.Position;
 import java.time.Instant;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
@@ -37,4 +40,7 @@ public interface AuditMapper {
     /** 有界读取授权父资源的实际效果和请求结果。 */
     List<Row> refundHistory(@Param("tenant") long tenant,@Param("resource") String resource,@Param("before") Instant before,
                             @Param("cursor") String cursor,@Param("limit") int limit);
+    /** 限定租户，按统一时间顺序合并已提交业务操作和已留痕退款请求结果。 */
+    List<Entry> operationHistory(@Param("tenant") long tenant, @Param("query") AdminQuery query,
+                                 @Param("position") Position position);
 }

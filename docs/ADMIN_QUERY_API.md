@@ -19,6 +19,7 @@
 | GET /payment-receipts/{receiptNo} | 实收、累计退款、预占及未占用金额 |
 | GET /refunds/{refundNo} | 退款分项、审批引用、版本、processingReasonCode |
 | GET /orders/{orderNo}/operation-evidence | 订单及实际收退款记录，独立分页，试点返回已冻结商城报价关联；另需 trade.admin.evidence.read |
+| GET /operation-audits | 操作日志列表，跨业务查询当前租户已留痕操作，支持对象和记录时间筛选 |
 | GET /refunds/{refundNo}/operation-audits | 当前租户退款的申请、审批、已核实渠道终态、重复请求及业务效果证据 |
 | GET /returns | 按 returnNo/orderNo/memberId/orderItemId/warehouseId/status 查退货申请 |
 | GET /quotes | 按 quoteId/memberId 查不可变报价 |
@@ -30,9 +31,11 @@
 | GET /refunds（增强） | 保留原数组、cursor和默认待审批；新增refundNo/orderNo/memberId及时间筛选，显式status=ALL查全部 |
 | GET /returns/{returnNo}（增强） | 保留原字段和ETag；新增时间及inspection数量摘要 |
 
-新增列表返回 `{items,nextAfter,hasMore,observedAt}`。`after`默认0、`limit`默认20最大100，按根记录ID升序；不能把升序当“最新优先”。改变筛选时清空游标。除单支付尝试列表外，可使用成对的 `createdFrom/createdTo`，UTC毫秒精度、左闭右开、最大90天。精确编号与时间条件也取AND。未知或重复参数返回400。
+通用管理列表返回 `{items,nextAfter,hasMore,observedAt}`。`after`默认0、`limit`默认20最大100，按根记录ID升序；不能把升序当“最新优先”。改变筛选时清空游标。除单支付尝试列表外，可使用成对的 `createdFrom/createdTo`，UTC毫秒精度、左闭右开、最大90天。精确编号与时间条件也取AND。未知或重复参数返回400。
 
-所有业务ID为字符串，金额／数量／版本为JS安全整数。内部cursor不出现在新增列表行内；翻页读取Page.nextAfter。列表也携带若干详情的安全标量字段，具体以OpenAPI为准，页面不需要额外调用详情来获得这些字段。
+全局操作日志使用 `{items,nextCursor}`。结果按记录时间降序，同一时刻以来源和数字流水号决定稳定顺序。`resourceType` 与 `resourceRef` 精确匹配日志中的对象类型和编号；`createdFrom/createdTo` 对操作记录时间生效。续页传回 `cursor=nextCursor`，不保证跨请求快照。该投影合并已记录的业务操作和退款请求的已知结果，只返回操作人摘要、错误分类、追踪号和定位对象所需的字段。前端入口为「运行与准入 → 操作日志」。
+
+所有业务ID为字符串，金额／数量／版本为JS安全整数。通用管理列表行不暴露内部游标；翻页读取Page.nextAfter。列表也携带若干详情的安全标量字段，具体以OpenAPI为准，页面不需要额外调用详情来获得这些字段。
 
 退款原数组接口继续以末条 `cursor` 翻页，不改成 Page。退货验收继续使用详情响应ETag作为If-Match；不使用inspection的实收编号代替RMA申请编号。
 
@@ -40,7 +43,7 @@
 
 | 授权角色 | JWT必须包含 | 允许读取 |
 |---|---|---|
-| 租户交易管理员 | trade.admin | 本租户订单、支付／收款、退款、退货、报价全部安全投影 |
+| 租户交易管理员 | trade.admin | 本租户订单、支付／收款、退款、退货、报价及操作日志的安全投影 |
 | 证据诊断管理员 | trade.admin + trade.admin.evidence.read | 上述普通查询及证据、资格评估 |
 | 任务诊断管理员 | trade.admin + trade.admin.jobs.read | 上述普通查询及任务、租约 |
 | 普通会员 | 无管理scope | 不能调用这些管理查询，仍使用本人接口 |
@@ -66,6 +69,8 @@
 5. 普通查询维持trade.admin兼容授权，诊断权限单独隔离。新增接口没有修改退款审批、会员本人归属和内部服务身份边界。
 
 ## 数据库与验证
+
+全局操作日志依赖 `V053__operation_audit_query_indexes.sql`，对既有审计表追加租户、对象与时间查询索引。由 Flyway 按版本应用，不需要补写历史日志。
 
 新增 `V033__admin_query_indexes.sql`，只追加20个管理查询索引，不建业务表、不改历史迁移或共享数据。已有tenant/jobType/status/id索引复用，未重复创建。
 

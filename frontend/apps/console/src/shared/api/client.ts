@@ -26,6 +26,7 @@ import {
   ledgerEntrySchema,
   memberSchema,
   merchantSchema,
+  operationAuditPageSchema,
   operationsFinancialFactSchema,
   operationsSummarySchema,
   type OperationsScope,
@@ -345,6 +346,14 @@ export const api = {
     request(`${admin}/refunds${refundQueueQuery(query)}`, { signal }, (value) => parseArray(refundQueueItemSchema, value)),
   refund: (refundNo: string) =>
     request(`${admin}/refunds/${encodeURIComponent(refundNo)}`, undefined, (value) => parseWith(adminRefundDetailSchema, value)),
+  operationAudits: (query: { cursor?: string; resourceType?: string; resourceRef?: string; createdFrom?: string; createdTo?: string }, signal?: AbortSignal) => {
+    const search = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (value) search.set(key, value)
+    }
+    return request(`${admin}/operation-audits${search.size ? '?' + search.toString() : ''}`,
+      { signal }, (value) => parseWith(operationAuditPageSchema, value))
+  },
   refundAudit: (refundNo: string, cursor?: string, signal?: AbortSignal) =>
     request(`${admin}/refunds/${encodeURIComponent(refundNo)}/operation-audits${cursor ? '?cursor=' + encodeURIComponent(cursor) : ''}`,
       { signal }, (value) => parseWith(refundAuditHistorySchema, value)),

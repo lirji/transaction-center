@@ -88,4 +88,61 @@
        ORDER BY occurred_at DESC,id DESC LIMIT #{limit})
     ) evidence ORDER BY occurred_at DESC,id DESC LIMIT #{limit}
   </select>
+  <resultMap id="operationEntry" type="com.lrj.trade.core.query.OperationAuditQuery$Entry">
+    <constructor>
+      <idArg column="id" javaType="java.lang.String"/>
+      <arg column="occurred_at" javaType="java.time.Instant"/>
+      <arg column="resource_type" javaType="java.lang.String"/>
+      <arg column="resource_id" javaType="java.lang.String"/>
+      <arg column="action" javaType="java.lang.String"/>
+      <arg column="actor_id" javaType="java.lang.String"/>
+      <arg column="result" javaType="java.lang.String"/>
+      <arg column="error_code" javaType="java.lang.String"/>
+      <arg column="trace_id" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <!-- 各来源先按本表时间索引取一页，外层只合并至多两页。 -->
+  <select useCache="false" id="operationHistory" resultMap="operationEntry">
+    SELECT CONCAT(origin,sequence_no) AS id,occurred_at,resource_type,resource_id,action,actor_id,result,error_code,trace_id
+    FROM (
+      (SELECT 'E' AS origin,a.id AS sequence_no,a.created_at AS occurred_at,a.resource_type,
+        a.resource_id,a.action,a.actor_key AS actor_id,
+        CASE WHEN a.action='refund.approval.rejected-request' THEN 'REJECTED' ELSE 'RECORDED' END AS result,
+        NULL AS error_code,a.audit_trace_id AS trace_id
+       FROM tc_operation_audit a
+       WHERE a.tenant_id=#{tenant}
+       <if test="query.filters.resourceType != null">AND a.resource_type=#{query.filters.resourceType}</if>
+       <if test="query.filters.resourceRef != null">AND a.resource_id=#{query.filters.resourceRef}</if>
+       <if test="query.createdFrom != null">AND a.created_at &gt;= #{query.createdFrom} AND a.created_at &lt; #{query.createdTo}</if>
+       <if test="position != null">
+         <choose>
+           <when test="position.outcome">AND a.created_at &lt;= #{position.time}</when>
+           <otherwise>
+             AND (a.created_at &lt; #{position.time} OR (a.created_at=#{position.time} AND a.id &lt; #{position.id}))
+           </otherwise>
+         </choose>
+       </if>
+       ORDER BY a.created_at DESC,a.id DESC LIMIT #{query.fetchLimit})
+      <if test="query.filters.resourceType == null or query.filters.resourceType == 'REFUND'">
+        UNION ALL
+        (SELECT 'R' AS origin,o.id AS sequence_no,o.recorded_at AS occurred_at,'REFUND' AS resource_type,
+          o.resource_id,r.action_code AS action,r.actor_key AS actor_id,o.result_code AS result,o.error_code,r.trace_id
+         FROM tc_audit_attempt_outcome o
+         JOIN tc_audit_operation_attempt r ON r.tenant_id=o.tenant_id AND r.id=o.attempt_id
+         WHERE o.tenant_id=#{tenant} AND r.action_code IN ('refund.request','refund.approved','refund.rejected')
+         <if test="query.filters.resourceRef != null">AND o.resource_id=#{query.filters.resourceRef}</if>
+         <if test="query.createdFrom != null">AND o.recorded_at &gt;= #{query.createdFrom} AND o.recorded_at &lt; #{query.createdTo}</if>
+         <if test="position != null">
+           <choose>
+             <when test="position.outcome">
+               AND (o.recorded_at &lt; #{position.time} OR (o.recorded_at=#{position.time} AND o.id &lt; #{position.id}))
+             </when>
+             <otherwise>AND o.recorded_at &lt; #{position.time}</otherwise>
+           </choose>
+         </if>
+         ORDER BY o.recorded_at DESC,o.id DESC LIMIT #{query.fetchLimit})
+      </if>
+    ) page_rows
+    ORDER BY occurred_at DESC,origin DESC,sequence_no DESC LIMIT #{query.fetchLimit}
+  </select>
 </mapper>

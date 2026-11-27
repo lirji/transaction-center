@@ -6,6 +6,7 @@ import {
   CircleGauge,
   CreditCard,
   FileText,
+  History,
   Banknote,
   Package,
   Receipt,
@@ -53,6 +54,7 @@ export const navigation: NavigationGroup[] = [
     { label: 'Outbox', path: '/outbox', icon: Workflow, scopes: [TRADE_ADMIN] },
     { label: '对账', path: '/reconciliation', icon: Receipt, scopes: [TRADE_ADMIN] },
     { label: '准入策略', path: '/admission', icon: ShieldAlert, scopes: [TRADE_ADMIN] },
+    { label: '操作日志', path: '/operation-logs', icon: History, scopes: [TRADE_ADMIN] },
     { label: '任务', path: '/jobs', icon: Timer, scopes: [TRADE_ADMIN], requireAll: [TRADE_ADMIN, TRADE_ADMIN_JOBS_READ] },
   ] },
 ]

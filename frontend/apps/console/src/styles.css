@@ -123,6 +123,9 @@ main { min-width: 0; }
 .data-table.receipt-table { min-width: 1040px; }
 .data-table.refund-table { min-width: 820px; }
 .data-table.trade-list-table { min-width: 880px; }
+.operation-log-table :is(.audit-actor, .audit-trace) { overflow-wrap: anywhere; }
+.operation-log-table .audit-actor { width: 22%; }
+.operation-log-table .audit-trace { width: 15%; }
 .table-scroll { max-width: 100%; overflow-x: auto; }
 .row-action-cell { white-space: nowrap; }
 .queue-table td { overflow-wrap: anywhere; }

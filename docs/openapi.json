@@ -10470,6 +10470,134 @@
           }
         }
       }
+    },
+    "/api/v1/trade/admin/operation-audits": {
+      "get": {
+        "operationId": "adminQueryOperationAudits",
+        "summary": "OperationAudits",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "需要 trade.admin，仅查询 JWT 当前租户。按操作记录时间降序读取在线业务审计和已留痕的退款请求结果。resourceType 与 resourceRef 精确匹配。createdFrom/createdTo 筛选操作记录时间，下一页传回 nextCursor。未知或重复参数拒绝，不保证跨页快照。只返回身份摘要及安全业务字段。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdFrom",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "createdTo",
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "两端同时提供，UTC毫秒精度，[from,to)，最大90天。"
+            }
+          },
+          {
+            "in": "query",
+            "name": "resourceType",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "resourceRef",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 55
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "安全只读投影",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationAuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数或请求体无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证或令牌无效"
+          },
+          "403": {
+            "description": "缺少操作权限"
+          },
+          "429": {
+            "description": "ADMIN_QUERY_BUSY，Retry-After为1秒",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "查询不可用或证据入口关闭/事实不一致",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Failure"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14784,6 +14912,92 @@
           "nextAfter",
           "hasMore",
           "observedAt"
+        ],
+        "additionalProperties": false
+      },
+      "OperationAuditEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[ER][1-9][0-9]{0,18}$"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "RECORDED",
+              "REPLAYED",
+              "REJECTED",
+              "CONFLICT",
+              "DENIED",
+              "UNKNOWN"
+            ]
+          },
+          "errorCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "occurredAt",
+          "resourceType",
+          "resourceId",
+          "action",
+          "actorId",
+          "result",
+          "errorCode",
+          "traceId"
+        ],
+        "additionalProperties": false
+      },
+      "OperationAuditPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperationAuditEntry"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 55
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ],
         "additionalProperties": false
       }

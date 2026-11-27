@@ -56,6 +56,14 @@ public final class AdminQueryParameters {
             default -> AdminQuery.parse(input,fields,true);
         };
     }
+    /** 审计使用时间游标，拒绝混入通用的主键游标或重复条件。 */
+    public static AdminQuery operationAudit(MultiValueMap<String,String> params) {
+        Map<String,List<String>> input = new HashMap<>(params);
+        var cursor = input.remove("cursor");
+        if (input.containsKey("after") || cursor != null && cursor.size() != 1)
+            throw new TradeException("INVALID_ARGUMENT","审计查询参数无效");
+        return AdminQuery.parse(input,AdminQuery.fields("resourceType","resourceRef"),true);
+    }
     /** 详情无查询参数，未知字段不会被静默忽略。 */
     public static void none(MultiValueMap<String,String> params) { if(!params.isEmpty()) throw new TradeException("INVALID_ARGUMENT","详情接口不接受查询参数"); }
 }

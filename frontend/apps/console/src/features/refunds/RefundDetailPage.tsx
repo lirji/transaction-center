@@ -6,22 +6,7 @@ import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
 import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
-
-const auditActions: Record<string, string> = {
-  'refund.request': '申请退款',
-  'refund.compensation': '异常款项补偿',
-  'refund.approved': '批准退款',
-  'refund.rejected': '驳回退款',
-  'refund.approval.expired': '审批到期',
-  'refund.channel.submitted': '提交原渠道',
-  'refund.channel.succeeded': '核实退款成功',
-  'refund.channel.failed': '核实退款失败',
-}
-
-const auditResults: Record<string, string> = {
-  SUCCEEDED: '已提交', REPLAYED: '重复请求', REJECTED: '校验拒绝',
-  CONFLICT: '冲突', DENIED: '权限拒绝', UNKNOWN: '待核实',
-}
+import { refundAuditActions, refundAuditResults } from '../../shared/ui/refundAuditLabels'
 
 /** 按已授权的原退款读取独立操作流水，部分日志故障不影响退款详情。 */
 function RefundAuditHistory({ refundNo }: { refundNo: string }) {
@@ -55,8 +40,8 @@ function RefundAuditHistory({ refundNo }: { refundNo: string }) {
             {history.data.items.map((item) => (
               <tr key={item.id}>
                 <td>{formatBeijingTime(item.occurredAt)}</td>
-                <td>{auditActions[item.action] ?? item.action}</td>
-                <td><Badge tone={statusTone(item.result)}>{auditResults[item.result] ?? item.result}</Badge>
+                <td>{refundAuditActions[item.action] ?? item.action}</td>
+                <td><Badge tone={statusTone(item.result)}>{refundAuditResults[item.result] ?? item.result}</Badge>
                   {item.errorCode && <div className="mono">{item.errorCode}</div>}</td>
                 <td>{item.afterState ? `${dash(item.beforeState)} → ${item.afterState}` : '—'}</td>
                 <td className="mono">{dash(item.effectId)}</td>

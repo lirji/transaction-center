@@ -142,4 +142,19 @@ summary['description']='当前 JWT 租户的单币种经营汇总。订单按创
 facts=operation('/operations/financial-facts','get','OperationsFinancialFacts',ref('OperationsFinancialFactPage'),
                 range_params+[{**param('scope',enum=fund_kinds+['NET']),'required':True},param('after'),param('limit')])
 facts['description']='当前 JWT 租户经营汇总的资金明细。NET 包含正常实收和原收款为正常实收的成功退款，可按账本游标继续读取。不保证跨请求快照。需要 trade.admin。'
+nullable_text={'type':['string','null']}
+schemas['OperationAuditEntry']=obj({
+    'id':{'type':'string','pattern':'^[ER][1-9][0-9]{0,18}$'},
+    'occurredAt':instant(),'resourceType':{'type':'string'},'resourceId':nullable_text,
+    'action':{'type':'string'},'actorId':{'type':'string'},
+    'result':{'type':'string','enum':['RECORDED','REPLAYED','REJECTED','CONFLICT','DENIED','UNKNOWN']},
+    'errorCode':nullable_text,'traceId':nullable_text,
+})
+schemas['OperationAuditPage']=obj({'items':array('OperationAuditEntry'),'nextCursor':{'type':['string','null'],'maxLength':55}})
+audit_filters=[param('limit'),param('createdFrom'),param('createdTo'),
+               *[{**param(name),'schema':{'type':'string','maxLength':64}} for name in ('resourceType','resourceRef')],
+               {**param('cursor'),'schema':{'type':'string','maxLength':55}}]
+audit_log=operation('/operation-audits','get','OperationAudits',ref('OperationAuditPage'),audit_filters)
+audit_log['description']='需要 trade.admin，仅查询 JWT 当前租户。按操作记录时间降序读取在线业务审计和已留痕的退款请求结果。resourceType 与 resourceRef 精确匹配。createdFrom/createdTo 筛选操作记录时间，下一页传回 nextCursor。未知或重复参数拒绝，不保证跨页快照。只返回身份摘要及安全业务字段。'
+del audit_log['responses']['404']
 p.write_text(json.dumps(spec,ensure_ascii=False,indent=2)+'\n')

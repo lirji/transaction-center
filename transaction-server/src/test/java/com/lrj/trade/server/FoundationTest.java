@@ -2460,6 +2460,79 @@ class FoundationTest {
             "refund.approved/REPLAYED","refund.channel.submitted/SUCCEEDED","refund.channel.succeeded/SUCCEEDED"),actions);
     }
 
+    @Test void globalOperationAuditUsesTenantFiltersAndStableCrossSourceCursor() throws Exception {
+        Actor owner = actor(), other = actor();
+        long tenant = owner.tenantId();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            auditWriter.append(owner,"order.create","ORDER","ORD-AUDIT","private reason",0,1);
+            auditWriter.append(owner,"member.profile","MEMBER","MEM-AUDIT","private reason",0,1);
+            auditWriter.append(owner,"refund.approved","REFUND","RF-AUDIT","private reason",0,1);
+            auditWriter.append(other,"order.create","ORDER","OTHER-TENANT","private reason",0,1);
+        });
+        assertCode("REFUND_INVALID",() -> auditWriter.capture(owner,"refund.request",null,attempt -> {
+            throw new TradeException("REFUND_INVALID","private error detail");
+        }));
+        auditWriter.readOrderEvidence(owner,"PRIVATE-EVIDENCE",() -> "retained in specialist audit");
+        String recorded = "2026-11-27 08:00:00.123";
+        jdbc.update("UPDATE tc_operation_audit SET created_at=? WHERE tenant_id=?",recorded,tenant);
+        jdbc.update("UPDATE tc_audit_attempt_outcome SET recorded_at=? WHERE tenant_id=?",recorded,tenant);
+
+        String path = "/api/v1/trade/admin/operation-audits";
+        String admin = "global-audit-admin";
+        jwt(admin,"trade.admin",tenant);
+        jwt("global-audit-member","",tenant);
+        jwt("global-audit-other","trade.admin",other.tenantId());
+        assertEquals(401,request("GET",path,null,null).statusCode());
+        assertEquals(403,request("GET",path,"global-audit-member",null).statusCode());
+        assertEquals(403,request("HEAD",path,"global-audit-member",null).statusCode());
+        for (String query : List.of("?tenantId="+tenant,"?after=0","?cursor=bad","?cursor=a&cursor=b",
+                "?createdFrom=2026-11-27T08:00:00Z","?resourceType=ORDER&resourceType=REFUND")) {
+            assertEquals(400,request("GET",path+query,admin,null).statusCode(),query);
+        }
+
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        var actions = new ArrayList<String>();
+        String cursor = null;
+        for (int page = 0; page < 4; page++) {
+            String suffix = cursor == null ? "" : "&cursor=" + java.net.URLEncoder.encode(cursor,java.nio.charset.StandardCharsets.UTF_8);
+            var response = request("GET",path+"?limit=1"+suffix,admin,null);
+            assertEquals(200,response.statusCode(),response.body());
+            assertEquals("no-store",response.headers().firstValue("Cache-Control").orElse(""));
+            assertFalse(response.body().contains("private"));
+            assertFalse(response.body().contains("OTHER-TENANT"));
+            var result = json.readTree(response.body());
+            assertEquals(1,result.path("items").size());
+            var row = result.path("items").get(0);
+            actions.add(row.path("action").asText()+"/"+row.path("result").asText());
+            assertEquals(owner.key(),row.path("actorId").asText());
+            assertEquals("2026-11-27T08:00:00.123Z",row.path("occurredAt").asText());
+            assertFalse(row.has("reason"));
+            if (page == 0) {
+                assertTrue(row.path("resourceId").isNull());
+                assertEquals("REFUND_INVALID",row.path("errorCode").asText());
+            }
+            if (page < 3) {
+                assertTrue(result.path("nextCursor").isTextual());
+                cursor = result.path("nextCursor").asText();
+            } else {
+                assertTrue(result.path("nextCursor").isNull());
+            }
+        }
+        assertEquals(List.of("refund.request/REJECTED","refund.approved/RECORDED",
+            "member.profile/RECORDED","order.create/RECORDED"),actions);
+
+        var filtered = request("GET",path+"?resourceType=ORDER&resourceRef=ORD-AUDIT"
+            +"&createdFrom=2026-11-27T08:00:00.123Z&createdTo=2026-11-27T09:00:00Z",admin,null);
+        assertEquals(200,filtered.statusCode(),filtered.body());
+        assertEquals(1,json.readTree(filtered.body()).path("items").size());
+        var excluded = request("GET",path+"?createdFrom=2026-11-27T08:00:00Z&createdTo=2026-11-27T08:00:00.123Z",admin,null);
+        assertEquals(200,excluded.statusCode(),excluded.body());
+        assertTrue(json.readTree(excluded.body()).path("items").isEmpty());
+        var deniedResource = request("GET",path+"?resourceRef=ORD-AUDIT","global-audit-other",null);
+        assertEquals(200,deniedResource.statusCode(),deniedResource.body());
+        assertTrue(json.readTree(deniedResource.body()).path("items").isEmpty());
+    }
+
     @Test void approvalReceiptRejectedBusinessDecisionLeavesNoAcceptedEvidence() {
         Fixture f=paymentFixture(1); var refund=requestRefund(f,paidRefundOrder(f,"approval-self",1),"approval",100);
         var self=approvalReceipt(f,refund,"self",f.actor());

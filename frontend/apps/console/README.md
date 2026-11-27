@@ -23,6 +23,8 @@ Casdoor 应用若尚未签发上述 audience / scope，需要 IAM 侧补齐，�
 
 `public/config.js` 可覆盖 `OIDC_CLIENT_ID` / `OIDC_ORGANIZATION`。Outbox 重放、对账只查单、改准入策略还需要对应额外 scope。
 
+「运行与准入 → 操作日志」供租户管理员查询已记录的业务操作，支持对象类型、对象编号和北京时间范围筛选。
+
 ## 隔离浏览器与CI
 
-`pnpm e2e`为拦截API的3项界面合同测试，使用独立4185端口；真实MySQL、Spring HTTP、OIDC登录和业务种子由根目录`bash scripts/verify-console-integration.sh`运行。完整准备步骤、数据覆盖和报告见[联调说明](../../../docs/CONSOLE_INTEGRATION.md)。GitHub Actions已接入锁定安装、lint、单元测试、生产构建及两类浏览器门禁。
+`pnpm e2e`运行拦截 API 的界面合同测试，使用独立4185端口；真实MySQL、Spring HTTP、OIDC登录和业务种子由根目录`bash scripts/verify-console-integration.sh`运行。完整准备步骤、数据覆盖和报告见[联调说明](../../../docs/CONSOLE_INTEGRATION.md)。GitHub Actions已接入锁定安装、lint、单元测试、生产构建及两类浏览器门禁。

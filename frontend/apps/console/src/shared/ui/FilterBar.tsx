@@ -1,7 +1,7 @@
 import { useMemo, type FormEvent, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { Button, Field } from '../../components/ui'
 
-export function FilterBar({ children, onSubmit }: { children: ReactNode; onSubmit: () => void }) {
+export function FilterBar({ children, onSubmit, onReset }: { children: ReactNode; onSubmit: () => void; onReset?: () => void }) {
   return (
     <form
       className="filter-bar"
@@ -13,6 +13,7 @@ export function FilterBar({ children, onSubmit }: { children: ReactNode; onSubmi
       {children}
       <div className="modal-actions">
         <Button tone="primary" type="submit">查询</Button>
+        {onReset && <Button onClick={onReset}>清空筛选</Button>}
       </div>
     </form>
   )

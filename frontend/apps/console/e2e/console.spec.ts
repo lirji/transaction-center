@@ -98,6 +98,56 @@ test.describe('transaction console', () => {
     await expect(page.getByText('ORD-1')).toBeVisible()
   })
 
+  for (const width of [1440, 390]) {
+    test(`opens and filters the operation log at ${width}px`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 })
+      const cursor = '2026-09-08T00:00:00Z,E12'
+      const orderLog = {
+        id: 'E12', occurredAt: '2026-09-08T00:00:00Z', resourceType: 'ORDER',
+        resourceId: 'ORD-AUDIT', action: 'order.create', actorId: 'a'.repeat(64),
+        result: 'RECORDED', traceId: 'b'.repeat(32), errorCode: null,
+      }
+      const refundLog = {
+        ...orderLog, id: 'R11', resourceType: 'REFUND', resourceId: null,
+        action: 'refund.request', result: 'REJECTED', errorCode: 'REFUND_INVALID',
+      }
+      await page.route('**/admin/operation-audits**', async (route) => {
+        const params = new URL(route.request().url()).searchParams
+        const second = params.get('cursor') === cursor
+        const filtered = params.get('resourceType') === 'ORDER' && params.get('resourceRef') === 'ORD-AUDIT'
+        await route.fulfill({ json: {
+          items: second ? [refundLog] : [orderLog],
+          nextCursor: second || filtered ? null : cursor,
+        } })
+      })
+      await page.goto('/orders')
+      if (width === 390) await page.getByRole('button', { name: '打开菜单' }).click()
+      await page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: '操作日志' }).click()
+      await expect(page.getByRole('heading', { name: '操作日志' })).toBeVisible()
+      await expect(page.getByText('2026/09/08 08:00:00')).toBeVisible()
+      await expect(page.getByRole('link', { name: 'ORD-AUDIT' })).toHaveAttribute('href', '/orders/ORD-AUDIT')
+
+      const list = page.getByRole('region', { name: '操作日志列表' })
+      const pageFits = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      expect(pageFits).toBe(true)
+      if (width === 390) expect(await list.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+      await testInfo.attach('operation-logs', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+
+      await page.getByRole('button', { name: '下一页' }).click()
+      await expect(page.getByText('REFUND_INVALID')).toBeVisible()
+      await page.getByLabel('对象类型').selectOption('ORDER')
+      await page.getByLabel('对象编号').fill('ORD-AUDIT')
+      const request = page.waitForRequest((pending) => pending.url().includes('/admin/operation-audits?resourceType=ORDER&resourceRef=ORD-AUDIT'))
+      await page.getByRole('button', { name: '查询' }).click()
+      expect(new URL((await request).url()).searchParams.has('cursor')).toBe(false)
+      await expect(page.getByRole('link', { name: 'ORD-AUDIT' })).toBeVisible()
+      await expect(page.getByRole('button', { name: '下一页' })).toBeDisabled()
+      await page.getByRole('button', { name: '清空筛选' }).click()
+      await expect(page).toHaveURL(/\/operation-logs$/)
+      await expect(page.getByLabel('对象编号')).toHaveValue('')
+    })
+  }
+
   test('loads only the active order section and keeps the list query after a retry', async ({ page }) => {
     const requests: string[] = []
     page.on('request', (request) => {

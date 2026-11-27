@@ -30,10 +30,11 @@ public class AdminQueryController {
     private final AdminAttemptQueryService attempt;
     private final AdminRefundQueryService refund;
     private final AuditWriter operationAudit;
+    private final OperationAuditQuery operationAuditQuery;
     private final CheckoutPilotAuditLookup checkoutPilot;
     private final OrderReferralEvidenceService evidence;private final CustomerEligibilityService eligibility;private final AdminEvidenceAccess evidenceAccess;
     /** 管理员证据有独立入口授权，复用交易事实算法而非内部HTTP身份。 */
-    public AdminQueryController(AdminOrderQueryService order,AdminReturnQueryService returns,AdminPaymentQueryService payment,AdminReceiptQueryService receipt,AdminQuoteQueryService quote,AdminJobQueryService job,AdminAttemptQueryService attempt,AdminRefundQueryService refund,OrderReferralEvidenceService evidence,CustomerEligibilityService eligibility,AdminEvidenceAccess evidenceAccess,AuditWriter operationAudit,CheckoutPilotAuditLookup checkoutPilot) {
+    public AdminQueryController(AdminOrderQueryService order,AdminReturnQueryService returns,AdminPaymentQueryService payment,AdminReceiptQueryService receipt,AdminQuoteQueryService quote,AdminJobQueryService job,AdminAttemptQueryService attempt,AdminRefundQueryService refund,OrderReferralEvidenceService evidence,CustomerEligibilityService eligibility,AdminEvidenceAccess evidenceAccess,AuditWriter operationAudit,CheckoutPilotAuditLookup checkoutPilot,OperationAuditQuery operationAuditQuery) {
         this.order=order;
         this.returns=returns;
         this.payment=payment;
@@ -43,6 +44,7 @@ public class AdminQueryController {
         this.attempt=attempt;
         this.refund=refund;
         this.operationAudit=operationAudit;
+        this.operationAuditQuery=operationAuditQuery;
         this.checkoutPilot=checkoutPilot;
         this.evidence=evidence;this.eligibility=eligibility;this.evidenceAccess=evidenceAccess;
     }
@@ -127,6 +129,13 @@ public class AdminQueryController {
     @GetMapping("/refunds/{refundNo}")
     public AdminRefundQueryService.Detail refund(@AuthenticationPrincipal Jwt jwt,@PathVariable String refundNo,@RequestParam MultiValueMap<String,String> params) {
         AdminQueryParameters.none(params);AdminQuery.text(refundNo,64);return refund.detail(actor(jwt).tenantId(),refundNo);
+    }
+    /** 全局列表仍以认证租户为边界，与单笔退款日志共用原始审计记录。 */
+    @GetMapping("/operation-audits")
+    public OperationAuditQuery.Page operationAuditList(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam MultiValueMap<String,String> params) {
+        var query = AdminQueryParameters.operationAudit(params);
+        return operationAuditQuery.page(actor(jwt).tenantId(),query,params.getFirst("cursor"));
     }
     /** 审计查询先按租户和可读业务编号解析真实退款父资源。 */
     @GetMapping("/refunds/{refundNo}/operation-audits")
