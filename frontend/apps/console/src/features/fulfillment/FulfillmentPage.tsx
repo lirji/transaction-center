@@ -38,7 +38,7 @@ export function FulfillmentPage() {
       <Panel>
         <h2>交付信息</h2>
         <MutationBanner error={fulfill.error} success={fulfill.data ? `履约单 ${fulfill.data.resourceNo} · ${fulfill.data.status}` : undefined} />
-        <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" disabled={fulfill.isPending || !orderNo.trim() || !canWrite}>声明已交付</Button>}>
+        <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" loading={fulfill.isPending} disabled={!orderNo.trim() || !canWrite}>声明已交付</Button>}>
           <Field label="订单号" hint="可从订单详情带入。"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} placeholder="ORD-…" required /></Field>
           <Field label="来源请求号"><input value={sourceRequestId} onChange={(event) => setSourceRequestId(event.target.value)} required /></Field>
           <Field label="交付凭证引用"><input value={deliveryRef} onChange={(event) => setDeliveryRef(event.target.value)} required /></Field>

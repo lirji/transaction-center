@@ -346,10 +346,10 @@ export const api = {
     request(`${admin}/refunds${refundQueueQuery(query)}`, { signal }, (value) => parseArray(refundQueueItemSchema, value)),
   refund: (refundNo: string) =>
     request(`${admin}/refunds/${encodeURIComponent(refundNo)}`, undefined, (value) => parseWith(adminRefundDetailSchema, value)),
-  operationAudits: (query: { cursor?: string; resourceType?: string; resourceRef?: string; createdFrom?: string; createdTo?: string }, signal?: AbortSignal) => {
+  operationAudits: (query: { limit?: number; cursor?: string; resourceType?: string; resourceRef?: string; createdFrom?: string; createdTo?: string }, signal?: AbortSignal) => {
     const search = new URLSearchParams()
     for (const [key, value] of Object.entries(query)) {
-      if (value) search.set(key, value)
+      if (value) search.set(key, String(value))
     }
     return request(`${admin}/operation-audits${search.size ? '?' + search.toString() : ''}`,
       { signal }, (value) => parseWith(operationAuditPageSchema, value))
@@ -422,7 +422,7 @@ export const api = {
 
   operationsSummary: (range: OperationsRange, signal?: AbortSignal) =>
     request(`${admin}/operations/summary?${new URLSearchParams(range)}`, { signal }, (value) => parseWith(operationsSummarySchema, value)),
-  operationsFinancialFacts: (query: OperationsRange & { scope: OperationsScope; after: string }, signal?: AbortSignal) =>
+  operationsFinancialFacts: (query: OperationsRange & { scope: OperationsScope; after: string; limit?: number }, signal?: AbortSignal) =>
     request(`${admin}/operations/financial-facts${pageQuery(query)}`, { signal }, (value) => parsePage(operationsFinancialFactSchema, value)),
   orders: (query: Record<string, QueryScalar> = {}) =>
     request(`${admin}/orders${pageQuery(query)}`, undefined, (value) => parsePage(adminOrderViewSchema, value)),

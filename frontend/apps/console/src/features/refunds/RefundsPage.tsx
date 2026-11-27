@@ -1,3 +1,6 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
+import { usePageSize } from '../../shared/ui/usePageSize'
+import { Select } from '../../components/Select'
 import { useCallback, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -21,6 +24,7 @@ export function RefundsPage() {
   const [params, setParams] = useSearchParams()
   const status = STATUSES.find((value) => value === params.get('status')) ?? 'PENDING_APPROVAL'
   const [after, setAfter] = useState(0)
+  const [pageSize, setPageSize] = usePageSize('refunds', 20, () => setAfter(0))
   const [approvalNo, setApprovalNo] = useState(() => params.get('approvalNo') ?? '')
   const [refundNo, setRefundNo] = useState(() => params.get('refundNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
@@ -55,8 +59,8 @@ export function RefundsPage() {
 
   const policy = useQuery({ queryKey: ['refund-policy'], queryFn: api.refundPolicy, enabled: policyOpen, retry: false })
   const queue = useQuery({
-    queryKey: ['refunds', after, filters],
-    queryFn: () => api.refunds({ ...filters, after }),
+    queryKey: ['refunds', after, pageSize, filters],
+    queryFn: () => api.refunds({ ...filters, after, limit: pageSize }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
   })
@@ -131,6 +135,13 @@ export function RefundsPage() {
     setParams(search, { replace: true })
   }
 
+  function remove(keys: string[]) {
+    const next = new URLSearchParams(params)
+    keys.forEach((key) => next.delete(key))
+    setAfter(0)
+    setParams(next, { replace: true })
+  }
+
   function resetFilters() {
     setApprovalNo('')
     setRefundNo('')
@@ -159,7 +170,15 @@ export function RefundsPage() {
           <div className="queue-actions" role="group" aria-label="退款队列">
             {PRESETS.map((value) => <Button key={value} aria-pressed={status === value} onClick={() => changeStatus(value)}>{statusLabel(value)}</Button>)}
           </div>
-          <FilterBar onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
+          <FilterBar applied={appliedFilters(params, remove, [
+              ['状态', 'status', () => setFilterError(''), (value) => STATUSES.includes(value as typeof status) ? statusLabel(value as typeof status) : value],
+              ['审批单号', 'approvalNo', () => setApprovalNo('')],
+              ['退款单号', 'refundNo', () => setRefundNo('')],
+              ['订单号', 'orderNo', () => setOrderNo('')],
+              ['会员 ID', 'memberId', () => setMemberId('')],
+              ['申请时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo(''); setFilterError('') }],
+              ['审批截止', ['approvalDeadlineFrom', 'approvalDeadlineTo'], () => { setBusinessFrom(''); setBusinessTo(''); setFilterError('') }],
+            ])} onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
             activeAdvanced={[filters.approvalNo, filters.memberId, filters.createdFrom || filters.createdTo, filters.approvalDeadlineFrom || filters.approvalDeadlineTo].filter(Boolean).length}
             advanced={<>
               <Field label="审批单号"><input value={approvalNo} onChange={(event) => setApprovalNo(event.target.value)} /></Field>
@@ -168,9 +187,9 @@ export function RefundsPage() {
                 <TimeRangeFields labelPrefix="审批截止" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
             </>}>
             <Field label="状态">
-              <select value={status} onChange={(event) => changeStatus(event.target.value)}>
+              <Select value={status} onChange={(value) => changeStatus(value)}>
                 {STATUSES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
             <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
@@ -185,7 +204,7 @@ export function RefundsPage() {
               <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
                 {(rows: RefundQueueItem[]) => <RefundRows rows={rows} />}
               </QueryGate>
-              <CursorPager scope={['refunds', filters]} after={after} onPage={setAfter} pageSize={20}
+              <CursorPager scope={['refunds', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
                 rows={queue.isSuccess ? queue.data : undefined} getCursor={(row) => row.cursor} />
             </>
           )}
@@ -196,7 +215,7 @@ export function RefundsPage() {
           {policy.isLoading ? <StateBanner tone="loading" title="正在读取政策" detail="请等待载入当前币种和额度。" /> : null}
           {policy.isError ? <StateBanner tone="error" title={describeProblem(policy.error).title} detail={describeProblem(policy.error).detail} /> : null}
           {policy.data ? (
-            <StackForm onSubmit={submitPolicy} actions={<Button tone="primary" type="submit" disabled={update.isPending || policy.isFetching}>保存政策</Button>}>
+            <StackForm onSubmit={submitPolicy} actions={<Button tone="primary" type="submit" loading={update.isPending} disabled={policy.isFetching}>保存政策</Button>}>
               <MutationBanner error={update.error} success={update.data ? `政策已更新，版本 ${update.data.version}` : undefined} />
               <p>当前版本 {policy.data.version} · 免审额度 {formatMinor(policy.data.autoApproveLimit, policy.data.currency)}</p>
               <Field label="币种"><input value={currency ?? policy.data.currency} onChange={(event) => setCurrency(event.target.value)} /></Field>

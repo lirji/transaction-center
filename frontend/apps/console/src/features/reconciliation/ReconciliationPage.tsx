@@ -1,3 +1,5 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
+import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -18,7 +20,9 @@ export function ReconciliationPage() {
   const state = queueStates.find((value) => value === params.get('state')) ?? 'OPEN'
   const [opState, setOpState] = useState<'QUEUED' | 'RUNNING' | 'RESULT_ACCEPTED' | 'REVIEW'>('REVIEW')
   const [after, setAfter] = useState(0)
+  const [pageSize, setPageSize] = usePageSize('recon-cases', 50, () => setAfter(0))
   const [opAfter, setOpAfter] = useState(0)
+  const [operationSize, setOperationSize] = usePageSize('recon-operations', 50, () => setOpAfter(0))
   const [queryNumber, setQueryNumber] = useState('')
   const [number, setNumber] = useState('')
   const [selected, setSelected] = useState<ReconciliationCase>()
@@ -26,8 +30,8 @@ export function ReconciliationPage() {
   const [reason, setReason] = useState('')
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
-  const cases = useQuery({ queryKey: ['recon-cases', state, after, number], queryFn: () => api.reconciliationCases(state, after, 50, number || undefined) })
-  const operations = useQuery({ queryKey: ['recon-ops', opState, opAfter, number], queryFn: () => api.reconciliationOperations(opState, opAfter, 50, number || undefined) })
+  const cases = useQuery({ queryKey: ['recon-cases', state, after, pageSize, number], queryFn: () => api.reconciliationCases(state, after, pageSize, number || undefined) })
+  const operations = useQuery({ queryKey: ['recon-ops', opState, opAfter, operationSize, number], queryFn: () => api.reconciliationOperations(opState, opAfter, operationSize, number || undefined) })
   const queryCase = useMutation({
     mutationFn: (payload: { caseNo: string; expectedVersion: number; action: 'QUERY_PAYMENT' | 'QUERY_REFUND'; reason: string; ticketRef: string }) =>
       api.queryReconciliationCase(payload.caseNo, { expectedVersion: payload.expectedVersion, action: payload.action, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -60,11 +64,11 @@ export function ReconciliationPage() {
           <Button type="submit">精确查询</Button>
         </form>
         <Field label="差异状态">
-          <select value={state} onChange={(event) => { setParams({ state: event.target.value }, { replace: true }); setAfter(0) }}>
+          <Select value={state} onChange={(value) => { setParams({ state: value }, { replace: true }); setAfter(0) }}>
             <option value="OPEN">OPEN</option>
             <option value="PROCESSING">PROCESSING</option>
             <option value="CLOSED">CLOSED</option>
-          </select>
+          </Select>
         </Field>
       </Panel>
       <Panel className="table-panel">
@@ -90,18 +94,18 @@ export function ReconciliationPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['recon-cases', state, number]} after={after} onPage={setAfter} pageSize={50}
+        <CursorPager scope={['recon-cases', state, number]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           rows={cases.isSuccess ? cases.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">查单作业</h2>
         <div className="panel-inset">
-          <select value={opState} onChange={(event) => { setOpState(event.target.value as typeof opState); setOpAfter(0) }}>
+          <Select value={opState} onChange={(value) => { setOpState(value as typeof opState); setOpAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
             <option value="QUEUED">QUEUED</option>
             <option value="RUNNING">RUNNING</option>
             <option value="RESULT_ACCEPTED">RESULT_ACCEPTED</option>
-          </select>
+          </Select>
         </div>
         <QueryGate query={operations} emptyTitle="没有作业" emptyDetail="当前状态下没有查单作业。">
           {(rows) => (
@@ -122,7 +126,7 @@ export function ReconciliationPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['recon-operations', opState, number]} after={opAfter} onPage={setOpAfter} pageSize={50}
+        <CursorPager scope={['recon-operations', opState, number]} after={opAfter} onPage={setOpAfter} pageSize={operationSize} onPageSize={setOperationSize}
           rows={operations.isSuccess ? operations.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       {selected && (
@@ -139,16 +143,16 @@ export function ReconciliationPage() {
           }}>
             <MutationBanner error={queryCase.error} />
             <Field label="查单动作">
-              <select value={action} onChange={(event) => setAction(event.target.value as typeof action)}>
+              <Select value={action} onChange={(value) => setAction(value as typeof action)}>
                 <option value="QUERY_PAYMENT">QUERY_PAYMENT</option>
                 <option value="QUERY_REFUND">QUERY_REFUND</option>
-              </select>
+              </Select>
             </Field>
             <Field label="原因"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
             <Field label="工单引用"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
             <div className="modal-actions">
               <Button onClick={() => setSelected(undefined)} disabled={queryCase.isPending}>取消</Button>
-              <Button tone="primary" type="submit" disabled={queryCase.isPending}>排队查单</Button>
+              <Button tone="primary" type="submit" loading={queryCase.isPending}>排队查单</Button>
             </div>
           </form>
         </Modal>

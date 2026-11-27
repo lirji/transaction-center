@@ -1,6 +1,10 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
+import { formatInteger } from '../../shared/ui/display'
+import { usePageSize } from '../../shared/ui/usePageSize'
+import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, CursorPager, Field, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Button, ConfirmDialog, CursorPager, Field, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable, CopyValue } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseInteger, parsePositiveId } from '../../shared/api/money'
@@ -11,7 +15,8 @@ import { formatBeijingTime } from '../../shared/ui/display'
 
 export function InventoryPage() {
   const [whAfter, setWhAfter] = useState(0)
-  const { params, after: balAfter, apply, setAfter: setBalAfter } = useAdminListSearch()
+  const [warehouseSize, setWarehouseSize] = usePageSize('warehouses', 20, () => setWhAfter(0))
+  const { params, after: balAfter, apply, remove, setAfter: setBalAfter, pageSize, setPageSize } = useAdminListSearch()
   const balanceFilters = {
     warehouseId: params.get('warehouseId') || undefined,
     skuId: params.get('skuId') || undefined,
@@ -30,17 +35,18 @@ export function InventoryPage() {
   const [ledgerWarehouse, setLedgerWarehouse] = useState('')
   const [ledgerSku, setLedgerSku] = useState('')
   const [ledgerAfter, setLedgerAfter] = useState(0)
+  const [ledgerSize, setLedgerSize] = usePageSize('inventory-ledger', 20, () => setLedgerAfter(0))
   const [ledgerSelection, setLedgerSelection] = useState<{ warehouseId: number; skuId: number }>()
   const [ledgerError, setLedgerError] = useState('')
   const [formError, setFormError] = useState('')
   const [confirmAdjust, setConfirmAdjust] = useState(false)
   const queryClient = useQueryClient()
-  const warehouses = useQuery({ queryKey: ['warehouses', whAfter], queryFn: () => api.warehouses(whAfter) })
-  const balances = useQuery({ queryKey: ['inventories', balAfter, balanceFilters], queryFn: () => api.inventories({ after: balAfter, ...balanceFilters }) })
+  const warehouses = useQuery({ queryKey: ['warehouses', whAfter, warehouseSize], queryFn: () => api.warehouses(whAfter, warehouseSize) })
+  const balances = useQuery({ queryKey: ['inventories', balAfter, pageSize, balanceFilters], queryFn: () => api.inventories({ after: balAfter, limit: pageSize, ...balanceFilters }) })
   const ledgers = useQuery({
-    queryKey: ['ledgers', ledgerSelection, ledgerAfter],
+    queryKey: ['ledgers', ledgerSelection, ledgerAfter, ledgerSize],
     queryFn: () => ledgerSelection
-      ? api.inventoryLedgers(ledgerSelection.warehouseId, ledgerSelection.skuId, ledgerAfter)
+      ? api.inventoryLedgers(ledgerSelection.warehouseId, ledgerSelection.skuId, ledgerAfter, ledgerSize)
       : Promise.reject(new Error('请先选择仓库和 SKU')),
     enabled: Boolean(ledgerSelection),
   })
@@ -129,7 +135,12 @@ export function InventoryPage() {
         description="先核对库存余额和预占，再按仓库与 SKU 查看流水或登记盘点调整。"
       />
       <MutationBanner error={createWh.error ?? adjust.error} success={createWh.data || adjust.data ? `resourceId=${(createWh.data ?? adjust.data)?.resourceId}` : undefined} />
-      <FilterBar onReset={clearFilters} onSubmit={() => {
+      <FilterBar applied={appliedFilters(params, remove, [
+          ['仓库 ID', 'warehouseId', () => setWarehouseFilter('')],
+          ['SKU ID', 'skuId', () => setSkuFilter('')],
+          ['可售数量上限', 'maxAvailable', () => setAvailableFilter('')],
+        ])}
+          onReset={clearFilters} onSubmit={() => {
         setBalanceError('')
         try {
           const available = availableFilter.trim()
@@ -158,12 +169,12 @@ export function InventoryPage() {
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.id}>
-                        <td className="mono">{row.warehouseId}</td>
+                        <td><CopyValue value={row.warehouseId} name="仓库 ID" /></td>
                         <td className="mono">{row.skuId}</td>
-                        <td className="numeric-cell">{row.available}</td>
-                        <td className="numeric-cell">{row.reserved}</td>
-                        <td className="numeric-cell">{row.sold}</td>
-                        <td className="numeric-cell">{row.stockTotal}</td>
+                        <td className="numeric-cell">{row.available === 0 ? <Badge tone="warn">0 · 缺货</Badge> : formatInteger(row.available)}</td>
+                        <td className="numeric-cell">{formatInteger(row.reserved)}</td>
+                        <td className="numeric-cell">{formatInteger(row.sold)}</td>
+                        <td className="numeric-cell">{formatInteger(row.stockTotal)}</td>
                         <td className="row-action-cell">
                           <Button tone="ghost" onClick={() => viewLedger(row.warehouseId, row.skuId)}>查看流水</Button>
                           <Button tone="ghost" onClick={() => prepareAdjustment(row.warehouseId, row.skuId)}>盘点调整</Button>
@@ -175,8 +186,8 @@ export function InventoryPage() {
               </>
             )}
           </QueryGate>
-          <PagePager scope={['inventory-balances', balanceFilters]} after={balAfter} onPage={setBalAfter}
-            result={balances.isSuccess ? { items: balances.data, nextAfter: balances.data.at(-1)?.id ?? null, hasMore: balances.data.length === 20 } : undefined} />
+          <PagePager scope={['inventory-balances', balanceFilters]} after={balAfter} onPage={setBalAfter} pageSize={pageSize} onPageSize={setPageSize}
+            result={balances.isSuccess ? { items: balances.data, nextAfter: balances.data.at(-1)?.id ?? null, hasMore: balances.data.length === pageSize } : undefined} />
         </Panel>
         <Panel className="table-panel">
           <h2 className="table-title">仓库</h2>
@@ -194,13 +205,13 @@ export function InventoryPage() {
               </>
             )}
           </QueryGate>
-          <CursorPager scope={['warehouses']} after={whAfter} onPage={setWhAfter} pageSize={20}
+          <CursorPager scope={['warehouses']} after={whAfter} onPage={setWhAfter} pageSize={warehouseSize} onPageSize={setWarehouseSize}
             rows={warehouses.isSuccess ? warehouses.data : undefined} getCursor={(row) => row.id} />
         </Panel>
         <div className="page-grid">
           <Panel>
             <h2>创建仓库</h2>
-            <StackForm onSubmit={submitWarehouse} actions={<Button tone="primary" type="submit" disabled={createWh.isPending}>创建</Button>}>
+            <StackForm onSubmit={submitWarehouse} actions={<Button tone="primary" type="submit" loading={createWh.isPending}>创建</Button>}>
               <Field label="仓库编号"><input value={warehouseNo} onChange={(event) => setWarehouseNo(event.target.value)} required /></Field>
               <Field label="仓库名称"><input value={warehouseName} onChange={(event) => setWarehouseName(event.target.value)} required /></Field>
             </StackForm>
@@ -208,15 +219,15 @@ export function InventoryPage() {
           <section id="inventory-adjustment">
             <Panel>
               <h2>盘点调整</h2>
-              <StackForm onSubmit={submitAdjust} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" disabled={adjust.isPending}>提交</Button>}>
+              <StackForm onSubmit={submitAdjust} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" loading={adjust.isPending}>提交</Button>}>
                 <Field label="仓库">
-                  <select value={adjWarehouse} onChange={(event) => setAdjWarehouse(event.target.value)} required>
+                  <Select value={adjWarehouse} onChange={(value) => setAdjWarehouse(value)} required>
                     <option value="">选择仓库</option>
                     {adjWarehouse && !warehouses.data?.some((row) => row.id === adjWarehouse) ? <option value={adjWarehouse}>仓库 ID {adjWarehouse}</option> : null}
                     {(warehouses.data ?? []).map((row) => (
                       <option key={row.id} value={row.id}>{row.name} · {row.warehouseNo}</option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="SKU ID" hint="可从余额行带入，或填写尚未建余额的 SKU。">
                   <input value={adjSku} onChange={(event) => setAdjSku(event.target.value)} required />
@@ -232,13 +243,13 @@ export function InventoryPage() {
             <h2>库存流水</h2>
             <StackForm onSubmit={applyLedger} actions={<Button tone="primary" type="submit">查询</Button>}>
               <Field label="仓库" error={ledgerError}>
-                <select value={ledgerWarehouse} onChange={(event) => setLedgerWarehouse(event.target.value)}>
+                <Select value={ledgerWarehouse} onChange={(value) => setLedgerWarehouse(value)}>
                   <option value="">选择仓库</option>
                   {ledgerWarehouse && !warehouses.data?.some((row) => row.id === ledgerWarehouse) ? <option value={ledgerWarehouse}>仓库 ID {ledgerWarehouse}</option> : null}
                   {(warehouses.data ?? []).map((row) => (
                     <option key={row.id} value={row.id}>{row.name} · {row.warehouseNo}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <Field label="SKU ID"><input value={ledgerSku} onChange={(event) => setLedgerSku(event.target.value)} /></Field>
             </StackForm>
@@ -262,7 +273,7 @@ export function InventoryPage() {
                               <td>{row.soldDelta}</td>
                               <td>{row.totalDelta}</td>
                               <td className="mono">{row.operationRef}</td>
-                              <td>{row.reason}</td>
+                              <td><span className="table-long-text" title={row.reason}>{row.reason}</span></td>
                             </tr>
                           ))}
                         </tbody>
@@ -270,7 +281,7 @@ export function InventoryPage() {
                     </>
                   )}
                 </QueryGate>
-                <CursorPager scope={['inventory-ledger', ledgerSelection]} after={ledgerAfter} onPage={setLedgerAfter} pageSize={20}
+                <CursorPager scope={['inventory-ledger', ledgerSelection]} after={ledgerAfter} onPage={setLedgerAfter} pageSize={ledgerSize} onPageSize={setLedgerSize}
                   rows={ledgers.isSuccess ? ledgers.data : undefined} getCursor={(row) => row.id} />
               </>
             ) : null}

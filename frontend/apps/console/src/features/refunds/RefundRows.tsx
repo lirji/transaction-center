@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Badge, DataTable } from '../../components/ui'
+import { Badge, DataTable, CopyValue } from '../../components/ui'
 import { type RefundQueueItem } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { useListLinkState } from '../../shared/ui/useAdminListSearch'
@@ -14,12 +14,15 @@ export function RefundRows({ rows }: { rows: RefundQueueItem[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.refundNo}>
-            <td><Link to={`/refunds/${encodeURIComponent(row.refundNo)}`} state={listState} className="mono">{row.businessNo ?? row.refundNo}</Link></td>
+            <td><CopyValue value={row.businessNo ?? row.refundNo} name="退款单号"><Link to={`/refunds/${encodeURIComponent(row.refundNo)}`} state={listState} className="mono">{row.businessNo ?? row.refundNo}</Link></CopyValue></td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{refundLabels[row.status]}</Badge></td>
             <td className="numeric-cell">{formatMinorAmount(row.amount)}</td>
             <td>{row.currency}</td>
-            <td className="time-cell">{formatBeijingTime(row.approvalDeadline)}</td>
+            <td className="time-cell">{formatBeijingTime(row.approvalDeadline)}
+              {row.status === 'PENDING_APPROVAL' && row.approvalDeadline && Date.parse(row.approvalDeadline) <= Date.now() &&
+                <small><Badge tone="warn">已到审批截止</Badge></small>}
+            </td>
             <td>{row.approvalBusinessNo ?? row.approvalRef ?? '—'}</td>
           </tr>
         ))}

@@ -18,3 +18,8 @@ export function formatBeijingTime(value: string | null | undefined) {
   const timestamp = value ? Date.parse(value) : Number.NaN
   return Number.isNaN(timestamp) ? '—' : beijingTime.format(timestamp)
 }
+
+const integerFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 })
+export function formatInteger(value: number | bigint) {
+  return integerFormat.format(value)
+}

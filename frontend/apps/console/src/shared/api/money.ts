@@ -1,3 +1,4 @@
+const wholeNumber = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 })
 const MAX_SAFE = Number.MAX_SAFE_INTEGER
 
 export class IntegerParseError extends Error {
@@ -28,7 +29,7 @@ export function formatMinorAmount(amount: number): string {
   const abs = Math.abs(amount)
   const major = Math.trunc(abs / 100)
   const minor = String(abs % 100).padStart(2, '0')
-  return `${amount < 0 ? '-' : ''}${major}.${minor}`
+  return `${amount < 0 ? '-' : ''}${wholeNumber.format(major)}.${minor}`
 }
 
 export function formatMinor(amount: number, currency: string): string {

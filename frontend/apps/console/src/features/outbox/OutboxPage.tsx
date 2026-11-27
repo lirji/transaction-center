@@ -1,3 +1,5 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
+import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -18,13 +20,15 @@ export function OutboxPage() {
   const state = queueStates.find((value) => value === params.get('state')) ?? 'REVIEW'
   const [taskState, setTaskState] = useState<'READY' | 'RUNNING' | 'DONE' | 'REVIEW'>('REVIEW')
   const [after, setAfter] = useState(0)
+  const [pageSize, setPageSize] = usePageSize('outbox', 50, () => setAfter(0))
   const [taskAfter, setTaskAfter] = useState(0)
+  const [taskSize, setTaskSize] = usePageSize('outbox-tasks', 50, () => setTaskAfter(0))
   const [selected, setSelected] = useState<OutboxPublication>()
   const [reason, setReason] = useState('')
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
-  const publications = useQuery({ queryKey: ['outbox', state, after], queryFn: () => api.outboxPublications(state, after) })
-  const tasks = useQuery({ queryKey: ['outbox-tasks', taskState, taskAfter], queryFn: () => api.outboxTasks(taskState, taskAfter) })
+  const publications = useQuery({ queryKey: ['outbox', state, after, pageSize], queryFn: () => api.outboxPublications(state, after, pageSize) })
+  const tasks = useQuery({ queryKey: ['outbox-tasks', taskState, taskAfter, taskSize], queryFn: () => api.outboxTasks(taskState, taskAfter, taskSize) })
   const replay = useMutation({
     mutationFn: (payload: { eventId: string; expectedVersion: number; reason: string; ticketRef: string }) =>
       api.replayOutbox(payload.eventId, { expectedVersion: payload.expectedVersion, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -46,11 +50,11 @@ export function OutboxPage() {
       <MutationBanner error={replay.error} success={replay.data ? `已受理重放 eventId=${replay.data.eventId} replayCount=${replay.data.replayCount}` : undefined} />
       <Panel>
         <Field label="发布状态">
-          <select value={state} onChange={(event) => { setParams({ state: event.target.value }, { replace: true }); setAfter(0) }}>
+          <Select value={state} onChange={(value) => { setParams({ state: value }, { replace: true }); setAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
             <option value="PENDING">PENDING</option>
             <option value="SENT">SENT</option>
-          </select>
+          </Select>
         </Field>
       </Panel>
       <Panel className="table-panel">
@@ -83,18 +87,18 @@ export function OutboxPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['outbox', state]} after={after} onPage={setAfter} pageSize={50}
+        <CursorPager scope={['outbox', state]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           rows={publications.isSuccess ? publications.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">维护任务</h2>
         <div className="panel-inset">
-          <select value={taskState} onChange={(event) => { setTaskState(event.target.value as typeof taskState); setTaskAfter(0) }}>
+          <Select value={taskState} onChange={(value) => { setTaskState(value as typeof taskState); setTaskAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
             <option value="READY">READY</option>
             <option value="RUNNING">RUNNING</option>
             <option value="DONE">DONE</option>
-          </select>
+          </Select>
         </div>
         <QueryGate query={tasks} emptyTitle="没有任务" emptyDetail="当前状态下没有发布任务。">
           {(rows) => (
@@ -115,7 +119,7 @@ export function OutboxPage() {
             </>
           )}
         </QueryGate>
-        <CursorPager scope={['outbox-tasks', taskState]} after={taskAfter} onPage={setTaskAfter} pageSize={50}
+        <CursorPager scope={['outbox-tasks', taskState]} after={taskAfter} onPage={setTaskAfter} pageSize={taskSize} onPageSize={setTaskSize}
           rows={tasks.isSuccess ? tasks.data : undefined} getCursor={(row) => row.id} />
       </Panel>
       {selected && (
@@ -129,7 +133,7 @@ export function OutboxPage() {
             <Field label="工单引用"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
             <div className="modal-actions">
               <Button onClick={() => setSelected(undefined)} disabled={replay.isPending}>取消</Button>
-              <Button tone="primary" type="submit" disabled={replay.isPending}>确认重放</Button>
+              <Button tone="primary" type="submit" loading={replay.isPending}>确认重放</Button>
             </div>
           </form>
         </Modal>

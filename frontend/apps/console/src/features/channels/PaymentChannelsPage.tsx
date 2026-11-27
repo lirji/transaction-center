@@ -1,3 +1,4 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
@@ -7,6 +8,7 @@ import { parseChannelCode, parseCurrencyCode, parseHttpsUrl } from '../../shared
 
 export function PaymentChannelsPage() {
   const [after, setAfter] = useState(0)
+  const [pageSize, setPageSize] = usePageSize('payment-channels', 20, () => setAfter(0))
   const [channelCode, setChannelCode] = useState('')
   const [channelMerchantNo, setChannelMerchantNo] = useState('')
   const [currency, setCurrency] = useState('CNY')
@@ -15,7 +17,7 @@ export function PaymentChannelsPage() {
   const [returnUrl, setReturnUrl] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['payment-channels', after], queryFn: () => api.paymentChannels(after) })
+  const query = useQuery({ queryKey: ['payment-channels', after, pageSize], queryFn: () => api.paymentChannels(after, pageSize) })
   const create = useMutation({
     mutationFn: api.createPaymentChannel,
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['payment-channels'] }) },
@@ -70,13 +72,13 @@ export function PaymentChannelsPage() {
               </>
             )}
           </QueryGate>
-          <CursorPager scope={['payment-channels']} after={after} onPage={setAfter} pageSize={20}
+          <CursorPager scope={['payment-channels']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.channelId} />
         </Panel>
         <Panel>
           <h2>登记渠道</h2>
           <MutationBanner error={create.error} success={create.data ? `resourceId=${create.data.resourceId}` : undefined} />
-          <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={create.isPending}>登记</Button>}>
+          <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" loading={create.isPending}>登记</Button>}>
             <Field label="渠道编码" error={formError} hint="须符合 ^[A-Z][A-Z0-9_]{0,63}$">
               <input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} required />
             </Field>

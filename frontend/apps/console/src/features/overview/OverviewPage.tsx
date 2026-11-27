@@ -64,10 +64,11 @@ export function OverviewPage() {
     <div className="workspace">
       <PageHeader title="交易运营工作台" description="查看当前交易受理状态，进入需要跟进的业务队列。" />
       <div className="section-gap">
+        <OperationsSummary />
         <div className="workbench-top">
           <Panel className="table-panel">
             <h2 className="table-title">当前待处理</h2>
-            <DataTable label="当前待处理事项" className="queue-table overview-queue-table">
+            <DataTable tools={false} label="当前待处理事项" className="queue-table overview-queue-table">
               <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
               <tbody>
                 <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}
@@ -94,7 +95,6 @@ export function OverviewPage() {
             </dl>
           </Panel>
         </div>
-        <OperationsSummary />
       </div>
     </div>
   )

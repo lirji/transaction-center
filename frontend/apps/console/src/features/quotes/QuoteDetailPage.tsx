@@ -47,7 +47,7 @@ export function QuoteDetailPage() {
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">冻结商品</h2>
-        <DataTable label="报价商品明细">
+        <DataTable label="报价商品明细" refreshing={detail.isFetching} onRefresh={() => void detail.refetch()}>
           <thead><tr><th>SKU ID</th><th>SKU 修订</th><th>标题</th><th>数量</th><th className="numeric-cell">单价</th><th>应付</th></tr></thead>
           <tbody>
             {row.items.map((item) => (

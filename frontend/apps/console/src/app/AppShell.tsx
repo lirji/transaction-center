@@ -37,7 +37,7 @@ export function AppShell() {
     .flatMap((entry) => entry.items.map((item) => ({ ...item, group: entry.label })))
     .filter((item) => `${item.label} ${item.group}`.toLowerCase().includes(query.trim().toLowerCase()))
   const audienceOk = auth.audience.includes('transaction-center') || auth.audience.length === 0
-  const restoreOrder = Boolean(location.state?.returnedOrder)
+  const restoreOrder = Boolean(location.state?.returnedOrder || location.state?.restoreListScroll)
 
   useEffect(() => {
     setNavOpen(false)
@@ -107,7 +107,7 @@ export function AppShell() {
               {isDetail ? (
                 <>
                   <li><Link to={{ pathname: sectionPath, search: typeof listSearch === 'string' ? listSearch : '' }}
-                    state={sectionPath === '/orders' ? { returnedOrder: location.state?.listOrderRef } : undefined}>{current?.label}</Link><ChevronRight size={14} aria-hidden="true" /></li>
+                    state={typeof listSearch === 'string' ? { restoreListScroll: true, returnedOrder: location.state?.listOrderRef } : undefined}>{current?.label}</Link><ChevronRight size={14} aria-hidden="true" /></li>
                   <li aria-current="page">详情</li>
                 </>
               ) : <li aria-current="page">{current?.label ?? '控制台'}</li>}

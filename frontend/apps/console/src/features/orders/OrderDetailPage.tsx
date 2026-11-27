@@ -1,3 +1,4 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -72,7 +73,7 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
               setCopyResult('复制失败，可选中订单号手动复制')
             }
           }}>复制订单号</button>
-          <Link className="button secondary" to={{ pathname: '/orders', search: listSearch }} state={{ returnedOrder: order.orderNo }}>返回订单列表</Link>
+          <Link className="button secondary" to={{ pathname: '/orders', search: listSearch }} state={{ returnedOrder: order.orderNo, restoreListScroll: typeof location.state?.ordersSearch === 'string' }}>返回订单列表</Link>
           {showFulfill ? <Link className="button primary" to={`/fulfillment?orderNo=${encodeURIComponent(order.orderNo)}`}>声明履约</Link> : null}
         </>}
       />
@@ -130,7 +131,7 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
         ) : null}
         {active === 'items' ? <Panel className="table-panel">
           <h2 className="table-title">冻结商品</h2>
-          <DataTable label="冻结商品明细">
+          <DataTable label="冻结商品明细" refreshing={detail.isFetching} onRefresh={() => void detail.refetch()}>
             <thead><tr><th>商品快照标题</th><th>SKU</th><th className="numeric-cell">数量</th><th className="numeric-cell">已验收退货量</th><th className="numeric-cell">冻结单价</th><th className="numeric-cell">行应付</th><th>SKU 修订</th><th>明细编号</th></tr></thead>
             <tbody>
               {order.items.map((item) => (
@@ -176,15 +177,16 @@ function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children 
   resource: string
   title: string
   emptyTitle: string
-  read: (query: { orderNo: string; after: string }, signal: AbortSignal) => Promise<{
+  read: (query: { orderNo: string; after: string; limit: number }, signal: AbortSignal) => Promise<{
     items: T[]; nextAfter: string | null; hasMore: boolean; observedAt: string
   }>
   children: (rows: T[]) => ReactNode
 }) {
   const [after, setAfter] = useState('0')
+  const [pageSize, setPageSize] = usePageSize('order-detail-records', 20, () => setAfter('0'))
   const query = useQuery({
-    queryKey: [resource, orderNo, after],
-    queryFn: ({ signal }) => read({ orderNo, after }, signal),
+    queryKey: [resource, orderNo, after, pageSize],
+    queryFn: ({ signal }) => read({ orderNo, after, limit: pageSize }, signal),
     retry: false,
   })
   return (
@@ -193,7 +195,7 @@ function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children 
       <PageQueryGate query={query} emptyTitle={emptyTitle} emptyDetail="当前订单没有匹配记录。">
         {(page) => children(page.items)}
       </PageQueryGate>
-      <PagePager scope={[`order-detail-${resource}`, orderNo]} after={after} onPage={setAfter}
+      <PagePager scope={[`order-detail-${resource}`, orderNo]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
         result={query.isSuccess ? query.data : undefined} />
     </Panel>
   )
@@ -201,9 +203,10 @@ function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children 
 
 function OrderRefunds({ orderNo }: { orderNo: string }) {
   const [after, setAfter] = useState(0)
+  const [pageSize, setPageSize] = usePageSize('order-detail-refunds', 20, () => setAfter(0))
   const query = useQuery({
-    queryKey: ['admin-refunds', orderNo, 'ALL', after],
-    queryFn: ({ signal }) => api.refunds({ orderNo, status: 'ALL', after }, signal),
+    queryKey: ['admin-refunds', orderNo, 'ALL', after, pageSize],
+    queryFn: ({ signal }) => api.refunds({ orderNo, status: 'ALL', after, limit: pageSize }, signal),
     retry: false,
   })
   return (
@@ -212,7 +215,7 @@ function OrderRefunds({ orderNo }: { orderNo: string }) {
       <QueryGate query={query} emptyTitle="本单无退款" emptyDetail="当前订单没有退款记录。">
         {(rows) => <RefundRows rows={rows} />}
       </QueryGate>
-      <CursorPager scope={['order-detail-refunds', orderNo]} after={after} onPage={setAfter} pageSize={20}
+      <CursorPager scope={['order-detail-refunds', orderNo]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
         rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.cursor} />
     </Panel>
   )

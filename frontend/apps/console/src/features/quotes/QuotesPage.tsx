@@ -1,7 +1,8 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
+import { Field, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminQuoteView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
@@ -20,7 +21,7 @@ export function QuoteRows({ rows, observedAt }: { rows: AdminQuoteView[]; observ
           const expired = observedAt ? Date.parse(observedAt) >= Date.parse(row.expiresAt) : undefined
           return (
             <tr key={row.quoteId}>
-              <td><Link to={`/quotes/${encodeURIComponent(row.quoteId)}`} state={listState} className="mono">{row.businessNo ?? row.quoteId}</Link></td>
+              <td><CopyValue value={row.businessNo ?? row.quoteId} name="报价号"><Link to={`/quotes/${encodeURIComponent(row.quoteId)}`} state={listState} className="mono">{row.businessNo ?? row.quoteId}</Link></CopyValue></td>
               <td className="mono">{row.memberId}</td>
               <td className="numeric-cell">{formatMinorAmount(row.payableAmount)}</td>
               <td>{row.currency}</td>
@@ -37,7 +38,7 @@ export function QuoteRows({ rows, observedAt }: { rows: AdminQuoteView[]; observ
 }
 
 export function QuotesPage() {
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [quoteId, setQuoteId] = useState(() => params.get('quoteId') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
   const [from, setFrom] = useState(() => isoFromSearch(params, 'createdFrom'))
@@ -54,8 +55,8 @@ export function QuotesPage() {
   })() : ''
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
   const query = useQuery({
-    queryKey: ['admin-quotes', after, filters],
-    queryFn: () => api.quotes({ after, ...filters }),
+    queryKey: ['admin-quotes', after, pageSize, filters],
+    queryFn: () => api.quotes({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
   })
@@ -92,7 +93,12 @@ export function QuotesPage() {
       />
       <Panel>
         <h2>筛选</h2>
-        <FilterBar onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
+        <FilterBar applied={appliedFilters(params, remove, [
+          ['报价号', 'quoteId', () => setQuoteId('')],
+          ['会员 ID', 'memberId', () => setMemberId('')],
+          ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+        ])}
+          onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
           activeAdvanced={[filters.createdFrom || filters.createdTo].filter(Boolean).length}
           advanced={<>
             <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
@@ -110,7 +116,7 @@ export function QuotesPage() {
             <PageQueryGate query={query} emptyTitle="没有报价" emptyDetail="当前筛选没有报价记录。">
               {(page) => <QuoteRows rows={page.items} observedAt={page.observedAt} />}
             </PageQueryGate>
-            <PagePager scope={['quotes', filters]} after={after} onPage={setAfter}
+            <PagePager scope={['quotes', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

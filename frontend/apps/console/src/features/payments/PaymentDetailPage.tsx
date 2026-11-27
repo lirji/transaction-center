@@ -1,3 +1,5 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
+import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -11,6 +13,7 @@ import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
 export function PaymentDetailPage() {
   const { paymentNo = '' } = useParams()
   const [after, setAfter] = useState('0')
+  const [pageSize, setPageSize] = usePageSize('payment-attempts', 20, () => setAfter('0'))
   const [status, setStatus] = useState('')
   const detail = useQuery({
     queryKey: ['admin-payment', paymentNo],
@@ -19,8 +22,8 @@ export function PaymentDetailPage() {
     enabled: Boolean(paymentNo),
   })
   const attempts = useQuery({
-    queryKey: ['admin-attempts', paymentNo, after, status],
-    queryFn: () => api.paymentAttempts(paymentNo, { after, status: status || undefined }),
+    queryKey: ['admin-attempts', paymentNo, after, pageSize, status],
+    queryFn: () => api.paymentAttempts(paymentNo, { after, limit: pageSize, status: status || undefined }),
     retry: false,
     enabled: Boolean(paymentNo),
   })
@@ -63,13 +66,13 @@ export function PaymentDetailPage() {
           <div className="table-toolbar">
             <h2>尝试</h2>
             <label>status
-              <select value={status} onChange={(event) => { setStatus(event.target.value); setAfter('0') }}>
+              <Select value={status} onChange={(value) => { setStatus(value); setAfter('0') }}>
                 <option value="">全部</option>
                 <option value="PREPARED">PREPARED</option>
                 <option value="UNKNOWN">UNKNOWN</option>
                 <option value="SUCCEEDED">SUCCEEDED</option>
                 <option value="CLOSED">CLOSED</option>
-              </select>
+              </Select>
             </label>
           </div>
           <PageQueryGate query={attempts} emptyTitle="没有尝试" emptyDetail="该支付意图没有匹配的尝试记录。">
@@ -93,7 +96,7 @@ export function PaymentDetailPage() {
               </>
             )}
           </PageQueryGate>
-          <PagePager scope={['payment-attempts', paymentNo, status]} after={after} onPage={setAfter}
+          <PagePager scope={['payment-attempts', paymentNo, status]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             result={attempts.isSuccess ? attempts.data : undefined} />
         </Panel>
       </div>

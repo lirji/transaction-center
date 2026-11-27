@@ -1,9 +1,11 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
+import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
+import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminReceiptView } from '../../shared/api/client'
-import { formatMinorAmount } from '../../shared/api/money'
+import { formatMinor, formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseReceiptDispositionFilter, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
@@ -17,18 +19,21 @@ const NORMAL_RECEIPT = receiptDispositionSchema.enum.NORMAL
 
 export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
   const listState = useListLinkState('/receipts')
+  const [preview, setPreview] = useState<string>()
+  const selected = rows.find((row) => row.receiptNo === preview)
   return (
+    <>
     <DataTable label="实收列表" className="receipt-table pin-key">
       <thead>
         <tr>
           <th>实收单号</th><th>实收分类</th><th className="numeric-cell">实收金额</th><th>币种</th><th>渠道</th>
-          <th>订单号</th><th>支付单号</th><th className="time-cell">确认时间（北京时间）</th><th>未占用金额</th>
+          <th>订单号</th><th>支付单号</th><th className="time-cell">确认时间（北京时间）</th><th>未占用金额</th><th>操作</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.receiptNo}>
-            <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} state={listState} className="mono">{row.businessNo ?? row.receiptNo}</Link></td>
+            <td><CopyValue value={row.businessNo ?? row.receiptNo} name="实收单号"><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} state={listState} className="mono">{row.businessNo ?? row.receiptNo}</Link></CopyValue></td>
             <td><Badge tone={row.disposition === NORMAL_RECEIPT ? 'good' : 'warn'}>{dispositionLabels[row.disposition]}</Badge></td>
             <td className="numeric-cell">{formatMinorAmount(row.amount)}</td>
             <td>{row.currency}</td>
@@ -37,15 +42,36 @@ export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
             <td><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentBusinessNo ?? row.paymentNo}</Link></td>
             <td className="time-cell">{formatBeijingTime(row.confirmedAt)}</td>
             <td className="numeric-cell">{formatMinorAmount(row.unreservedAmount)}</td>
+            <td className="row-action-cell"><Button tone="ghost" aria-haspopup="dialog" onClick={() => setPreview(row.receiptNo)}>查看摘要</Button></td>
           </tr>
         ))}
       </tbody>
     </DataTable>
+    {selected && <Modal variant="drawer" title={selected.businessNo ?? selected.receiptNo}
+      description="实收摘要" onClose={() => setPreview(undefined)}>
+      <div className="drawer-body">
+        <dl className="summary-fields">
+          <div><dt>实收金额</dt><dd className="summary-amount">{formatMinor(selected.amount, selected.currency)}</dd></div>
+          <div><dt>实收分类</dt><dd><Badge tone={selected.disposition === NORMAL_RECEIPT ? 'good' : 'warn'}>{dispositionLabels[selected.disposition]}</Badge></dd></div>
+          <div><dt>已退金额</dt><dd>{formatMinor(selected.refundedAmount, selected.currency)}</dd></div>
+          <div><dt>退款预占</dt><dd>{formatMinor(selected.refundReservedAmount, selected.currency)}</dd></div>
+        </dl>
+        <dl className="kv detail-meta">
+          <dt>渠道</dt><dd>{selected.channelCode}</dd>
+          <dt>渠道支付时间（北京时间）</dt><dd>{formatBeijingTime(selected.providerPaidAt)}</dd>
+          <dt>确认时间（北京时间）</dt><dd>{formatBeijingTime(selected.confirmedAt)}</dd>
+          <dt>订单号</dt><dd><Link to={`/orders/${encodeURIComponent(selected.orderNo)}`}>{selected.orderBusinessNo ?? selected.orderNo}</Link></dd>
+        </dl>
+      </div>
+      <footer className="modal-actions drawer-footer"><Link className="button primary" state={listState}
+        to={`/receipts/${encodeURIComponent(selected.receiptNo)}`}>查看完整实收详情</Link></footer>
+    </Modal>}
+    </>
   )
 }
 
 export function ReceiptsPage() {
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [receiptNo, setReceiptNo] = useState(() => params.get('receiptNo') ?? '')
   const [paymentNo, setPaymentNo] = useState(() => params.get('paymentNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
@@ -76,8 +102,8 @@ export function ReceiptsPage() {
     Boolean(filters.confirmedFrom) !== Boolean(filters.confirmedTo)
 
   const query = useQuery({
-    queryKey: ['admin-receipts', after, filters],
-    queryFn: () => api.paymentReceipts({ after, ...filters }),
+    queryKey: ['admin-receipts', after, pageSize, filters],
+    queryFn: () => api.paymentReceipts({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !urlConflict && !incompleteWindow,
   })
@@ -139,7 +165,17 @@ export function ReceiptsPage() {
           <Button aria-pressed={!filters.abnormalOnly && !filters.disposition} onClick={() => applyPreset(false)}>全部实收</Button>
           <Button aria-pressed={Boolean(filters.abnormalOnly && !filters.disposition)} onClick={() => applyPreset(true)}>异常实收</Button>
         </div>
-        <FilterBar onSubmit={submit} onReset={resetFilters} invalid={incompleteWindow || (Boolean(formError) && !conflict)}
+        <FilterBar applied={appliedFilters(params, remove, [
+          ['实收单号', 'receiptNo', () => setReceiptNo('')],
+          ['支付单号', 'paymentNo', () => setPaymentNo('')],
+          ['订单号', 'orderNo', () => setOrderNo('')],
+          ['渠道', 'channelCode', () => setChannelCode('')],
+          ['实收分类', 'disposition', () => setDisposition(''), (value) => dispositionLabels[value as keyof typeof dispositionLabels] ?? value],
+          ['异常范围', 'abnormalOnly', () => setAbnormalOnly(false), () => '仅异常'],
+          ['登记时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+          ['确认时间', ['confirmedFrom', 'confirmedTo'], () => { setBusinessFrom(''); setBusinessTo('') }],
+        ])}
+          onSubmit={submit} onReset={resetFilters} invalid={incompleteWindow || (Boolean(formError) && !conflict)}
           activeAdvanced={[filters.paymentNo, filters.channelCode, filters.createdFrom || filters.createdTo, filters.confirmedFrom || filters.confirmedTo].filter(Boolean).length}
           advanced={<>
             <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
@@ -151,10 +187,10 @@ export function ReceiptsPage() {
           <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
           <Field label="实收分类"><EmptySelect value={disposition} onChange={setDisposition} options={DISPOSITIONS} optionLabel={(value) => dispositionLabels[value as keyof typeof dispositionLabels]} /></Field>
           <Field label="异常范围" error={conflict ? '仅异常与正常实收互斥' : formError || undefined}>
-            <select value={abnormalOnly ? 'true' : ''} onChange={(event) => setAbnormalOnly(event.target.value === 'true')}>
+            <Select value={abnormalOnly ? 'true' : ''} onChange={(value) => setAbnormalOnly(value === 'true')}>
               <option value="">否</option>
               <option value="true">仅异常</option>
-            </select>
+            </Select>
           </Field>
         </FilterBar>
       </Panel>
@@ -167,7 +203,7 @@ export function ReceiptsPage() {
             <PageQueryGate query={query} emptyTitle="没有收款" emptyDetail="当前筛选没有实收记录。">
               {(page) => <ReceiptRows rows={page.items} />}
             </PageQueryGate>
-            <PagePager scope={['receipts', filters]} after={after} onPage={setAfter}
+            <PagePager scope={['receipts', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

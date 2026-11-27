@@ -1,3 +1,4 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, CursorPager, Field, PageHeader, Panel, StackForm, DataTable } from '../../components/ui'
@@ -6,6 +7,7 @@ import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 
 export function ConsentsPage() {
   const [after, setAfter] = useState(0)
+  const [pageSize, setPageSize] = usePageSize('consent-documents', 20, () => setAfter(0))
   const [purpose, setPurpose] = useState('')
   const [documentVersion, setDocumentVersion] = useState('')
   const [title, setTitle] = useState('')
@@ -13,7 +15,7 @@ export function ConsentsPage() {
   const [contentHash, setContentHash] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['consent-documents', after], queryFn: () => api.consentDocuments(after) })
+  const query = useQuery({ queryKey: ['consent-documents', after, pageSize], queryFn: () => api.consentDocuments(after, pageSize) })
   const publish = useMutation({
     mutationFn: api.publishConsentDocument,
     onSuccess: async () => {
@@ -74,13 +76,13 @@ export function ConsentsPage() {
               </>
             )}
           </QueryGate>
-          <CursorPager scope={['consent-documents']} after={after} onPage={setAfter} pageSize={20}
+          <CursorPager scope={['consent-documents']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.id} />
         </Panel>
         <Panel>
           <h2>发布新版本</h2>
           <MutationBanner error={publish.error} success={publish.data ? `已发布 resourceId=${publish.data.resourceId}` : undefined} />
-          <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={publish.isPending}>发布</Button>}>
+          <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" loading={publish.isPending}>发布</Button>}>
             <Field label="用途"><input value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={64} /></Field>
             <Field label="版本"><input value={documentVersion} onChange={(event) => setDocumentVersion(event.target.value)} maxLength={64} /></Field>
             <Field label="标题"><input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={200} /></Field>

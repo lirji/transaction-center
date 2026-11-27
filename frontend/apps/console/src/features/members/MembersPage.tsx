@@ -1,3 +1,6 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
+import { DateTimePicker } from '../../components/DateTimePicker'
+import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
@@ -21,7 +24,7 @@ const MEMBER_STATUS_LABELS: Record<string, string> = { [MEMBER_ACTIVE]: '正常'
 export function MembersPage() {
   const auth = useAuth()
   const canEvidence = auth.hasScope(TRADE_ADMIN_EVIDENCE_READ)
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
     memberId: params.get('memberId') || undefined,
     status: params.get('status') || undefined,
@@ -38,7 +41,7 @@ export function MembersPage() {
   const [reason, setReason] = useState('')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['members', after, filters], queryFn: () => api.members({ after, ...filters }) })
+  const query = useQuery({ queryKey: ['members', after, pageSize, filters], queryFn: () => api.members({ after, limit: pageSize, ...filters }) })
   const change = useMutation({
     mutationFn: (payload: { member: Member; targetStatus: 'ACTIVE' | 'FROZEN'; reason: string }) =>
       api.changeMemberStatus(payload.member.memberId, {
@@ -70,7 +73,12 @@ export function MembersPage() {
         description="查询会员注册与支付事实，按需冻结、解冻或评估资格。"
       />
       <MutationBanner error={change.error} success={change.isSuccess ? `已提交状态变更，resourceId=${change.data?.resourceId}` : undefined} />
-      <FilterBar onReset={clearFilters} invalid={Boolean(filterError)} activeAdvanced={params.has('registeredFrom') || params.has('registeredTo') ? 1 : 0}
+      <FilterBar applied={appliedFilters(params, remove, [
+          ['会员 ID', 'memberId', () => setMemberFilter('')],
+          ['会员状态', 'status', () => setStatusFilter(''), (value) => MEMBER_STATUS_LABELS[value] ?? value],
+          ['注册时间', ['registeredFrom', 'registeredTo'], () => { setRegisteredFrom(''); setRegisteredTo('') }],
+        ])}
+          onReset={clearFilters} invalid={Boolean(filterError)} activeAdvanced={params.has('registeredFrom') || params.has('registeredTo') ? 1 : 0}
         advanced={<TimeRangeFields labelPrefix="注册" from={registeredFrom} to={registeredTo} onFrom={setRegisteredFrom} onTo={setRegisteredTo} />} onSubmit={() => {
         setFilterError('')
         try {
@@ -122,8 +130,8 @@ export function MembersPage() {
             </>
           )}
         </QueryGate>
-        <PagePager scope={['members', filters]} after={after} onPage={setAfter}
-          result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.memberId ?? null, hasMore: query.data.length === 20 } : undefined} />
+        <PagePager scope={['members', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+          result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.memberId ?? null, hasMore: query.data.length === pageSize } : undefined} />
       </Panel>
       {selected && (
         <Modal
@@ -148,7 +156,7 @@ export function MembersPage() {
             </Field>
             <div className="modal-actions">
               <Button onClick={() => setSelected(undefined)} disabled={change.isPending}>取消</Button>
-              <Button tone="primary" type="submit" disabled={change.isPending}>提交</Button>
+              <Button tone="primary" type="submit" loading={change.isPending}>提交</Button>
             </div>
           </form>
         </Modal>
@@ -204,20 +212,20 @@ function EligibilityPanel({ initialMemberId }: { initialMemberId: string }) {
       {formError ? <StateBanner tone="warn" title="未发送请求" detail={formError} /> : null}
       <StackForm
         onSubmit={submit}
-        actions={<Button tone="primary" type="submit" disabled={query.isPending}>评估</Button>}
+        actions={<Button tone="primary" type="submit" loading={query.isPending}>评估</Button>}
       >
         <Field label="memberId"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} required /></Field>
         <Field label="policyVersion">
-          <select value={policyVersion} onChange={(event) => setPolicyVersion(event.target.value as typeof policyVersion)}>
+          <Select value={policyVersion} onChange={(value) => setPolicyVersion(value as typeof policyVersion)}>
             <option value="NEVER_CONFIRMED_PAID_V1">NEVER_CONFIRMED_PAID_V1</option>
             <option value="REGISTERED_DURING_CAMPAIGN_V1">REGISTERED_DURING_CAMPAIGN_V1</option>
-          </select>
+          </Select>
         </Field>
         <Field label="活动开始时间（北京时间）">
-          <input type="datetime-local" value={campaignStartAt} onChange={(event) => setCampaignStartAt(event.target.value)} />
+          <DateTimePicker value={campaignStartAt} onChange={setCampaignStartAt} />
         </Field>
         <Field label="评估时间（北京时间）">
-          <input type="datetime-local" value={evaluatedAt} onChange={(event) => setEvaluatedAt(event.target.value)} />
+          <DateTimePicker value={evaluatedAt} onChange={setEvaluatedAt} />
         </Field>
       </StackForm>
       {query.data ? (

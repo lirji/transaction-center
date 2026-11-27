@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { Button, EmptyState, StateBanner } from '../../components/ui'
+import { TableQueryContext } from './tableQuery'
 import { ApiProblem, describeProblem, isVersionConflict } from '../api/client'
 
 export function QueryError({ query }: { query: UseQueryResult<unknown> }) {
@@ -20,13 +21,15 @@ export function QueryGate<T>({ query, emptyTitle, emptyDetail, children }: {
   emptyDetail: string
   children: (data: T) => ReactNode
 }) {
-  if (query.isLoading) return <StateBanner tone="loading" title="正在读取" detail="正在获取当前记录，请稍候。" />
+  if (query.isLoading) return <QuerySkeleton />
   if (query.isError) return <QueryError query={query} />
   const data = query.data
   if (data === undefined || (Array.isArray(data) && data.length === 0)) {
-    return <EmptyState title={emptyTitle} detail={emptyDetail} />
+    return <EmptyState title={emptyTitle} detail={emptyDetail} action={<Button tone="ghost" loading={query.isFetching} onClick={() => void query.refetch()}>重新查询</Button>} />
   }
-  return children(data)
+  return <TableQueryContext.Provider value={{ refreshing: query.isFetching, refresh: () => void query.refetch() }}>
+    {children(data)}
+  </TableQueryContext.Provider>
 }
 
 export function PageQueryGate<T extends { items: unknown[] }>({ query, emptyTitle, emptyDetail, children }: {
@@ -35,13 +38,21 @@ export function PageQueryGate<T extends { items: unknown[] }>({ query, emptyTitl
   emptyDetail: string
   children: (data: T) => ReactNode
 }) {
-  if (query.isLoading) return <StateBanner tone="loading" title="正在读取" detail="正在获取当前记录，请稍候。" />
+  if (query.isLoading) return <QuerySkeleton />
   if (query.isError) return <QueryError query={query} />
   const data = query.data
   if (!data || data.items.length === 0) {
-    return <EmptyState title={emptyTitle} detail={emptyDetail} />
+    return <EmptyState title={emptyTitle} detail={emptyDetail} action={<Button tone="ghost" loading={query.isFetching} onClick={() => void query.refetch()}>重新查询</Button>} />
   }
-  return children(data)
+  return <TableQueryContext.Provider value={{ refreshing: query.isFetching, refresh: () => void query.refetch() }}>
+    {children(data)}
+  </TableQueryContext.Provider>
+}
+
+function QuerySkeleton() {
+  return <div className="query-skeleton" role="status" aria-label="正在读取">
+    <span /><span /><span />
+  </div>
 }
 
 export function MutationBanner({ error, success }: { error: unknown; success?: string }) {

@@ -1,7 +1,8 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
+import { Badge, Field, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminPaymentView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
@@ -29,7 +30,7 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
         {rows.map((row) => (
           <tr key={row.paymentNo}>
             <td>
-              <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} state={listState} className="mono">{row.businessNo ?? row.paymentNo}</Link>
+              <CopyValue value={row.businessNo ?? row.paymentNo} name="支付单号"><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} state={listState} className="mono">{row.businessNo ?? row.paymentNo}</Link></CopyValue>
             </td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{paymentLabels[row.status]}</Badge></td>
@@ -46,7 +47,7 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
 }
 
 export function PaymentsPage() {
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [paymentNo, setPaymentNo] = useState(() => params.get('paymentNo') ?? '')
   const [orderNo, setOrderNo] = useState(() => params.get('orderNo') ?? '')
   const [memberId, setMemberId] = useState(() => params.get('memberId') ?? '')
@@ -69,8 +70,8 @@ export function PaymentsPage() {
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
 
   const query = useQuery({
-    queryKey: ['admin-payments', after, filters],
-    queryFn: () => api.payments({ after, ...filters }),
+    queryKey: ['admin-payments', after, pageSize, filters],
+    queryFn: () => api.payments({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !memberUrlError && !incompleteWindow,
   })
@@ -111,7 +112,14 @@ export function PaymentsPage() {
       />
       <Panel>
         <h2>筛选</h2>
-        <FilterBar onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
+        <FilterBar applied={appliedFilters(params, remove, [
+          ['支付单号', 'paymentNo', () => setPaymentNo('')],
+          ['订单号', 'orderNo', () => setOrderNo('')],
+          ['会员 ID', 'memberId', () => setMemberId('')],
+          ['支付状态', 'status', () => setStatus(''), (value) => paymentLabels[value as keyof typeof paymentLabels] ?? value],
+          ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+        ])}
+          onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
           activeAdvanced={[filters.createdFrom || filters.createdTo].filter(Boolean).length}
           advanced={<>
             <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
@@ -131,7 +139,7 @@ export function PaymentsPage() {
             <PageQueryGate query={query} emptyTitle="没有支付意图" emptyDetail="当前筛选没有支付记录。">
               {(page) => <PaymentRows rows={page.items} />}
             </PageQueryGate>
-            <PagePager scope={['payments', filters]} after={after} onPage={setAfter}
+            <PagePager scope={['payments', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

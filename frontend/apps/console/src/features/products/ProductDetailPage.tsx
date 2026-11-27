@@ -1,3 +1,5 @@
+import { usePageSize } from '../../shared/ui/usePageSize'
+import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation, useParams } from 'react-router-dom'
@@ -22,7 +24,8 @@ function ProductDetail({ id }: { id: string }) {
   const list = { pathname: '/products', search: typeof location.state?.listSearch === 'string' ? location.state.listSearch : '' }
   const product = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) })
   const [skuAfter, setSkuAfter] = useState(0)
-  const skus = useQuery({ queryKey: ['product-skus', id, skuAfter], queryFn: () => api.productSkus(id, skuAfter), enabled: Boolean(id) })
+  const [pageSize, setPageSize] = usePageSize('product-skus', 20, () => setSkuAfter(0))
+  const skus = useQuery({ queryKey: ['product-skus', id, skuAfter, pageSize], queryFn: () => api.productSkus(id, skuAfter, pageSize), enabled: Boolean(id) })
   const [name, setName] = useState('')
   const [unitPrice, setUnitPrice] = useState('')
   const [currency, setCurrency] = useState('')
@@ -85,7 +88,7 @@ function ProductDetail({ id }: { id: string }) {
   if (product.isLoading) return <div className="workspace"><StateBanner tone="loading" title="正在读取商品" detail="正在获取商品目录及规格。" /></div>
   if (product.isError || !product.data) {
     const problem = describeProblem(product.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to={list}>返回列表</Link></div>
+    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to={list} state={typeof location.state?.listSearch === 'string' ? { restoreListScroll: true } : undefined}>返回列表</Link></div>
   }
   const current = product.data
   const draft = current.status === productStatusSchema.enum.DRAFT
@@ -153,7 +156,7 @@ function ProductDetail({ id }: { id: string }) {
         title={current.name}
         description={`版本 ${current.version} · 目录价用于商品管理，实际应付额以订单为准。`}
         actions={<>
-          <Link className="button secondary" to={list}>返回列表</Link>
+          <Link className="button secondary" to={list} state={typeof location.state?.listSearch === 'string' ? { restoreListScroll: true } : undefined}>返回列表</Link>
           {draft && <Button tone="primary" disabled={publish.isPending} aria-haspopup="dialog" onClick={() => setConfirm('publish')}>发布</Button>}
           {current.status === productStatusSchema.enum.PUBLISHED &&
             <Button disabled={unpublish.isPending} aria-haspopup="dialog" onClick={() => setConfirm('unpublish')}>下架</Button>}
@@ -180,7 +183,7 @@ function ProductDetail({ id }: { id: string }) {
           {skus.isError ? <StateBanner tone="error" title={describeProblem(skus.error).title} detail={describeProblem(skus.error).detail} /> : null}
           {skus.data && skus.data.length > 0 ? (
             <>
-              <DataTable label="商品 SKU 列表" className="trade-list-table pin-key">
+              <DataTable label="商品 SKU 列表" refreshing={skus.isFetching} onRefresh={() => void skus.refetch()} className="trade-list-table pin-key">
                 <thead><tr><th>SKU 标题</th><th>SKU 编码</th><th>SKU ID</th><th>规格</th><th>库存类型</th><th className="numeric-cell">单价</th><th>币种</th><th>修订</th>{draft ? <th>操作</th> : null}</tr></thead>
                 <tbody>
                   {skus.data.map((row) => (
@@ -214,14 +217,14 @@ function ProductDetail({ id }: { id: string }) {
               </DataTable>
             </>
           ) : skus.data ? <div className="panel-inset"><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
-          <CursorPager scope={['product-skus', id]} after={skuAfter} onPage={setSkuAfter} pageSize={20}
+          <CursorPager scope={['product-skus', id]} after={skuAfter} onPage={setSkuAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={skus.isSuccess ? skus.data : undefined} getCursor={(row) => row.skuId} />
         </Panel>
         {draft ? (
           <div className="page-grid">
             <Panel>
               <h2>编辑草稿</h2>
-              <StackForm onSubmit={submitEdit} actions={<Button tone="primary" type="submit" disabled={edit.isPending}>保存</Button>}>
+              <StackForm onSubmit={submitEdit} actions={<Button tone="primary" type="submit" loading={edit.isPending}>保存</Button>}>
                 <Field label="名称" wide><input value={name} placeholder={current.name} onChange={(event) => setName(event.target.value)} /></Field>
                 <Field label="单价（最小单位）" error={formError}>
                   <input value={unitPrice} placeholder={String(current.unitPrice)} onChange={(event) => setUnitPrice(event.target.value)} />
@@ -231,15 +234,15 @@ function ProductDetail({ id }: { id: string }) {
             </Panel>
             <Panel>
               <h2>追加 SKU</h2>
-              <StackForm onSubmit={submitSku} actions={<Button tone="primary" type="submit" disabled={addSku.isPending}>追加</Button>}>
+              <StackForm onSubmit={submitSku} actions={<Button tone="primary" type="submit" loading={addSku.isPending}>追加</Button>}>
                 <Field label="SKU 编码"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} required /></Field>
                 <Field label="单价（最小单位）" error={skuAddError}><input value={skuPrice} onChange={(event) => setSkuPrice(event.target.value)} required /></Field>
                 <Field label="币种"><input value={skuCurrency} placeholder={current.currency} onChange={(event) => setSkuCurrency(event.target.value)} /></Field>
                 <Field label="库存类型">
-                  <select value={stockType} onChange={(event) => setStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
+                  <Select value={stockType} onChange={(value) => setStockType(value as 'PHYSICAL' | 'SERVICE')}>
                     <option value="PHYSICAL">实物</option>
                     <option value="SERVICE">服务</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="规格键"><input value={specKey} onChange={(event) => setSpecKey(event.target.value)} /></Field>
                 <Field label="规格值"><input value={specValue} onChange={(event) => setSpecValue(event.target.value)} /></Field>
@@ -255,16 +258,16 @@ function ProductDetail({ id }: { id: string }) {
             <Field label="单价" error={skuEditError}><input data-initial-focus value={editPrice} onChange={(event) => setEditPrice(event.target.value)} required /></Field>
             <Field label="币种"><input value={editCurrency} onChange={(event) => setEditCurrency(event.target.value)} /></Field>
             <Field label="库存类型">
-              <select value={editStockType} onChange={(event) => setEditStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
+              <Select value={editStockType} onChange={(value) => setEditStockType(value as 'PHYSICAL' | 'SERVICE')}>
                 <option value="PHYSICAL">实物</option>
                 <option value="SERVICE">服务</option>
-              </select>
+              </Select>
             </Field>
             <Field label="规格键"><input value={editSpecKey} onChange={(event) => setEditSpecKey(event.target.value)} /></Field>
             <Field label="规格值"><input value={editSpecValue} onChange={(event) => setEditSpecValue(event.target.value)} /></Field>
             <footer className="modal-actions">
               <Button onClick={() => setEditing(undefined)} disabled={saveSku.isPending}>取消</Button>
-              <Button tone="primary" type="submit" disabled={saveSku.isPending}>{saveSku.isPending ? '正在保存…' : '保存 SKU'}</Button>
+              <Button tone="primary" type="submit" loading={saveSku.isPending}>{saveSku.isPending ? '正在保存…' : '保存 SKU'}</Button>
             </footer>
           </form>
         </Modal>

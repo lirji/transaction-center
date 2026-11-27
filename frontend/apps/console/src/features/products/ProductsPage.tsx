@@ -1,8 +1,9 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { Badge, Button, DataTable, Field, Modal, PageHeader, PagePager, Panel } from '../../components/ui'
+import { Badge, Button, DataTable, Field, Modal, PageHeader, PagePager, Panel, CopyValue } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { formatMinorAmount, parseInteger } from '../../shared/api/money'
@@ -15,7 +16,7 @@ import { productStatusLabels } from './productDisplay'
 
 export function ProductsPage() {
   const { search } = useLocation()
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
     productNo: params.get('productNo') || undefined,
     skuNo: params.get('skuNo') || undefined,
@@ -34,7 +35,7 @@ export function ProductsPage() {
   const [currency, setCurrency] = useState('CNY')
   const [formError, setFormError] = useState('')
   const queryClient = useQueryClient()
-  const query = useQuery({ queryKey: ['products', after, filters], queryFn: () => api.searchProducts({ after, ...filters }) })
+  const query = useQuery({ queryKey: ['products', after, pageSize, filters], queryFn: () => api.searchProducts({ after, limit: pageSize, ...filters }) })
   const create = useMutation({
     mutationFn: api.createProduct,
     onSuccess: async () => {
@@ -85,7 +86,13 @@ export function ProductsPage() {
         description="查询目录价和发布状态，维护商品与 SKU。"
         actions={<Button tone="primary" aria-haspopup="dialog" onClick={openCreate}><Plus size={16} aria-hidden="true" />创建草稿</Button>}
       />
-      <FilterBar onReset={clearFilters} onSubmit={() => apply({
+      <FilterBar applied={appliedFilters(params, remove, [
+          ['商品编号', 'productNo', () => setProductNoFilter('')],
+          ['SKU 编码', 'skuNo', () => setSkuNoFilter('')],
+          ['商品名称', 'name', () => setNameFilter('')],
+          ['发布状态', 'status', () => setStatusFilter(''), (value) => productStatusLabels[value as keyof typeof productStatusLabels] ?? value],
+        ])}
+          onReset={clearFilters} onSubmit={() => apply({
         productNo: productNoFilter.trim(), skuNo: skuNoFilter.trim(), name: nameFilter.trim(), status: statusFilter,
       })}>
         <Field label="按商品编号"><input value={productNoFilter} onChange={(event) => setProductNoFilter(event.target.value)} maxLength={64} /></Field>
@@ -109,13 +116,13 @@ export function ProductsPage() {
                     <tr key={row.productId}>
                       <td>
                         <Link to={`/products/${row.productId}`} state={{ listSearch: search }}>{row.name}</Link>
-                        <small className="mono">{row.productNo}</small>
+                        <small><CopyValue value={row.productNo} name="商品编号" /></small>
                       </td>
                       <td><Badge tone={row.status === productStatusSchema.enum.PUBLISHED ? 'good' : row.status === productStatusSchema.enum.OFFLINE ? 'neutral' : 'warn'}>{productStatusLabels[row.status]}</Badge></td>
                       <td className="numeric-cell">{formatMinorAmount(row.unitPrice)}</td>
                       <td>{row.currency}</td>
                       <td className="mono">{row.skuId}</td>
-                      <td className="mono">{row.productId}</td>
+                      <td><CopyValue value={row.productId} name="商品 ID" /></td>
                       <td>{row.publishedRevision ?? '—'}</td>
                       <td className="mono">{row.version}</td>
                     </tr>
@@ -125,8 +132,8 @@ export function ProductsPage() {
             </>
           )}
         </QueryGate>
-        <PagePager scope={['products', filters]} after={after} onPage={setAfter}
-          result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.productId ?? null, hasMore: query.data.length === 20 } : undefined} />
+        <PagePager scope={['products', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
+          result={query.isSuccess ? { items: query.data, nextAfter: query.data.at(-1)?.productId ?? null, hasMore: query.data.length === pageSize } : undefined} />
       </Panel>
       {createOpen && (
         <Modal title="创建商品草稿" description="填写商品信息和主 SKU。创建后可在商品详情维护规格并发布。"
@@ -142,7 +149,7 @@ export function ProductsPage() {
             <Field label="币种"><input value={currency} onChange={(event) => setCurrency(event.target.value)} maxLength={3} required /></Field>
             <footer className="modal-actions">
               <Button onClick={() => setCreateOpen(false)} disabled={create.isPending}>取消</Button>
-              <Button tone="primary" type="submit" disabled={create.isPending}>{create.isPending ? '正在创建…' : '创建'}</Button>
+              <Button tone="primary" type="submit" loading={create.isPending}>{create.isPending ? '正在创建…' : '创建'}</Button>
             </footer>
           </form>
         </Modal>

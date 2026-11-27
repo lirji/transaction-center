@@ -1,7 +1,9 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
+import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
+import { Badge, Field, PageHeader, PagePager, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminJobView } from '../../shared/api/client'
 import { FormValidationError, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
@@ -21,7 +23,7 @@ export function JobRows({ rows }: { rows: AdminJobView[] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.jobId}>
-            <td><Link to={`/jobs/${encodeURIComponent(row.jobId)}`} state={listState} className="mono">{row.jobId}</Link></td>
+            <td><CopyValue value={row.jobId} name="任务编号"><Link to={`/jobs/${encodeURIComponent(row.jobId)}`} state={listState} className="mono">{row.jobId}</Link></CopyValue></td>
             <td className="mono">{row.jobType}</td>
             <td><Badge tone={statusTone(row.status)}>{row.status}</Badge></td>
             <td>{row.attempts}</td>
@@ -35,7 +37,7 @@ export function JobRows({ rows }: { rows: AdminJobView[] }) {
 }
 
 export function JobsPage() {
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const [callbackNo, setCallbackNo] = useState(() => params.get('callbackNo') ?? '')
   const [jobType, setJobType] = useState(() => params.get('jobType') ?? '')
   const [status, setStatus] = useState(() => params.get('status') ?? '')
@@ -53,8 +55,8 @@ export function JobsPage() {
   }
   const incompleteWindow = Boolean(filters.createdFrom) !== Boolean(filters.createdTo)
   const query = useQuery({
-    queryKey: ['admin-jobs', after, filters],
-    queryFn: () => api.jobs({ after, ...filters }),
+    queryKey: ['admin-jobs', after, pageSize, filters],
+    queryFn: () => api.jobs({ after, limit: pageSize, ...filters }),
     retry: false,
     enabled: !incompleteWindow,
   })
@@ -95,15 +97,22 @@ export function JobsPage() {
       />
       <Panel>
         <h2>筛选</h2>
-        <FilterBar onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
+        <FilterBar applied={appliedFilters(params, remove, [
+          ['回调接收号', 'callbackNo', () => setCallbackNo('')],
+          ['任务类型', 'jobType', () => setJobType('')],
+          ['状态', 'status', () => setStatus('')],
+          ['租约过期', 'leaseExpired', () => setLeaseExpired(''), (value) => value === 'true' ? '已过期' : '未过期'],
+          ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+        ])}
+          onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
           activeAdvanced={[params.get('leaseExpired'), filters.createdFrom || filters.createdTo].filter(Boolean).length}
           advanced={<>
             <Field label="租约过期">
-            <select value={leaseExpired} onChange={(event) => setLeaseExpired(event.target.value)}>
+            <Select value={leaseExpired} onChange={(value) => setLeaseExpired(value)}>
               <option value="">全部</option>
               <option value="true">已过期</option>
               <option value="false">未过期</option>
-            </select>
+            </Select>
           </Field>
             <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
           </>}>
@@ -121,7 +130,7 @@ export function JobsPage() {
             <PageQueryGate query={query} emptyTitle="没有任务" emptyDetail="当前筛选没有任务记录。">
               {(page) => <JobRows rows={page.items} />}
             </PageQueryGate>
-            <PagePager scope={['jobs', filters]} after={after} onPage={setAfter}
+            <PagePager scope={['jobs', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={query.isSuccess ? query.data : undefined} />
           </>
         )}

@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Locator } from '@playwright/test'
+
+async function choose(control: Locator, label: string) {
+  await control.click()
+  await control.page().getByRole('option', { name: label, exact: true }).click()
+}
 
 const order = {
   orderId: '1',
@@ -137,10 +142,10 @@ test.describe('transaction console', () => {
       await expect(page.getByText('REFUND_INVALID')).toBeVisible()
       await page.getByRole('button', { name: '上一页' }).click()
       await expect(page.getByRole('link', { name: 'ORD-AUDIT' })).toBeVisible()
-      await page.getByRole('combobox', { name: '跳转页码' }).selectOption({ label: '第 2 页' })
+      await choose(page.getByRole('combobox', { name: '跳转页码' }), '第 2 页')
       await expect(page.getByText('REFUND_INVALID')).toBeVisible()
-      await page.getByLabel('对象类型').selectOption('ORDER')
-      await page.getByLabel('对象编号').fill('ORD-AUDIT')
+      await choose(page.getByRole('combobox', { name: '对象类型' }), '订单')
+      await page.getByLabel('对象编号', { exact: true }).fill('ORD-AUDIT')
       const request = page.waitForRequest((pending) => pending.url().includes('/admin/operation-audits?resourceType=ORDER&resourceRef=ORD-AUDIT'))
       await page.getByRole('button', { name: '查询' }).click()
       expect(new URL((await request).url()).searchParams.has('cursor')).toBe(false)
@@ -148,7 +153,7 @@ test.describe('transaction console', () => {
       await expect(page.getByRole('button', { name: '下一页' })).toBeDisabled()
       await page.getByRole('button', { name: '清空筛选' }).click()
       await expect(page).toHaveURL(/\/operation-logs$/)
-      await expect(page.getByLabel('对象编号')).toHaveValue('')
+      await expect(page.getByLabel('对象编号', { exact: true })).toHaveValue('')
     })
   }
 
@@ -263,11 +268,11 @@ test('keeps advanced order filters visible in the applied count and clears the c
   await expect(expand).toHaveAttribute('aria-expanded', 'false')
   await expect(expand.getByLabel('已应用 1 项高级条件')).toBeVisible()
   await expand.click()
-  await expect(page.getByLabel('币种')).toHaveValue('CNY')
+  await expect(page.getByLabel('币种', { exact: true })).toHaveValue('CNY')
   await page.screenshot({ path: testInfo.outputPath('order-filters-desktop.png') })
   await page.getByRole('button', { name: '清空筛选' }).click()
   await expect(page).toHaveURL(/\/orders$/)
-  await expect(page.getByLabel('币种')).toHaveValue('')
+  await expect(page.getByLabel('币种', { exact: true })).toHaveValue('')
   await expect(page.getByText('本页 1 条')).toBeVisible()
 
   await page.keyboard.press('Control+k')
@@ -344,35 +349,160 @@ test('uses known cursors for previous page and jumps, restores them after refres
   await expect(page.getByRole('link', { name: 'ORD-10', exact: true })).toBeVisible()
   await next.click()
   await expect(page.getByRole('link', { name: 'ORD-20', exact: true })).toBeVisible()
-  await expect(jump).toHaveValue('2')
+  await expect(jump).toHaveText('第 3 页')
 
   await next.click()
   await expect(page.getByRole('heading', { name: '当前筛选无订单' })).toBeVisible()
   await expect(next).toBeDisabled()
   await previous.click()
   await expect(page.getByRole('link', { name: 'ORD-20', exact: true })).toBeVisible()
-  await jump.selectOption({ label: '第 1 页' })
+  await choose(jump, '第 1 页')
   await expect(page.getByRole('link', { name: 'ORD-0', exact: true })).toBeVisible()
   const requestsBeforeJump = requested.length
-  await jump.selectOption({ label: '第 3 页' })
+  await choose(jump, '第 3 页')
   await expect(page.getByRole('link', { name: 'ORD-20', exact: true })).toBeVisible()
   expect(requested.slice(requestsBeforeJump).every((cursor) => cursor === '20')).toBe(true)
   await expect(page).toHaveURL(/after=20/)
 
   await page.reload()
-  await expect(jump).toHaveValue('2')
+  await expect(jump).toHaveText('第 3 页')
   await expect(previous).toBeEnabled()
   await page.getByRole('link', { name: 'ORD-20', exact: true }).click()
   await expect(page.getByRole('heading', { name: '订单摘要' })).toBeVisible()
   await page.getByRole('link', { name: '返回订单列表' }).click()
-  await expect(jump).toHaveValue('2')
+  await expect(jump).toHaveText('第 3 页')
   await expect(previous).toBeEnabled()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   await pager.screenshot({ path: testInfo.outputPath('cursor-pager-mobile.png') })
 
-  await page.getByLabel('订单号').fill('ORD-0')
+  await page.getByLabel('订单号', { exact: true }).fill('ORD-0')
   await page.getByRole('button', { name: '查询' }).click()
   await expect(page).toHaveURL(/orderNo=ORD-0$/)
   await expect(previous).toBeDisabled()
   await expect(jump).toHaveCount(0)
+})
+
+test('workbench compares equal periods and opens funding facts from the actual summary', async ({ page }, testInfo) => {
+  const windows: Array<{ from: string; to: string }> = []
+  await page.route('**/api/v1/trade/admin/operations/summary?**', async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const from = params.get('createdFrom')!
+    const to = params.get('createdTo')!
+    if (!windows.some((window) => window.from === from && window.to === to)) windows.push({ from, to })
+    const previous = from !== windows[0].from
+    await route.fulfill({ json: {
+      from, to, currency: 'CNY', observedAt: order.updatedAt, orderCount: previous ? 4 : 8,
+      orderPayable: previous ? '12000' : '24000', paidOrderCount: previous ? 3 : 6,
+      normalReceipt: '20800', abnormalReceipt: '620', normalRefund: '1800', abnormalRefund: '55', netReceipt: '19000',
+    } })
+  })
+  await page.route('**/admin/operations/financial-facts?**', async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    expect(params.get('scope')).toBe('NET')
+    expect(params.get('currency')).toBe('CNY')
+    expect(params.get('createdFrom')).toBe(windows[0].from)
+    await route.fulfill({ json: { items: [], nextAfter: null, hasMore: false, observedAt: order.updatedAt } })
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  const summary = page.getByRole('button', { name: '查看期间净收款明细' })
+  await expect(summary).toContainText('19,000')
+  await expect(page.getByRole('button', { name: '查看正常确认收款明细' })).toContainText('20,800')
+  await page.getByRole('button', { name: '对比上一期' }).click()
+  await expect(page.getByRole('link', { name: '查看创建订单' })).toContainText('较上期 +100.0%')
+  expect(windows[1].to).toBe(windows[0].from)
+  expect(Date.parse(windows[1].to) - Date.parse(windows[1].from))
+    .toBe(Date.parse(windows[0].to) - Date.parse(windows[0].from))
+  await page.screenshot({ path: testInfo.outputPath('workbench-financial-summary.png') })
+  await summary.click()
+  await expect(page.getByRole('heading', { name: '期间净收款明细' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '期间无资金记录' })).toBeVisible()
+})
+
+test('table tools, keyboard selection, presets and real page size requests', async ({ page, browserName }, testInfo) => {
+  const issued: URLSearchParams[] = []
+  await page.route('**/api/v1/trade/admin/orders?**', async (route) => {
+    issued.push(new URL(route.request().url()).searchParams)
+    await route.fulfill({ json: {
+      items: [order], nextAfter: null, hasMore: false, observedAt: order.updatedAt,
+    } })
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/orders?after=10&status=PAID')
+  const table = page.getByRole('region', { name: '订单列表' })
+  await expect(table.getByRole('link', { name: 'ORD-1' })).toBeVisible()
+  if (browserName === 'chromium') {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await table.getByRole('button', { name: '复制订单号' }).click()
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('ORD-1')
+  }
+  await choose(page.getByRole('combobox', { name: '每页条数' }), '50 条 / 页')
+  await expect(page).toHaveURL(/status=PAID&size=50$/)
+  await expect.poll(() => issued.at(-1)?.get('limit')).toBe('50')
+  expect(issued.at(-1)?.get('after')).toBe('0')
+  await page.reload()
+  await expect(page.getByRole('combobox', { name: '每页条数' })).toHaveText('50 条 / 页')
+
+  await page.getByRole('button', { name: '显示设置' }).click()
+  await page.getByRole('checkbox', { name: '紧凑行高' }).check()
+  await page.getByRole('checkbox', { name: '仓库 ID', exact: true }).uncheck()
+  await expect(table.getByRole('columnheader', { name: '仓库 ID' })).toHaveCount(0)
+  await expect(table.getByRole('table')).toHaveClass(/data-table-compact/)
+  await page.screenshot({ path: testInfo.outputPath('order-table-tools.png') })
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: '放大表格' }).click()
+  const expanded = page.getByRole('dialog', { name: '订单列表' })
+  await expect(expanded.getByRole('columnheader', { name: '订单号' })).toBeVisible()
+  await expect(expanded.getByRole('columnheader', { name: '仓库 ID' })).toHaveCount(0)
+  await expanded.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(table.getByRole('link', { name: 'ORD-1' })).toBeVisible()
+
+  const beforeRefresh = issued.length
+  await page.getByRole('group', { name: '订单列表工具' }).getByRole('button', { name: '刷新' }).click()
+  await expect.poll(() => issued.length).toBe(beforeRefresh + 1)
+  await page.getByRole('button', { name: '取消筛选 订单状态' }).click()
+  await expect(page).toHaveURL(/\/orders\?size=50$/)
+  await expect.poll(() => issued.at(-1)?.get('status')).toBeNull()
+
+  const choice = page.getByRole('combobox', { name: '订单状态' })
+  await choice.focus()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(choice).not.toHaveText('全部')
+  await page.getByRole('button', { name: '高级筛选' }).click()
+  await page.getByRole('button', { name: '近 7 天' }).click()
+  const from = page.getByLabel('起始时间（北京时间）', { exact: true })
+  await expect(from).toHaveValue(/^\d{4}-\d{2}-\d{2} 00:00$/)
+  await page.getByRole('button', { name: '打开日历' }).first().click()
+  await expect(page.getByRole('group', { name: '选择日期' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('group', { name: '选择日期' })).toHaveCount(0)
+  await page.getByRole('button', { name: '查询', exact: true }).click()
+  await expect.poll(() => issued.at(-1)?.has('createdFrom')).toBe(true)
+  const filter = issued.at(-1)!
+  expect(Date.parse(filter.get('createdTo')!) - Date.parse(filter.get('createdFrom')!)).toBe(7 * 86_400_000)
+})
+
+test('receipt drawer shows the available amounts without leaving the results', async ({ page }, testInfo) => {
+  await page.route('**/admin/payment-receipts?**', async (route) => route.fulfill({ json: {
+    items: [{
+      receiptNo: 'RCT-1', paymentNo: 'PAY-1', orderNo: 'ORD-1', attemptNo: 'PATT-1',
+      channelCode: 'DEMO', amount: 239900, currency: 'CNY', disposition: 'EXCESS',
+      providerPaidAt: order.updatedAt, confirmedAt: order.updatedAt, createdAt: order.updatedAt,
+      refundedAmount: 1200, refundReservedAmount: 100, unreservedAmount: 238600, version: 1,
+    }], nextAfter: null, hasMore: false, observedAt: order.updatedAt,
+  } }))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/receipts')
+  const trigger = page.getByRole('button', { name: '查看摘要' })
+  await trigger.click()
+  const preview = page.getByRole('dialog', { name: 'RCT-1' })
+  await expect(preview.getByText('CNY 2,399.00')).toBeVisible()
+  await expect(preview.getByText('超额收款')).toBeVisible()
+  await expect(preview.getByRole('link', { name: '查看完整实收详情' })).toHaveAttribute('href', '/receipts/RCT-1')
+  await page.screenshot({ path: testInfo.outputPath('receipt-drawer-mobile.png') })
+  await page.keyboard.press('Escape')
+  await expect(trigger).toBeFocused()
+  await expect(page).toHaveURL(/\/receipts$/)
 })

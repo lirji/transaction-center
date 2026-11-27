@@ -39,3 +39,25 @@ export function parseBeijingInput(value: string) {
   return Date.parse(`${normalized}Z`) === wallClock &&
     normalized.slice(0, 16) === value.slice(0, 16) ? timestamp : Number.NaN
 }
+
+export const businessRangeOptions = [
+  ['today', '今天'], ['yesterday', '昨天'], ['last7', '近 7 天'], ['last30', '近 30 天'], ['month', '本月'],
+] as const
+export type BusinessRange = (typeof businessRangeOptions)[number][0]
+
+export function beijingRange(range: BusinessRange, now = Date.now()) {
+  // UTC 对象仅用于北京日历日期的加减，最终仍由现有北京时间转换器解析。
+  const day = formatBeijingInput(now).slice(0, 10)
+  const start = new Date(`${day}T00:00:00Z`)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  if (range === 'yesterday') {
+    start.setUTCDate(start.getUTCDate() - 1)
+    end.setUTCDate(end.getUTCDate() - 1)
+  } else if (range === 'month') {
+    start.setUTCDate(1)
+  } else {
+    start.setUTCDate(start.getUTCDate() - (range === 'last30' ? 29 : range === 'last7' ? 6 : 0))
+  }
+  return { from: start.toISOString().slice(0, 16), to: end.toISOString().slice(0, 16) }
+}

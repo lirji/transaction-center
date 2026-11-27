@@ -48,7 +48,8 @@ describe('RefundsPage', () => {
     })
     renderWithApp(<RefundsPage />, { route: '/refunds' })
     await screen.findByText('筛选')
-    await userEvent.selectOptions(screen.getByLabelText('状态'), 'ALL')
+    await userEvent.click(screen.getByRole('combobox', { name: '状态' }))
+    await userEvent.click(screen.getByRole('option', { name: '全部' }))
     await waitFor(() => {
       expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('status=ALL'))).toBe(true)
     })

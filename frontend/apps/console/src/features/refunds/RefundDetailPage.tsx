@@ -33,7 +33,7 @@ function RefundAuditHistory({ refundNo }: { refundNo: string }) {
       )}
       {shown && history.data?.items.length === 0 && <p className="panel-inset">暂无操作日志</p>}
       {shown && history.data && history.data.items.length > 0 && (
-        <DataTable label="退款操作日志">
+        <DataTable label="退款操作日志" refreshing={history.isFetching} onRefresh={() => void history.refetch()}>
           <thead><tr><th className="time-cell">时间（北京时间）</th><th>动作</th><th>结果</th><th>状态变化</th><th>提交证据</th></tr></thead>
           <tbody>
             {history.data.items.map((item) => (

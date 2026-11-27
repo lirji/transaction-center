@@ -1,3 +1,4 @@
+import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
@@ -72,16 +73,16 @@ export function AdmissionPage() {
               <div><dt>策略版本</dt><dd>{query.data.version}</dd></div>
             </dl>
             <Field label="新订单受理">
-              <select value={String(orderEnabled ?? query.data.orderEnabled)} onChange={(event) => setOrderEnabled(event.target.value === 'true')}>
+              <Select value={String(orderEnabled ?? query.data.orderEnabled)} onChange={(value) => setOrderEnabled(value === 'true')}>
                 <option value="true">允许新订单</option>
                 <option value="false">关闭新订单</option>
-              </select>
+              </Select>
             </Field>
             <Field label="新支付受理">
-              <select value={String(paymentEnabled ?? query.data.paymentEnabled)} onChange={(event) => setPaymentEnabled(event.target.value === 'true')}>
+              <Select value={String(paymentEnabled ?? query.data.paymentEnabled)} onChange={(value) => setPaymentEnabled(value === 'true')}>
                 <option value="true">允许新支付</option>
                 <option value="false">关闭新支付</option>
-              </select>
+              </Select>
             </Field>
             <Field label="原因" wide><input value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
           </StackForm>

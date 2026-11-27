@@ -1,3 +1,4 @@
+import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -105,7 +106,7 @@ function OperationRows({ rows }: { rows: OperationAuditEntry[] }) {
 
 type Filters = { resourceType?: string; resourceRef?: string; createdFrom?: string; createdTo?: string }
 
-function OperationFilters({ params, apply }: { params: URLSearchParams; apply: (filters: Filters) => void }) {
+function OperationFilters({ params, apply, remove }: { params: URLSearchParams; apply: (filters: Filters) => void; remove: (keys: string[]) => void }) {
   const [resourceType, setResourceType] = useState(params.get('resourceType') ?? '')
   const [resourceRef, setResourceRef] = useState(params.get('resourceRef') ?? '')
   const [from, setFrom] = useState(isoFromSearch(params, 'createdFrom'))
@@ -138,6 +139,11 @@ function OperationFilters({ params, apply }: { params: URLSearchParams; apply: (
     <Panel>
       <h2>筛选</h2>
       <FilterBar onSubmit={submit} onReset={reset} invalid={Boolean(error)}
+        applied={appliedFilters(params, remove, [
+          ['对象类型', 'resourceType', () => setResourceType(''), (value) => resourceLabels[value] ?? value],
+          ['对象编号', 'resourceRef', () => setResourceRef('')],
+          ['发生时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo(''); setError('') }],
+        ])}
         activeAdvanced={params.has('createdFrom') || params.has('createdTo') ? 1 : 0}
         advanced={<TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={error} />}>
         <Field label="对象类型">
@@ -154,7 +160,7 @@ function OperationFilters({ params, apply }: { params: URLSearchParams; apply: (
 }
 
 export function OperationLogsPage() {
-  const { params, after, apply, setAfter } = useAdminListSearch()
+  const { params, after, apply, remove, setAfter, pageSize, setPageSize } = useAdminListSearch()
   const filters = {
     resourceType: params.get('resourceType') || undefined,
     resourceRef: params.get('resourceRef') || undefined,
@@ -162,8 +168,8 @@ export function OperationLogsPage() {
     createdTo: params.get('createdTo') || undefined,
   }
   const query = useQuery({
-    queryKey: ['operation-logs', after, filters],
-    queryFn: ({ signal }) => api.operationAudits({ ...filters, cursor: after === '0' ? undefined : after }, signal),
+    queryKey: ['operation-logs', after, pageSize, filters],
+    queryFn: ({ signal }) => api.operationAudits({ ...filters, limit: pageSize === 20 ? undefined : pageSize, cursor: after === '0' ? undefined : after }, signal),
     retry: false,
   })
 
@@ -171,13 +177,13 @@ export function OperationLogsPage() {
     <div className="workspace">
       <PageHeader title="操作日志" description="查看当前租户已记录的交易业务操作。" />
       <div className="section-gap">
-        <OperationFilters key={JSON.stringify(filters)} params={params} apply={apply} />
+        <OperationFilters key={JSON.stringify(filters)} params={params} apply={apply} remove={remove} />
         <Panel className="table-panel">
           <h2 className="table-title">操作日志记录</h2>
           <PageQueryGate query={query} emptyTitle="暂无操作日志" emptyDetail="当前筛选范围没有操作记录。">
             {(page) => <OperationRows rows={page.items} />}
           </PageQueryGate>
-          <PagePager scope={['operation-logs', filters]} after={after} onPage={setAfter}
+          <PagePager scope={['operation-logs', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             result={query.isSuccess ? query.data : undefined} />
         </Panel>
       </div>
