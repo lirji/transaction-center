@@ -24,6 +24,7 @@ final class S3RefundArchiveObjects implements RefundArchiveObjects, AutoCloseabl
         this.bucket = bucket;
     }
 
+    /** 写入或复用固定档案版本，后续仍须完整回读。 */
     @Override
     public String putOnce(String key, byte[] bytes, String sha256) {
         try {
@@ -48,11 +49,13 @@ final class S3RefundArchiveObjects implements RefundArchiveObjects, AutoCloseabl
         }
     }
 
+    /** 由写入身份回读已上传的准确版本。 */
     @Override
     public byte[] verify(String key, String version, int bytes) {
         return read(writer, key, version, bytes);
     }
 
+    /** 恢复身份只读取工单允许的版本与长度。 */
     @Override
     public byte[] recover(String key, String version, int bytes) {
         return read(reader, key, version, bytes);
@@ -84,6 +87,7 @@ final class S3RefundArchiveObjects implements RefundArchiveObjects, AutoCloseabl
         return new TradeException("EVIDENCE_UNAVAILABLE", "交易退款档案暂不可用");
     }
 
+    /** 关闭双身份客户端连接池，避免作业停止后占用连接。 */
     @Override
     public void close() {
         writer.close();

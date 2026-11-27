@@ -96,8 +96,9 @@
     sha256,payload_bytes,payload,state
   </sql>
   <insert id="claim">
-    INSERT INTO tc_refund_audit_archive_batch(<include refid="batchFields"/>)
-    VALUES(#{batch.tenantId},#{batch.batchId},#{batch.refundId},#{batch.refundNo},#{batch.schemaVersion},
+    INSERT INTO tc_refund_audit_archive_batch(tenant_id,batch_id,refund_id,refund_no,schema_version,
+      facts_from,facts_until,fact_count,object_key,object_version,sha256,payload_bytes,payload,state)
+    VALUES(#{tenant},#{batch.batchId},#{batch.refundId},#{batch.refundNo},#{batch.schemaVersion},
       #{batch.factsFrom},#{batch.factsUntil},#{batch.factCount},#{batch.objectKey},#{batch.objectVersion},
       #{batch.sha256},#{batch.payloadBytes},#{batch.payload},#{batch.state})
     ON DUPLICATE KEY UPDATE batch_id=tc_refund_audit_archive_batch.batch_id
@@ -121,12 +122,22 @@
     UPDATE tc_refund_audit_archive_batch SET state='VERIFIED',payload=NULL
     WHERE tenant_id=#{tenant} AND batch_id=#{id} AND state='UPLOADED' AND object_version=#{version}
   </update>
-  <select id="grant" resultMap="grant" useCache="false">
+  <sql id="grantFields">
     SELECT g.ticket_id,g.batch_id,g.expires_at FROM tc_refund_audit_archive_grant g
     JOIN tc_refund_audit_archive_batch b ON b.tenant_id=g.tenant_id AND b.batch_id=g.batch_id
+  </sql>
+  <sql id="grantActive">
+    AND g.expires_at&gt;UTC_TIMESTAMP(3) AND g.revoked_at IS NULL AND b.state='VERIFIED'
+  </sql>
+  <select id="grant" resultMap="grant" useCache="false">
+    <include refid="grantFields"/>
     WHERE g.tenant_id=#{tenant} AND g.ticket_id=#{ticket} AND g.actor_key=#{actor}
-      AND g.expires_at&gt;UTC_TIMESTAMP(3) AND g.revoked_at IS NULL AND b.state='VERIFIED'
-    <if test="lock">FOR UPDATE</if>
+    <include refid="grantActive"/>
+  </select>
+  <select id="lockGrant" resultMap="grant" useCache="false">
+    <include refid="grantFields"/>
+    WHERE g.tenant_id=#{tenant} AND g.ticket_id=#{ticket} AND g.actor_key=#{actor}
+    <include refid="grantActive"/> FOR UPDATE
   </select>
   <insert id="storeRestored">
     INSERT INTO tc_refund_audit_archive_restored(tenant_id,ticket_id,batch_id,payload,expires_at)

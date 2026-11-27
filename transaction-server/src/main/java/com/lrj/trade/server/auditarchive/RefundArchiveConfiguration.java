@@ -86,12 +86,14 @@ class RefundArchiveConfiguration {
 
     /** 调度不接受外部租户。记录批次或清理数量，避免把取证数据写入调度日志。 */
     record RefundArchiveJobs(RefundAuditArchive archive) {
+        /** 核验一项精确退款或补办一个已领取档案。 */
         @XxlJob("tradeRefundAuditArchiveVerify")
         public void verify() {
             String batchId = archive.verify(XxlJobHelper.getJobParam());
             XxlJobHelper.log("交易退款归档核验批次 {}", batchId == null ? "无符合范围的工作项" : batchId);
         }
 
+        /** 删除本租户的已过期短期查询副本。 */
         @XxlJob("tradeRefundAuditArchiveCleanRestored")
         public void cleanRestored() {
             XxlJobHelper.log("交易退款归档过期临时副本清理数 {}", archive.cleanExpiredRestorations());

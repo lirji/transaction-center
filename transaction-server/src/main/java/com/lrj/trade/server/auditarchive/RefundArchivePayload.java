@@ -29,8 +29,10 @@ final class RefundArchivePayload {
 
     private RefundArchivePayload() {}
 
+    /** 首行固定文档版本、原退款和两类证据数量。 */
     record Header(int schemaVersion, Subject subject, int operationCount, int referenceCount) {}
 
+    /** 归档和恢复共用同一结构，禁止拼接跨退款证据。 */
     record Snapshot(Subject refund, List<Row> operations, List<Fact> references) {}
 
     /** 压缩对象不含领取时间和随机值，重复领取相同快照会得到相同摘要。 */

@@ -128,7 +128,7 @@ final class RefundAuditArchive {
         var payload = RefundArchivePayload.encode(new Snapshot(subject, operations, references));
         String digest = RefundArchivePayload.digest(payload);
         String batchId = UUID.randomUUID().toString();
-        mapper.claim(new Batch(tenant, batchId, id, subject.refundNo(), RefundArchivePayload.FORMAT, from, until,
+        mapper.claim(tenant, new Batch(tenant, batchId, id, subject.refundNo(), RefundArchivePayload.FORMAT, from, until,
                 count, objectKey(tenant, batchId), null, digest, payload.length, payload, CLAIMED));
         var claimed = mapper.batchByDigest(tenant, id, digest);
         if (claimed == null) throw new TradeException("EVIDENCE_UNAVAILABLE", "请先补办本租户待核验的档案批次");
@@ -163,7 +163,8 @@ final class RefundAuditArchive {
 
     private Grant requireGrant(Actor actor, String ticket, boolean lock) {
         if (actor.tenantId() != tenant || ticket == null || !ticket.matches("[A-Za-z0-9_-]{1,64}")) throw missing();
-        var grant = mapper.grant(tenant, ticket, actor.key(), lock);
+        String actorKey = actor.key();
+        var grant = lock ? mapper.lockGrant(tenant, ticket, actorKey) : mapper.grant(tenant, ticket, actorKey);
         if (grant == null) throw missing();
         return grant;
     }

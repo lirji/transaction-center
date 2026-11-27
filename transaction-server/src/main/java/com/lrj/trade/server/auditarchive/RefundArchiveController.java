@@ -56,10 +56,13 @@ public class RefundArchiveController {
         if (!params.isEmpty()) throw new TradeException("INVALID_ARGUMENT", "恢复工单查询参数无效");
     }
 
+    /** 恢复执行只返回行数，获取证据需独立读取权限。 */
     record Restored(int factCount) {}
 
+    /** 档案响应中的退款主信息使用可读业务编号。 */
     record Refund(String refundNo, String orderNo, String approvalNo, String receiptNo, String amountMinor,
                   String currency, String state, Instant updatedAt) {}
 
+    /** 公开工单投影只传受控字段与关联。 */
     record View(Refund refund, List<AuditMapper.Row> operations, List<RefundArchiveMapper.Fact> references) {}
 }
