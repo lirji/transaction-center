@@ -4,7 +4,7 @@ import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/us
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Field, PageHeader, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, Panel, StackForm, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseChannelCode, parseCurrencyCode, parseHttpsUrl } from '../../shared/api/validate'
@@ -44,13 +44,12 @@ export function PaymentChannelsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace configuration-workspace">
       <PageHeader
         title="支付渠道"
         description="列表不回显密钥或完整 returnUrl。登记渠道不等于真实渠道已执行；会员侧 202 只表示本地受理。"
       />
-      <StateBanner tone="info" title="不会构造付款跳转" detail="本台没有支付跳转按钮，也不把渠道登记当成收款成功。" />
-      <div className="section-gap">
+      <div className="registry-layout">
         <Panel className="table-panel">
           <h2 className="table-title">渠道绑定</h2>
           <QueryGate query={query} emptyTitle="没有渠道" emptyDetail="尚未登记支付渠道。">
@@ -78,8 +77,9 @@ export function PaymentChannelsPage() {
           <NumberedCursorPager numbered={query.numbered} onNumber={setPage} scope={['payment-channels']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.channelId} />
         </Panel>
-        <Panel>
+        <Panel className="settings-form">
           <h2>登记渠道</h2>
+          <p>使用现有凭据引用连接渠道商户与回跳配置。</p>
           <MutationBanner error={create.error} success={create.data ? `resourceId=${create.data.resourceId}` : undefined} />
           <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" loading={create.isPending}>登记</Button>}>
             <Field label="渠道编码" error={formError} hint="须符合 ^[A-Z][A-Z0-9_]{0,63}$">

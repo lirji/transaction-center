@@ -49,7 +49,7 @@ describe('RefundsPage', () => {
       return json([])
     })
     renderWithApp(<RefundsPage />, { route: '/refunds' })
-    await screen.findByText('筛选')
+    await screen.findByRole('heading', { name: '退款列表' })
     await userEvent.click(screen.getByRole('combobox', { name: '状态' }))
     await userEvent.click(screen.getByRole('option', { name: '全部' }))
     await waitFor(() => {

@@ -3,7 +3,7 @@ import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList
 import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminPaymentView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
@@ -24,7 +24,7 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
     <DataTable label="支付列表" className="trade-list-table pin-key">
       <thead>
         <tr>
-          <th>支付单号</th><th>订单号</th><th>支付状态</th><th className="numeric-cell">期望金额</th><th>币种</th><th>成功实收单号</th><th className="time-cell">关闭屏障（北京时间）</th><th className="time-cell">更新时间（北京时间）</th>
+          <th>支付单号</th><th>订单号</th><th>支付状态</th><th className="numeric-cell">期望金额</th><th className="currency-cell">币种</th><th>成功实收单号</th><th className="time-cell">关闭屏障（北京时间）</th><th className="time-cell">更新时间（北京时间）</th>
         </tr>
       </thead>
       <tbody>
@@ -36,7 +36,7 @@ export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{paymentLabels[row.status]}</Badge></td>
             <td className="numeric-cell">{formatMinorAmount(row.expectedAmount)}</td>
-            <td>{row.currency}</td>
+            <td className="currency-cell">{row.currency}</td>
             <td className="mono">{row.succeededReceiptNo ? <Link to={`/receipts/${encodeURIComponent(row.succeededReceiptNo)}`}>{row.succeededReceiptBusinessNo ?? row.succeededReceiptNo}</Link> : dash(row.succeededReceiptNo)}</td>
             <td className="time-cell">{formatBeijingTime(row.closeFenceAt)}</td>
             <td className="time-cell">{formatBeijingTime(row.updatedAt)}</td>
@@ -106,33 +106,41 @@ export function PaymentsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="支付"
-        description="查询支付意图。UNKNOWN 尝试不等于失败；closeFenceAt 不是渠道关闭证明。本台不能发起付款跳转。"
+        description="核对订单支付、发起进度和待复核记录。"
       />
-      <Panel>
-        <h2>筛选</h2>
-        <FilterBar applied={appliedFilters(params, remove, [
-          ['支付单号', 'paymentNo', () => setPaymentNo('')],
-          ['订单号', 'orderNo', () => setOrderNo('')],
-          ['会员 ID', 'memberId', () => setMemberId('')],
-          ['支付状态', 'status', () => setStatus(''), (value) => paymentLabels[value as keyof typeof paymentLabels] ?? value],
-          ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
-        ])}
-          onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
-          activeAdvanced={[filters.createdFrom || filters.createdTo].filter(Boolean).length}
-          advanced={<>
-            <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
-          </>}>
-          <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
-          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-          <Field label="支付状态"><EmptySelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} optionLabel={(value) => paymentLabels[value as keyof typeof paymentLabels]} /></Field>
-        </FilterBar>
-      </Panel>
-      <Panel className="table-panel">
-        <h2 className="table-title">支付意图列表</h2>
+      <Panel className="table-panel queue-results">
+        <div className="queue-heading"><h2 className="table-title">支付意图列表</h2><p>按支付单号或订单号定位渠道处理进度。</p></div>
+        <div className="queue-filter">
+          <div className="queue-actions" role="group" aria-label="支付队列">
+            {(['', paymentStatusSchema.enum.PENDING, paymentStatusSchema.enum.REVIEW, paymentStatusSchema.enum.SUCCEEDED] as const).map((value) => (
+              <Button key={value} aria-pressed={(filters.status ?? '') === value} onClick={() => {
+                setStatus(value)
+                setFormError('')
+                apply({ ...filters, status: value || undefined })
+              }}>{value ? paymentLabels[value] : '全部支付'}</Button>
+            ))}
+          </div>
+          <FilterBar applied={appliedFilters(params, remove, [
+            ['支付单号', 'paymentNo', () => setPaymentNo('')],
+            ['订单号', 'orderNo', () => setOrderNo('')],
+            ['会员 ID', 'memberId', () => setMemberId('')],
+            ['支付状态', 'status', () => setStatus(''), (value) => paymentLabels[value as keyof typeof paymentLabels] ?? value],
+            ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+          ])}
+            onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
+            activeAdvanced={[filters.createdFrom || filters.createdTo].filter(Boolean).length}
+            advanced={<>
+              <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
+            </>}>
+            <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
+            <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+            <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+            <Field label="支付状态"><EmptySelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} optionLabel={(value) => paymentLabels[value as keyof typeof paymentLabels]} /></Field>
+          </FilterBar>
+        </div>
         {memberUrlError || incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (

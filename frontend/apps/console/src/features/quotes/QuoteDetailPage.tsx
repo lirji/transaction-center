@@ -1,6 +1,7 @@
+import { RecordHeader } from '../../components/WorkspaceNavigation'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -16,25 +17,25 @@ export function QuoteDetailPage() {
   })
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取报价" detail="正在获取当前记录。" /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/quotes" listLabel="返回报价列表" title="报价详情" description="核对冻结商品、应付金额和有效期。" /><StateBanner tone="loading" title="正在读取报价" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/quotes" listLabel="返回报价列表" title="报价详情" description="核对冻结商品、应付金额和有效期。" /><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
   }
   const row = detail.data
   const expired = row.observedAt >= row.expiresAt
 
   return (
-    <div className="workspace">
-      <PageHeader
-        title={row.businessNo ?? row.quoteId}
-        description="报价冻结商品。未过期不等于当前可下单。"
+    <div className="workspace record-workspace">
+      <RecordHeader listPath="/quotes" listLabel="返回报价列表"
+        title={row.businessNo ?? `报价 ${row.quoteId}`}
+        description="核对冻结商品、应付金额和有效期。"
       />
-      <Panel>
+      <Panel className="record-summary">
         <h2>报价摘要</h2>
         <dl className="summary-fields">
-          <div><dt>应付</dt><dd className="summary-amount">{formatMinor(row.payableAmount, row.currency)} <small className="mono">{row.currency} {row.payableAmount}</small></dd></div>
+          <div><dt>应付</dt><dd className="summary-amount">{formatMinor(row.payableAmount, row.currency)} <small className="mono">最小单位 {row.payableAmount}</small></dd></div>
           <div><dt>有效至（北京时间）</dt><dd className="mono">{formatBeijingTime(row.expiresAt)} {expired ? <Badge tone="warn">已过期</Badge> : null}</dd></div>
           <div><dt>会员</dt><dd className="mono">{row.memberId}</dd></div>
           <div><dt>策略</dt><dd className="mono">{row.pricingPolicy}</dd></div>
@@ -48,7 +49,7 @@ export function QuoteDetailPage() {
       <Panel className="table-panel">
         <h2 className="table-title">冻结商品</h2>
         <DataTable label="报价商品明细" refreshing={detail.isFetching} onRefresh={() => void detail.refetch()}>
-          <thead><tr><th>SKU ID</th><th>SKU 修订</th><th>标题</th><th>数量</th><th className="numeric-cell">单价</th><th>应付</th></tr></thead>
+          <thead><tr><th>SKU ID</th><th>SKU 修订</th><th>标题</th><th>数量</th><th className="numeric-cell">单价</th><th className="numeric-cell">应付</th></tr></thead>
           <tbody>
             {row.items.map((item) => (
               <tr key={`${item.skuId}-${item.skuRevision}`}>

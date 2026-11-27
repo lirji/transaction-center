@@ -1,3 +1,4 @@
+import { WorkSections } from '../../components/WorkspaceNavigation'
 import { NumberedCursorPager } from '../../components/NumberedPager'
 import { outboxPublicationSchema, outboxTaskSchema } from '../../shared/api/schemas'
 import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
@@ -31,7 +32,7 @@ export function OutboxPage() {
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
   const publications = useNumberedList({ queryKey: ['outbox', state, after, pageSize], queryFn: () => api.outboxPublications(state, after, pageSize) }, { path: 'numbered-operations/outbox-publications', schema: outboxPublicationSchema, after: after, page: page, pageSize: pageSize, filters: { state } }, pageItems)
-  const tasks = useNumberedList({ queryKey: ['outbox-tasks', taskState, taskAfter, taskSize], queryFn: () => api.outboxTasks(taskState, taskAfter, taskSize) }, { path: 'numbered-operations/outbox-tasks', schema: outboxTaskSchema, after: taskAfter, page: taskPage, pageSize: taskSize, filters: { state: taskState } }, pageItems)
+  const tasks = useNumberedList({ queryKey: ['outbox-tasks', taskState, taskAfter, taskSize], enabled: publications.isFetched, queryFn: () => api.outboxTasks(taskState, taskAfter, taskSize) }, { path: 'numbered-operations/outbox-tasks', schema: outboxTaskSchema, after: taskAfter, page: taskPage, pageSize: taskSize, filters: { state: taskState } }, pageItems)
   const replay = useMutation({
     mutationFn: (payload: { eventId: string; expectedVersion: number; reason: string; ticketRef: string }) =>
       api.replayOutbox(payload.eventId, { expectedVersion: payload.expectedVersion, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -44,23 +45,25 @@ export function OutboxPage() {
   })
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="发布隔离"
-        description="查看事件发布异常与重放任务。重放受理后可在任务列表跟踪结果。"
+        description="查看事件来源和发布状态，追踪已经受理的重放任务。"
       />
+      <WorkSections sections={[{ id: 'outbox-queue', label: '发布事件' }, { id: 'outbox-history', label: '维护任务' }]} />
       {!canReplay ? <StateBanner tone="warn" title="当前令牌不能重放" detail="缺少 trade.events.replay。仍可查看队列。" /> : null}
       <MutationBanner error={replay.error} success={replay.data ? `已受理重放 eventId=${replay.data.eventId} replayCount=${replay.data.replayCount}` : undefined} />
-      <Panel>
-        <Field label="发布状态">
-          <Select value={state} onChange={(value) => { setParams({ state: value }, { replace: true }); setAfter(0) }}>
-            <option value="REVIEW">REVIEW</option>
-            <option value="PENDING">PENDING</option>
-            <option value="SENT">SENT</option>
-          </Select>
-        </Field>
-      </Panel>
-      <Panel className="table-panel">
+      <Panel className="table-panel queue-results" id="outbox-queue" tabIndex={-1}>
+        <div className="queue-heading"><h2 className="table-title">发布事件</h2><p>按发布状态筛选后核对事件与业务对象。</p></div>
+        <div className="queue-filter queue-filter-inline">
+          <Field label="发布状态">
+            <Select value={state} onChange={(value) => { setParams({ state: value }, { replace: true }); setAfter(0) }}>
+              <option value="REVIEW">REVIEW</option>
+              <option value="PENDING">PENDING</option>
+              <option value="SENT">SENT</option>
+            </Select>
+          </Field>
+        </div>
         <QueryGate query={publications} emptyTitle="没有发布记录" emptyDetail="当前状态下没有 Outbox 元数据。">
           {(rows) => (
             <>
@@ -93,7 +96,7 @@ export function OutboxPage() {
         <NumberedCursorPager numbered={publications.numbered} onNumber={setPage} scope={['outbox', state]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           rows={publications.isSuccess ? publications.data : undefined} getCursor={(row) => row.id} />
       </Panel>
-      <Panel className="table-panel">
+      <Panel className="table-panel" id="outbox-history" tabIndex={-1}>
         <h2 className="table-title">维护任务</h2>
         <div className="panel-inset">
           <Select value={taskState} onChange={(value) => { setTaskState(value as typeof taskState); setTaskAfter(0) }}>
@@ -103,7 +106,7 @@ export function OutboxPage() {
             <option value="DONE">DONE</option>
           </Select>
         </div>
-        <QueryGate query={tasks} emptyTitle="没有任务" emptyDetail="当前状态下没有发布任务。">
+        {publications.isFetched ? <QueryGate query={tasks} emptyTitle="没有任务" emptyDetail="当前状态下没有发布任务。">
           {(rows) => (
             <>
               <DataTable label="重放任务列表">
@@ -121,7 +124,7 @@ export function OutboxPage() {
               </DataTable>
             </>
           )}
-        </QueryGate>
+        </QueryGate> : <StateBanner tone="loading" title="正在读取维护任务" detail="事件队列读取结束后显示维护任务。" />}
         <NumberedCursorPager numbered={tasks.numbered} onNumber={setTaskPage} scope={['outbox-tasks', taskState]} after={taskAfter} onPage={setTaskAfter} pageSize={taskSize} onPageSize={setTaskSize}
           rows={tasks.isSuccess ? tasks.data : undefined} getCursor={(row) => row.id} />
       </Panel>

@@ -160,7 +160,7 @@ export function RefundsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="退款"
         description="查询退款进度、审批截止时间及关联订单。"
@@ -168,38 +168,37 @@ export function RefundsPage() {
       />
       <StateBanner tone="info" title="不能在此批准退款" detail="审批结果由独立审批流程签收，可在此查询退款进度。" />
       <div className="section-gap">
-        <Panel>
-          <h2>筛选</h2>
-          <div className="queue-actions" role="group" aria-label="退款队列">
-            {PRESETS.map((value) => <Button key={value} aria-pressed={status === value} onClick={() => changeStatus(value)}>{statusLabel(value)}</Button>)}
+        <Panel className="table-panel queue-results">
+          <div className="queue-heading"><h2 className="table-title">退款列表</h2><p>按阶段追踪退款和审批结果。</p></div>
+          <div className="queue-filter">
+            <div className="queue-actions" role="group" aria-label="退款队列">
+              {PRESETS.map((value) => <Button key={value} aria-pressed={status === value} onClick={() => changeStatus(value)}>{statusLabel(value)}</Button>)}
+            </div>
+            <FilterBar applied={appliedFilters(params, remove, [
+                ['状态', 'status', () => setFilterError(''), (value) => STATUSES.includes(value as typeof status) ? statusLabel(value as typeof status) : value],
+                ['审批单号', 'approvalNo', () => setApprovalNo('')],
+                ['退款单号', 'refundNo', () => setRefundNo('')],
+                ['订单号', 'orderNo', () => setOrderNo('')],
+                ['会员 ID', 'memberId', () => setMemberId('')],
+                ['申请时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo(''); setFilterError('') }],
+                ['审批截止', ['approvalDeadlineFrom', 'approvalDeadlineTo'], () => { setBusinessFrom(''); setBusinessTo(''); setFilterError('') }],
+              ])} onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
+              activeAdvanced={[filters.approvalNo, filters.memberId, filters.createdFrom || filters.createdTo, filters.approvalDeadlineFrom || filters.approvalDeadlineTo].filter(Boolean).length}
+              advanced={<>
+                <Field label="审批单号"><input value={approvalNo} onChange={(event) => setApprovalNo(event.target.value)} /></Field>
+                <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+                <TimeRangeFields labelPrefix="申请" from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
+                  <TimeRangeFields labelPrefix="审批截止" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
+              </>}>
+              <Field label="状态">
+                <Select value={status} onChange={(value) => changeStatus(value)}>
+                  {STATUSES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
+                </Select>
+              </Field>
+              <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
+              <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+            </FilterBar>
           </div>
-          <FilterBar applied={appliedFilters(params, remove, [
-              ['状态', 'status', () => setFilterError(''), (value) => STATUSES.includes(value as typeof status) ? statusLabel(value as typeof status) : value],
-              ['审批单号', 'approvalNo', () => setApprovalNo('')],
-              ['退款单号', 'refundNo', () => setRefundNo('')],
-              ['订单号', 'orderNo', () => setOrderNo('')],
-              ['会员 ID', 'memberId', () => setMemberId('')],
-              ['申请时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo(''); setFilterError('') }],
-              ['审批截止', ['approvalDeadlineFrom', 'approvalDeadlineTo'], () => { setBusinessFrom(''); setBusinessTo(''); setFilterError('') }],
-            ])} onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
-            activeAdvanced={[filters.approvalNo, filters.memberId, filters.createdFrom || filters.createdTo, filters.approvalDeadlineFrom || filters.approvalDeadlineTo].filter(Boolean).length}
-            advanced={<>
-              <Field label="审批单号"><input value={approvalNo} onChange={(event) => setApprovalNo(event.target.value)} /></Field>
-              <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-              <TimeRangeFields labelPrefix="申请" from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
-                <TimeRangeFields labelPrefix="审批截止" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
-            </>}>
-            <Field label="状态">
-              <Select value={status} onChange={(value) => changeStatus(value)}>
-                {STATUSES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
-              </Select>
-            </Field>
-            <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
-            <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          </FilterBar>
-        </Panel>
-        <Panel className="table-panel">
-          <h2 className="table-title">退款列表</h2>
           {memberUrlError || incompleteWindow ? (
             <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
           ) : (

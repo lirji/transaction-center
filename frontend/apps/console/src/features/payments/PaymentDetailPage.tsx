@@ -1,3 +1,4 @@
+import { RecordHeader } from '../../components/WorkspaceNavigation'
 import { NumberedPagePager } from '../../components/NumberedPager'
 import { adminAttemptViewSchema } from '../../shared/api/schemas'
 import { useLocalListPage, useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
@@ -6,7 +7,7 @@ import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -28,30 +29,30 @@ export function PaymentDetailPage() {
     queryKey: ['admin-attempts', paymentNo, after, pageSize, status],
     queryFn: () => api.paymentAttempts(paymentNo, { after, limit: pageSize, status: status || undefined }),
     retry: false,
-    enabled: Boolean(paymentNo),
+    enabled: detail.isSuccess,
   }, { path: `numbered-pages/payment-attempts/${encodeURIComponent(paymentNo)}`, schema: adminAttemptViewSchema, after: after, page: page, pageSize: pageSize, filters: { status: status || undefined } }, pageProjection)
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取支付" detail="正在获取当前记录。" /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/payments" listLabel="返回支付列表" title="支付意图" description="核对支付进度与渠道尝试。待确认的尝试需要渠道结果。" /><StateBanner tone="loading" title="正在读取支付" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/payments" listLabel="返回支付列表" title="支付意图" description="核对支付进度与渠道尝试。待确认的尝试需要渠道结果。" /><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
   }
   const payment = detail.data
 
   return (
-    <div className="workspace">
-      <PageHeader
+    <div className="workspace record-workspace">
+      <RecordHeader listPath="/payments" listLabel="返回支付列表"
         title={payment.businessNo ?? payment.paymentNo}
-        description="UNKNOWN 不等于失败。closeFenceAt 只是本地关闭屏障，不是渠道已关单证明。"
+        description="核对支付进度与渠道尝试。待确认的尝试需要渠道结果。"
       />
       <div className="section-gap">
-        <Panel>
+        <Panel className="record-summary">
           <h2>支付摘要</h2>
           <dl className="summary-fields">
             <div><dt>状态</dt><dd><Badge tone={statusTone(payment.status)}>{payment.status}</Badge></dd></div>
-            <div><dt>期望金额</dt><dd className="summary-amount">{formatMinor(payment.expectedAmount, payment.currency)} <small className="mono">{payment.currency} {payment.expectedAmount}</small></dd></div>
+            <div><dt>期望金额</dt><dd className="summary-amount">{formatMinor(payment.expectedAmount, payment.currency)} <small className="mono">最小单位 {payment.expectedAmount}</small></dd></div>
             <div><dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(payment.orderNo)}`}>{payment.orderBusinessNo ?? payment.orderNo}</Link></dd></div>
             <div><dt>会员</dt><dd className="mono">{payment.memberId}</dd></div>
             <div><dt>成功实收</dt><dd>{payment.succeededReceiptNo

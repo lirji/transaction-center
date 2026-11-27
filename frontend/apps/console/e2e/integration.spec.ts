@@ -419,13 +419,20 @@ test('diagnostic scopes show evidence and jobs; ordinary admin cannot read them'
   await login(page, 'diagnostic', `/orders/${data.paidOrder}`)
   await expect(page.getByRole('heading', { name: data.paidOrder, exact: true })).toBeVisible()
   expect((await api(page, `/admin/orders/${data.paidOrder}/referral-evidence`)).status).toBe(200)
-  await page.goto('/jobs')
+  await page.goto('/jobs?size=10')
   await expect(page.getByRole('heading', { name: '任务', exact: true })).toBeVisible()
+  const queue = page.getByRole('group', { name: '任务租约' })
+  await queue.getByRole('button', { name: '租约已过期' }).click()
+  await expect(page).toHaveURL(/leaseExpired=true/)
+  await queue.getByRole('button', { name: '全部任务' }).click()
+  await expect(page).toHaveURL(/\/jobs\?size=10$/)
   const jobs = (await api(page, '/admin/jobs')).body.items
   expect(jobs.length).toBeGreaterThan(0)
   await page.getByRole('link', { name: jobs[0].jobId, exact: true }).click()
   await expect(page.getByRole('heading', { name: jobs[0].jobId, exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '运行摘要' })).toBeVisible()
+  await page.getByRole('link', { name: '返回任务列表', exact: true }).click()
+  await expect(page).toHaveURL(/\/jobs\?size=10$/)
 })
 
 test('ordinary admin scope denial and genuine rate-limit response', async ({ page }) => {

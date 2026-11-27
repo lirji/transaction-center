@@ -1,7 +1,7 @@
 import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, ConfirmDialog, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -54,40 +54,46 @@ export function AdmissionPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace configuration-workspace">
       <PageHeader
         title="准入策略"
-        description="关闭只影响新增受理，不会取消既有恢复。写入同时需要 trade.admin 与 trade.admission.write。"
+        description="查看下单与支付的生效状态，按需调整新增交易受理。"
       />
       {!canWrite ? <StateBanner tone="warn" title="当前令牌不能改策略" detail="仍可读取。保存需要 trade.admission.write。" /> : null}
       <MutationBanner error={update.error} success={update.data ? `已保存 version=${update.data.version}` : undefined} />
-      <Panel>
-        <h2>订单与支付受理</h2>
-        {query.isLoading ? <StateBanner tone="loading" title="正在读取" detail="GET /admin/admission-policy" /> : null}
-        {query.isError ? <StateBanner tone="error" title={describeProblem(query.error).title} detail={describeProblem(query.error).detail} /> : null}
+      <div className="registry-layout">
+        <Panel className="record-summary">
+          <h2>订单与支付受理</h2>
+          {query.isLoading ? <StateBanner tone="loading" title="正在读取" detail="正在获取生效策略。" /> : null}
+          {query.isError ? <StateBanner tone="error" title={describeProblem(query.error).title} detail={describeProblem(query.error).detail} /> : null}
+          {query.data ? <dl className="summary-fields">
+            <div><dt>当前新订单受理</dt><dd><Badge tone={query.data.orderEnabled ? 'good' : 'warn'}>{query.data.orderEnabled ? '开放' : '暂停'}</Badge></dd></div>
+            <div><dt>当前新支付受理</dt><dd><Badge tone={query.data.paymentEnabled ? 'good' : 'warn'}>{query.data.paymentEnabled ? '开放' : '暂停'}</Badge></dd></div>
+            <div><dt>策略版本</dt><dd>{query.data.version}</dd></div>
+          </dl> : null}
+        </Panel>
         {query.data ? (
-          <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={!canWrite || update.isPending || !reason.trim()}>保存</Button>}>
-            <dl className="summary-fields">
-              <div><dt>当前新订单受理</dt><dd>{query.data.orderEnabled ? '开放' : '暂停'}</dd></div>
-              <div><dt>当前新支付受理</dt><dd>{query.data.paymentEnabled ? '开放' : '暂停'}</dd></div>
-              <div><dt>策略版本</dt><dd>{query.data.version}</dd></div>
-            </dl>
-            <Field label="新订单受理">
-              <Select value={String(orderEnabled ?? query.data.orderEnabled)} onChange={(value) => setOrderEnabled(value === 'true')}>
-                <option value="true">允许新订单</option>
-                <option value="false">关闭新订单</option>
-              </Select>
-            </Field>
-            <Field label="新支付受理">
-              <Select value={String(paymentEnabled ?? query.data.paymentEnabled)} onChange={(value) => setPaymentEnabled(value === 'true')}>
-                <option value="true">允许新支付</option>
-                <option value="false">关闭新支付</option>
-              </Select>
-            </Field>
-            <Field label="原因" wide><input value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
-          </StackForm>
+          <Panel className="settings-form">
+            <h2>调整新增受理</h2>
+            <p>暂停后，既有恢复任务仍会继续处理。</p>
+            <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" disabled={!canWrite || update.isPending || !reason.trim()}>保存</Button>}>
+              <Field label="新订单受理">
+                <Select value={String(orderEnabled ?? query.data.orderEnabled)} onChange={(value) => setOrderEnabled(value === 'true')}>
+                  <option value="true">允许新订单</option>
+                  <option value="false">关闭新订单</option>
+                </Select>
+              </Field>
+              <Field label="新支付受理">
+                <Select value={String(paymentEnabled ?? query.data.paymentEnabled)} onChange={(value) => setPaymentEnabled(value === 'true')}>
+                  <option value="true">允许新支付</option>
+                  <option value="false">关闭新支付</option>
+                </Select>
+              </Field>
+              <Field label="原因" wide><input value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
+            </StackForm>
+          </Panel>
         ) : null}
-      </Panel>
+      </div>
       {confirmDisable ? (
         <ConfirmDialog
           title="关闭新增受理"

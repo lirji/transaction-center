@@ -1,6 +1,7 @@
+import { RecordHeader } from '../../components/WorkspaceNavigation'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, PageHeader, Panel, StateBanner } from '../../components/ui'
+import { Badge, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { dash, statusTone, formatBeijingTime } from '../../shared/ui/display'
@@ -22,22 +23,22 @@ export function JobDetailPage() {
   })
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取任务" detail="正在获取当前记录。" /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/jobs" listLabel="返回任务列表" title="任务详情" description="追踪任务运行结果、租约和业务引用。" /><StateBanner tone="loading" title="正在读取任务" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/jobs" listLabel="返回任务列表" title="任务详情" description="追踪任务运行结果、租约和业务引用。" /><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
   }
   const row = detail.data
   const href = row.businessReference ? referencePath(row.businessReference.resourceType, row.businessReference.resourceNo) : undefined
 
   return (
-    <div className="workspace">
-      <PageHeader
+    <div className="workspace record-workspace">
+      <RecordHeader listPath="/jobs" listLabel="返回任务列表"
         title={row.jobId}
-        description="只读。leaseExpired 是观察值，不能在此重试或解锁。"
+        description="追踪任务运行结果、租约和业务引用。"
       />
-      <Panel>
+      <Panel className="record-summary">
         <h2>运行摘要</h2>
         <dl className="summary-fields">
           <div><dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{row.status}</Badge></dd></div>

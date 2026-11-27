@@ -13,6 +13,7 @@
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  box-shadow: 0 16px 60px #1823370c;
 }
 .login-card-narrow { display: block; max-width: 470px; min-height: auto; }
 .login-aside {
@@ -21,7 +22,7 @@
   align-items: center;
   padding: 32px;
   color: #fff;
-  background: var(--navy);
+  background: radial-gradient(ellipse at 92% -10%, #475bb4 0%, #29346f 45%, var(--navy) 82%);
 }
 .login-aside p { margin: 12px 0 0; color: #d5def0; }
 .login-brand { display: flex; align-items: center; gap: 10px; }

@@ -1,3 +1,4 @@
+import type { ComponentPropsWithoutRef } from 'react'
 import { cloneElement, isValidElement, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type FormEvent, type ReactElement, type ReactNode, type TableHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { Archive, ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Columns3, Copy, Expand, Info, LoaderCircle, RefreshCw, X } from 'lucide-react'
@@ -30,8 +31,8 @@ export function Badge({ tone = 'neutral', children }: { tone?: 'good' | 'warn' |
   return <span className={`status ${tone}`}>{children}</span>
 }
 
-export function Panel({ className = '', children }: { className?: string; children: ReactNode }) {
-  return <section className={`panel ${className}`}>{children}</section>
+export function Panel({ className = '', children, ...props }: ComponentPropsWithoutRef<'section'>) {
+  return <section {...props} className={`panel ${className}`}>{children}</section>
 }
 
 export function PanelHeader({ eyebrow, title, aside }: { eyebrow?: string; title: string; aside?: ReactNode }) {

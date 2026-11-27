@@ -138,8 +138,7 @@ function OperationFilters({ params, apply, remove }: { params: URLSearchParams; 
   }
 
   return (
-    <Panel>
-      <h2>筛选</h2>
+    <div className="queue-filter">
       <FilterBar onSubmit={submit} onReset={reset} invalid={Boolean(error)}
         applied={appliedFilters(params, remove, [
           ['对象类型', 'resourceType', () => setResourceType(''), (value) => resourceLabels[value] ?? value],
@@ -157,7 +156,7 @@ function OperationFilters({ params, apply, remove }: { params: URLSearchParams; 
           <input value={resourceRef} onChange={(event) => setResourceRef(event.target.value)} maxLength={64} />
         </Field>
       </FilterBar>
-    </Panel>
+    </div>
   )
 }
 
@@ -176,12 +175,12 @@ export function OperationLogsPage() {
   }, { path: 'numbered-operations/operation-audits', schema: operationAuditEntrySchema, after: after, page: page, pageSize: pageSize, filters: filters }, auditProjection)
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader title="操作日志" description="查看当前租户已记录的交易业务操作。" />
       <div className="section-gap">
-        <OperationFilters key={JSON.stringify(filters)} params={params} apply={apply} remove={remove} />
-        <Panel className="table-panel">
-          <h2 className="table-title">操作日志记录</h2>
+        <Panel className="table-panel queue-results">
+          <div className="queue-heading"><h2 className="table-title">操作日志记录</h2><p>按业务对象与时间范围追溯操作。</p></div>
+          <OperationFilters key={JSON.stringify(filters)} params={params} apply={apply} remove={remove} />
           <PageQueryGate query={query} emptyTitle="暂无操作日志" emptyDetail="当前筛选范围没有操作记录。">
             {(page) => <OperationRows rows={page.items} />}
           </PageQueryGate>

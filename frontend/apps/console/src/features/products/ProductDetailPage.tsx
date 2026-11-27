@@ -1,11 +1,12 @@
+import { RecordHeader } from '../../components/WorkspaceNavigation'
 import { NumberedCursorPager } from '../../components/NumberedPager'
 import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
 import { usePageSize } from '../../shared/ui/usePageSize'
 import { Select } from '../../components/Select'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation, useParams } from 'react-router-dom'
-import { Badge, Button, ConfirmDialog, DataTable, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { useParams } from 'react-router-dom'
+import { Badge, Button, ConfirmDialog, DataTable, Field, Modal, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type Sku } from '../../shared/api/client'
 import { MutationBanner } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -22,8 +23,6 @@ export function ProductDetailPage() {
 
 function ProductDetail({ id }: { id: string }) {
   const queryClient = useQueryClient()
-  const location = useLocation()
-  const list = { pathname: '/products', search: typeof location.state?.listSearch === 'string' ? location.state.listSearch : '' }
   const product = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) })
   const [skuAfter, setSkuAfter, page, setPage] = useLocalListPage<number>(0)
   const [pageSize, setPageSize] = usePageSize('product-skus', 20, () => setSkuAfter(0))
@@ -87,10 +86,11 @@ function ProductDetail({ id }: { id: string }) {
     onError: onConflict,
   })
 
-  if (product.isLoading) return <div className="workspace"><StateBanner tone="loading" title="正在读取商品" detail="正在获取商品目录及规格。" /></div>
+  const fallbackHeader = <RecordHeader listPath="/products" listLabel="返回列表" title="商品详情" description="查看商品资料、发布状态和 SKU。" />
+  if (product.isLoading) return <div className="workspace record-workspace">{fallbackHeader}<StateBanner tone="loading" title="正在读取商品" detail="正在获取商品目录及规格。" /></div>
   if (product.isError || !product.data) {
     const problem = describeProblem(product.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to={list} state={typeof location.state?.listSearch === 'string' ? { restoreListScroll: true } : undefined}>返回列表</Link></div>
+    return <div className="workspace record-workspace">{fallbackHeader}<StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
   }
   const current = product.data
   const draft = current.status === productStatusSchema.enum.DRAFT
@@ -153,12 +153,11 @@ function ProductDetail({ id }: { id: string }) {
   }
 
   return (
-    <div className="workspace">
-      <PageHeader
+    <div className="workspace record-workspace">
+      <RecordHeader listPath="/products" listLabel="返回列表"
         title={current.name}
         description={`版本 ${current.version} · 目录价用于商品管理，实际应付额以订单为准。`}
         actions={<>
-          <Link className="button secondary" to={list} state={typeof location.state?.listSearch === 'string' ? { restoreListScroll: true } : undefined}>返回列表</Link>
           {draft && <Button tone="primary" disabled={publish.isPending} aria-haspopup="dialog" onClick={() => setConfirm('publish')}>发布</Button>}
           {current.status === productStatusSchema.enum.PUBLISHED &&
             <Button disabled={unpublish.isPending} aria-haspopup="dialog" onClick={() => setConfirm('unpublish')}>下架</Button>}
@@ -169,7 +168,7 @@ function ProductDetail({ id }: { id: string }) {
         success={edit.data || publish.data || unpublish.data || addSku.data || saveSku.data ? `resourceId=${(edit.data ?? publish.data ?? unpublish.data ?? addSku.data ?? saveSku.data)?.resourceId}` : undefined}
       />
       <div className="section-gap">
-        <Panel>
+        <Panel className="record-summary">
           <h2>商品摘要</h2>
           <dl className="summary-fields">
             <div><dt>发布状态</dt><dd><Badge tone={current.status === productStatusSchema.enum.PUBLISHED ? 'good' : 'neutral'}>{productStatusLabels[current.status]}</Badge></dd></div>
@@ -223,7 +222,7 @@ function ProductDetail({ id }: { id: string }) {
             rows={skus.isSuccess ? skus.data : undefined} getCursor={(row) => row.skuId} />
         </Panel>
         {draft ? (
-          <div className="page-grid">
+          <div className="registry-layout">
             <Panel>
               <h2>编辑草稿</h2>
               <StackForm onSubmit={submitEdit} actions={<Button tone="primary" type="submit" loading={edit.isPending}>保存</Button>}>

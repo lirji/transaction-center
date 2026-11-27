@@ -1,10 +1,11 @@
+import { RecordHeader } from '../../components/WorkspaceNavigation'
 import { NumberedPagePager } from '../../components/NumberedPager'
 import { refundAuditEntrySchema } from '../../shared/api/schemas'
 import { useLocalListPage, useNumberedList, auditProjection } from '../../shared/ui/useNumberedList'
 import { Link, useParams } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
+import { Badge, Button, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -78,27 +79,27 @@ export function RefundDetailPage() {
   })
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取退款" detail="正在获取当前记录。" /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/refunds" listLabel="返回退款列表" title="退款详情" description="核对退款金额、审批截止和分项。审批在独立流程签收。" /><StateBanner tone="loading" title="正在读取退款" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/refunds" listLabel="返回退款列表" title="退款详情" description="核对退款金额、审批截止和分项。审批在独立流程签收。" /><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
   }
   const row = detail.data
 
   return (
-    <div className="workspace">
-      <PageHeader
+    <div className="workspace record-workspace">
+      <RecordHeader listPath="/refunds" listLabel="返回退款列表"
         title={row.businessNo ?? row.refundNo}
-        description="只读。不展示用户申请原因。processingReasonCode 是本地处理分类，不是渠道最终失败原因。本台不能批准或驳回。"
+        description="核对退款金额、审批截止和分项。审批在独立流程签收。"
       />
       <StateBanner tone="warn" title="不能在此批准退款" detail="没有批准或驳回按钮。需要独立审批签收。" />
       <div className="section-gap">
-        <Panel>
+        <Panel className="record-summary">
           <h2>退款摘要</h2>
           <dl className="summary-fields">
             <div><dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{refundLabels[row.status]}</Badge></dd></div>
-            <div><dt>金额</dt><dd className="summary-amount">{formatMinor(row.amount, row.currency)} <small className="mono">{row.currency} {row.amount}</small></dd></div>
+            <div><dt>金额</dt><dd className="summary-amount">{formatMinor(row.amount, row.currency)} <small className="mono">最小单位 {row.amount}</small></dd></div>
             <div><dt>审批截止（北京时间）</dt><dd className="mono">{formatBeijingTime(row.approvalDeadline)}</dd></div>
             <div><dt>审批单号</dt><dd>{dash(row.approvalBusinessNo ?? row.approvalRef)}</dd></div>
             <div><dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(row.orderNo)}`}>{row.orderBusinessNo ?? row.orderNo}</Link></dd></div>
@@ -111,7 +112,6 @@ export function RefundDetailPage() {
             <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(row.observedAt)}</dd>
           </dl>
         </Panel>
-        <RefundAuditHistory key={row.refundNo} refundNo={row.businessNo ?? row.refundNo} />
         <Panel className="table-panel">
           <h2 className="table-title">分项</h2>
           <DataTable label="退款分项">
@@ -128,6 +128,7 @@ export function RefundDetailPage() {
             </tbody>
           </DataTable>
         </Panel>
+        <RefundAuditHistory key={row.refundNo} refundNo={row.businessNo ?? row.refundNo} />
       </div>
     </div>
   )

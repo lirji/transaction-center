@@ -31,7 +31,7 @@ export function LoginPage() {
           </div>
           <div>
             <h2 className="login-aside-title">交易运营控制台</h2>
-            <p>查询交易记录，处理退款和履约，维护商品、库存与商户。</p>
+            <p>集中查看交易待办，核对订单和资金，处理库存与履约。</p>
           </div>
         </aside>
         <section className="login-form">

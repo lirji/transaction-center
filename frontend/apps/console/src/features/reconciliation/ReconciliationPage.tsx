@@ -1,3 +1,4 @@
+import { WorkSections } from '../../components/WorkspaceNavigation'
 import { NumberedCursorPager } from '../../components/NumberedPager'
 import { reconciliationCaseSchema, reconciliationOperationSchema } from '../../shared/api/schemas'
 import { useLocalListPage, useNumberedList, pageItems } from '../../shared/ui/useNumberedList'
@@ -34,7 +35,7 @@ export function ReconciliationPage() {
   const [ticketRef, setTicketRef] = useState('')
   const queryClient = useQueryClient()
   const cases = useNumberedList({ queryKey: ['recon-cases', state, after, pageSize, number], queryFn: () => api.reconciliationCases(state, after, pageSize, number || undefined) }, { path: 'numbered-operations/reconciliation-cases', schema: reconciliationCaseSchema, after: after, page: page, pageSize: pageSize, filters: { state, number: number || undefined } }, pageItems)
-  const operations = useNumberedList({ queryKey: ['recon-ops', opState, opAfter, operationSize, number], queryFn: () => api.reconciliationOperations(opState, opAfter, operationSize, number || undefined) }, { path: 'numbered-operations/reconciliation-operations', schema: reconciliationOperationSchema, after: opAfter, page: operationPage, pageSize: operationSize, filters: { state: opState, number: number || undefined } }, pageItems)
+  const operations = useNumberedList({ queryKey: ['recon-ops', opState, opAfter, operationSize, number], enabled: cases.isFetched, queryFn: () => api.reconciliationOperations(opState, opAfter, operationSize, number || undefined) }, { path: 'numbered-operations/reconciliation-operations', schema: reconciliationOperationSchema, after: opAfter, page: operationPage, pageSize: operationSize, filters: { state: opState, number: number || undefined } }, pageItems)
   const queryCase = useMutation({
     mutationFn: (payload: { caseNo: string; expectedVersion: number; action: 'QUERY_PAYMENT' | 'QUERY_REFUND'; reason: string; ticketRef: string }) =>
       api.queryReconciliationCase(payload.caseNo, { expectedVersion: payload.expectedVersion, action: payload.action, reason: payload.reason, ticketRef: payload.ticketRef }),
@@ -47,34 +48,36 @@ export function ReconciliationPage() {
   })
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="对账差异"
-        description="只查单需要 trade.reconciliation.query，默认可能关闭。202 表示已排队，不是当前执行结果。禁止在此关单、补建或派发退款。"
+        description="核对账务差异，追踪原渠道只查单的受理和执行结果。"
       />
+      <WorkSections sections={[{ id: 'reconciliation-queue', label: '差异队列' }, { id: 'reconciliation-history', label: '查单作业' }]} />
       {!canQuery ? <StateBanner tone="warn" title="当前令牌不能只查单" detail="仍可浏览差异列表。写入需要 trade.reconciliation.query。" /> : null}
       <MutationBanner error={queryCase.error} success={queryCase.data ? `已排队 operationNo=${queryCase.data.businessNo ?? queryCase.data.operationNo}，状态 QUEUED` : undefined} />
-      <Panel>
-        <form className="action-bar" onSubmit={(event) => {
-          event.preventDefault()
-          setNumber(queryNumber.trim())
-          setAfter(0)
-          setOpAfter(0)
-        }}>
-          <Field label="差异或操作编号">
-            <input value={queryNumber} maxLength={64} onChange={(event) => setQueryNumber(event.target.value)} />
+      <Panel className="table-panel queue-results" id="reconciliation-queue" tabIndex={-1}>
+        <div className="queue-heading"><h2 className="table-title">差异队列</h2><p>按差异状态查看待处置记录，或使用编号精确定位。</p></div>
+        <div className="queue-filter queue-filter-inline">
+          <form className="action-bar" onSubmit={(event) => {
+            event.preventDefault()
+            setNumber(queryNumber.trim())
+            setAfter(0)
+            setOpAfter(0)
+          }}>
+            <Field label="差异或操作编号">
+              <input value={queryNumber} maxLength={64} onChange={(event) => setQueryNumber(event.target.value)} />
+            </Field>
+            <Button type="submit">精确查询</Button>
+          </form>
+          <Field label="差异状态">
+            <Select value={state} onChange={(value) => { setParams({ state: value }, { replace: true }); setAfter(0) }}>
+              <option value="OPEN">OPEN</option>
+              <option value="PROCESSING">PROCESSING</option>
+              <option value="CLOSED">CLOSED</option>
+            </Select>
           </Field>
-          <Button type="submit">精确查询</Button>
-        </form>
-        <Field label="差异状态">
-          <Select value={state} onChange={(value) => { setParams({ state: value }, { replace: true }); setAfter(0) }}>
-            <option value="OPEN">OPEN</option>
-            <option value="PROCESSING">PROCESSING</option>
-            <option value="CLOSED">CLOSED</option>
-          </Select>
-        </Field>
-      </Panel>
-      <Panel className="table-panel">
+        </div>
         <QueryGate query={cases} emptyTitle="没有差异" emptyDetail="当前状态下没有对账差异。">
           {(rows) => (
             <>
@@ -100,7 +103,7 @@ export function ReconciliationPage() {
         <NumberedCursorPager numbered={cases.numbered} onNumber={setPage} scope={['recon-cases', state, number]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
           rows={cases.isSuccess ? cases.data : undefined} getCursor={(row) => row.id} />
       </Panel>
-      <Panel className="table-panel">
+      <Panel className="table-panel" id="reconciliation-history" tabIndex={-1}>
         <h2 className="table-title">查单作业</h2>
         <div className="panel-inset">
           <Select value={opState} onChange={(value) => { setOpState(value as typeof opState); setOpAfter(0) }}>
@@ -110,7 +113,7 @@ export function ReconciliationPage() {
             <option value="RESULT_ACCEPTED">RESULT_ACCEPTED</option>
           </Select>
         </div>
-        <QueryGate query={operations} emptyTitle="没有作业" emptyDetail="当前状态下没有查单作业。">
+        {cases.isFetched ? <QueryGate query={operations} emptyTitle="没有作业" emptyDetail="当前状态下没有查单作业。">
           {(rows) => (
             <>
               <DataTable label="对账查单操作列表">
@@ -128,7 +131,7 @@ export function ReconciliationPage() {
               </DataTable>
             </>
           )}
-        </QueryGate>
+        </QueryGate> : <StateBanner tone="loading" title="正在读取查单作业" detail="差异队列读取结束后显示查单作业。" />}
         <NumberedCursorPager numbered={operations.numbered} onNumber={setOperationPage} scope={['recon-operations', opState, number]} after={opAfter} onPage={setOpAfter} pageSize={operationSize} onPageSize={setOperationSize}
           rows={operations.isSuccess ? operations.data : undefined} getCursor={(row) => row.id} />
       </Panel>

@@ -51,12 +51,12 @@ export function ConsentsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace configuration-workspace">
       <PageHeader
         title="条款文档"
         description="后台发布不可变版本后再给会员展示。服务端不抓取远端正文，也不把列表中的任一版本暗中当成已同意。注册不会自动勾选营销条款。"
       />
-      <div className="section-gap">
+      <div className="registry-layout">
         <Panel className="table-panel">
           <h2 className="table-title">条款版本</h2>
           <QueryGate query={query} emptyTitle="尚未发布条款" emptyDetail="发布后会出现在本租户列表。不要按 documentVersion 字符串排序当最新。">
@@ -82,8 +82,9 @@ export function ConsentsPage() {
           <NumberedCursorPager numbered={query.numbered} onNumber={setPage} scope={['consent-documents']} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
             rows={query.isSuccess ? query.data : undefined} getCursor={(row) => row.id} />
         </Panel>
-        <Panel>
+        <Panel className="settings-form">
           <h2>发布新版本</h2>
+          <p>确认正文地址与摘要对应后再发布。</p>
           <MutationBanner error={publish.error} success={publish.data ? `已发布 resourceId=${publish.data.resourceId}` : undefined} />
           <StackForm onSubmit={submit} actions={<Button tone="primary" type="submit" loading={publish.isPending}>发布</Button>}>
             <Field label="用途"><input value={purpose} onChange={(event) => setPurpose(event.target.value)} maxLength={64} /></Field>

@@ -1,3 +1,5 @@
+import { focusWorkSection } from '../../shared/ui/listScroll'
+import { WorkSections } from '../../components/WorkspaceNavigation'
 import { InventoryAlerts } from './InventoryAlerts'
 import { NumberedPagePager, NumberedCursorPager } from '../../components/NumberedPager'
 import { balanceSchema, warehouseSchema, ledgerEntrySchema } from '../../shared/api/schemas'
@@ -45,8 +47,8 @@ export function InventoryPage() {
   const [formError, setFormError] = useState('')
   const [confirmAdjust, setConfirmAdjust] = useState(false)
   const queryClient = useQueryClient()
-  const warehouses = useNumberedList({ queryKey: ['warehouses', whAfter, warehouseSize], queryFn: () => api.warehouses(whAfter, warehouseSize) }, { path: 'numbered-pages/warehouses', schema: warehouseSchema, after: whAfter, page: warehousePage, pageSize: warehouseSize }, pageItems)
   const balances = useNumberedList({ queryKey: ['inventories', balAfter, pageSize, balanceFilters], queryFn: () => api.inventories({ after: balAfter, limit: pageSize, ...balanceFilters }) }, { path: 'numbered-pages/inventories', schema: balanceSchema, after: balAfter, page: balPage, pageSize: pageSize, filters: balanceFilters }, pageItems)
+  const warehouses = useNumberedList({ queryKey: ['warehouses', whAfter, warehouseSize], enabled: balances.isFetched, queryFn: () => api.warehouses(whAfter, warehouseSize) }, { path: 'numbered-pages/warehouses', schema: warehouseSchema, after: whAfter, page: warehousePage, pageSize: warehouseSize }, pageItems)
   const ledgers = useNumberedList({
     queryKey: ['ledgers', ledgerSelection, ledgerAfter, ledgerSize],
     queryFn: () => ledgerSelection
@@ -116,13 +118,13 @@ export function InventoryPage() {
     setLedgerWarehouse(warehouseId)
     setLedgerSku(skuId)
     loadLedger(warehouseId, skuId)
-    document.getElementById('inventory-ledger')?.scrollIntoView({ block: 'start' })
+    focusWorkSection('inventory-ledger')
   }
 
   function prepareAdjustment(warehouseId: string, skuId: string) {
     setAdjWarehouse(warehouseId)
     setAdjSku(skuId)
-    document.getElementById('inventory-adjustment')?.scrollIntoView({ block: 'start' })
+    focusWorkSection('inventory-adjustment')
   }
 
   function clearFilters() {
@@ -134,11 +136,12 @@ export function InventoryPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="仓库与库存"
         description="先核对库存余额和预占，再按仓库与 SKU 查看流水或登记盘点调整。"
       />
+      <WorkSections sections={[{ id: 'inventory-balances', label: '库存余额' }, { id: 'inventory-warehouses', label: '仓库' }, { id: 'inventory-ledger', label: '库存流水' }, { id: 'inventory-adjustment', label: '盘点调整' }]} />
       <MutationBanner error={createWh.error ?? adjust.error} success={createWh.data || adjust.data ? `resourceId=${(createWh.data ?? adjust.data)?.resourceId}` : undefined} />
       <FilterBar applied={appliedFilters(params, remove, [
           ['仓库 ID', 'warehouseId', () => setWarehouseFilter('')],
@@ -164,7 +167,7 @@ export function InventoryPage() {
       </FilterBar>
       {balanceError ? <StateBanner tone="warn" title="筛选条件无效" detail={balanceError} /> : null}
       <div className="section-gap">
-        <Panel className="table-panel">
+        <Panel className="table-panel" id="inventory-balances" tabIndex={-1}>
           <h2 className="table-title">库存余额</h2>
           <QueryGate query={balances} emptyTitle="没有余额行" emptyDetail="当前条件没有匹配的库存余额。">
             {(rows) => (
@@ -196,9 +199,9 @@ export function InventoryPage() {
         </Panel>
         <InventoryAlerts key={`${balanceFilters.warehouseId ?? ''}:${balanceFilters.skuId ?? ''}`}
         filters={{ warehouseId: balanceFilters.warehouseId, skuId: balanceFilters.skuId }} />
-      <Panel className="table-panel">
+      <Panel className="table-panel" id="inventory-warehouses" tabIndex={-1}>
           <h2 className="table-title">仓库</h2>
-          <QueryGate query={warehouses} emptyTitle="没有仓库" emptyDetail="先创建仓库，再做盘点。">
+          {balances.isFetched ? <QueryGate query={warehouses} emptyTitle="没有仓库" emptyDetail="先创建仓库，再做盘点。">
             {(rows) => (
               <>
                 <DataTable label="仓库列表">
@@ -211,11 +214,11 @@ export function InventoryPage() {
                 </DataTable>
               </>
             )}
-          </QueryGate>
+          </QueryGate> : <StateBanner tone="loading" title="正在读取仓库" detail="先读取当前库存余额，仓库清单随后显示。" />}
           <NumberedCursorPager numbered={warehouses.numbered} onNumber={setWarehousePage} scope={['warehouses']} after={whAfter} onPage={setWhAfter} pageSize={warehouseSize} onPageSize={setWarehouseSize}
             rows={warehouses.isSuccess ? warehouses.data : undefined} getCursor={(row) => row.id} />
         </Panel>
-        <div className="page-grid">
+        <div className="registry-layout">
           <Panel>
             <h2>创建仓库</h2>
             <StackForm onSubmit={submitWarehouse} actions={<Button tone="primary" type="submit" loading={createWh.isPending}>创建</Button>}>
@@ -223,7 +226,7 @@ export function InventoryPage() {
               <Field label="仓库名称"><input value={warehouseName} onChange={(event) => setWarehouseName(event.target.value)} required /></Field>
             </StackForm>
           </Panel>
-          <section id="inventory-adjustment">
+          <section id="inventory-adjustment" tabIndex={-1}>
             <Panel>
               <h2>盘点调整</h2>
               <StackForm onSubmit={submitAdjust} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" loading={adjust.isPending}>提交</Button>}>
@@ -245,7 +248,7 @@ export function InventoryPage() {
             </Panel>
           </section>
         </div>
-        <section id="inventory-ledger">
+        <section id="inventory-ledger" tabIndex={-1}>
           <Panel>
             <h2>库存流水</h2>
             <StackForm onSubmit={applyLedger} actions={<Button tone="primary" type="submit">查询</Button>}>

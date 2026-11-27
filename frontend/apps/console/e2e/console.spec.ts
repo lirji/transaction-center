@@ -100,6 +100,22 @@ test.describe('transaction console', () => {
     await expect(page.getByText('林若')).toBeVisible()
   })
 
+  test('payment presets preserve applied identifiers and clear pagination', async ({ page }) => {
+    await page.goto('/payments?orderNo=ORD-1&after=PAY-10&size=10')
+    const queue = page.getByRole('group', { name: '支付队列' })
+    const request = page.waitForRequest((entry) => {
+      const url = new URL(entry.url())
+      return url.pathname.endsWith('/admin/payments') && url.searchParams.get('status') === 'REVIEW'
+    })
+    await queue.getByRole('button', { name: '待复核' }).click()
+    const url = new URL((await request).url())
+    expect(url.searchParams.get('orderNo')).toBe('ORD-1')
+    expect(url.searchParams.get('limit')).toBe('10')
+    expect(url.searchParams.get('after')).toBe('0')
+    await expect(page).not.toHaveURL(/after=/)
+    await expect(queue.getByRole('button', { name: '待复核' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test('refund queue has no approve button', async ({ page }) => {
     await page.goto('/refunds')
     await expect(page.getByText('不能在此批准退款')).toBeVisible()
@@ -316,7 +332,7 @@ const moduleRoutes = [
   ['/reconciliation', '对账差异'], ['/admission', '准入策略'], ['/operation-logs', '操作日志'],
 ] as const
 
-for (const width of [1440, 1024, 390]) {
+for (const width of [2560, 1920, 1440, 1024, 390]) {
   test(`all accessible modules fit a ${width}px viewport`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
     const errors: string[] = []

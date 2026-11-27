@@ -27,7 +27,7 @@ export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
     <DataTable label="实收列表" className="receipt-table pin-key">
       <thead>
         <tr>
-          <th>实收单号</th><th>实收分类</th><th className="numeric-cell">实收金额</th><th>币种</th><th>渠道</th>
+          <th>实收单号</th><th>实收分类</th><th className="numeric-cell">实收金额</th><th className="currency-cell">币种</th><th>渠道</th>
           <th>订单号</th><th>支付单号</th><th className="time-cell">确认时间（北京时间）</th><th>未占用金额</th><th>操作</th>
         </tr>
       </thead>
@@ -37,7 +37,7 @@ export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
             <td><CopyValue value={row.businessNo ?? row.receiptNo} name="实收单号"><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} state={listState} className="mono">{row.businessNo ?? row.receiptNo}</Link></CopyValue></td>
             <td><Badge tone={row.disposition === NORMAL_RECEIPT ? 'good' : 'warn'}>{dispositionLabels[row.disposition]}</Badge></td>
             <td className="numeric-cell">{formatMinorAmount(row.amount)}</td>
-            <td>{row.currency}</td>
+            <td className="currency-cell">{row.currency}</td>
             <td>{row.channelCode}</td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentBusinessNo ?? row.paymentNo}</Link></td>
@@ -155,48 +155,47 @@ export function ReceiptsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="实收"
         description="查看渠道实际收款和异常分类。未占用金额用于核对资金，退款资格由退款流程判定。"
       />
-      <Panel>
-        <h2>筛选</h2>
-        <div className="queue-actions" role="group" aria-label="实收队列">
-          <Button aria-pressed={!filters.abnormalOnly && !filters.disposition} onClick={() => applyPreset(false)}>全部实收</Button>
-          <Button aria-pressed={Boolean(filters.abnormalOnly && !filters.disposition)} onClick={() => applyPreset(true)}>异常实收</Button>
+      <Panel className="table-panel queue-results">
+        <div className="queue-heading"><h2 className="table-title">实收列表</h2><p>核对渠道实际收款、资金占用与异常分类。</p></div>
+        <div className="queue-filter">
+          <div className="queue-actions" role="group" aria-label="实收队列">
+            <Button aria-pressed={!filters.abnormalOnly && !filters.disposition} onClick={() => applyPreset(false)}>全部实收</Button>
+            <Button aria-pressed={Boolean(filters.abnormalOnly && !filters.disposition)} onClick={() => applyPreset(true)}>异常实收</Button>
+          </div>
+          <FilterBar applied={appliedFilters(params, remove, [
+            ['实收单号', 'receiptNo', () => setReceiptNo('')],
+            ['支付单号', 'paymentNo', () => setPaymentNo('')],
+            ['订单号', 'orderNo', () => setOrderNo('')],
+            ['渠道', 'channelCode', () => setChannelCode('')],
+            ['实收分类', 'disposition', () => setDisposition(''), (value) => dispositionLabels[value as keyof typeof dispositionLabels] ?? value],
+            ['异常范围', 'abnormalOnly', () => setAbnormalOnly(false), () => '仅异常'],
+            ['登记时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+            ['确认时间', ['confirmedFrom', 'confirmedTo'], () => { setBusinessFrom(''); setBusinessTo('') }],
+          ])}
+            onSubmit={submit} onReset={resetFilters} invalid={incompleteWindow || (Boolean(formError) && !conflict)}
+            activeAdvanced={[filters.paymentNo, filters.channelCode, filters.createdFrom || filters.createdTo, filters.confirmedFrom || filters.confirmedTo].filter(Boolean).length}
+            advanced={<>
+              <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
+              <Field label="渠道"><input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} /></Field>
+              <TimeRangeFields labelPrefix="登记" from={from} to={to} onFrom={setFrom} onTo={setTo} />
+              <TimeRangeFields labelPrefix="确认" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
+            </>}>
+            <Field label="实收单号"><input value={receiptNo} onChange={(event) => setReceiptNo(event.target.value)} /></Field>
+            <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+            <Field label="实收分类"><EmptySelect value={disposition} onChange={setDisposition} options={DISPOSITIONS} optionLabel={(value) => dispositionLabels[value as keyof typeof dispositionLabels]} /></Field>
+            <Field label="异常范围" error={conflict ? '仅异常与正常实收互斥' : formError || undefined}>
+              <Select value={abnormalOnly ? 'true' : ''} onChange={(value) => setAbnormalOnly(value === 'true')}>
+                <option value="">否</option>
+                <option value="true">仅异常</option>
+              </Select>
+            </Field>
+          </FilterBar>
         </div>
-        <FilterBar applied={appliedFilters(params, remove, [
-          ['实收单号', 'receiptNo', () => setReceiptNo('')],
-          ['支付单号', 'paymentNo', () => setPaymentNo('')],
-          ['订单号', 'orderNo', () => setOrderNo('')],
-          ['渠道', 'channelCode', () => setChannelCode('')],
-          ['实收分类', 'disposition', () => setDisposition(''), (value) => dispositionLabels[value as keyof typeof dispositionLabels] ?? value],
-          ['异常范围', 'abnormalOnly', () => setAbnormalOnly(false), () => '仅异常'],
-          ['登记时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
-          ['确认时间', ['confirmedFrom', 'confirmedTo'], () => { setBusinessFrom(''); setBusinessTo('') }],
-        ])}
-          onSubmit={submit} onReset={resetFilters} invalid={incompleteWindow || (Boolean(formError) && !conflict)}
-          activeAdvanced={[filters.paymentNo, filters.channelCode, filters.createdFrom || filters.createdTo, filters.confirmedFrom || filters.confirmedTo].filter(Boolean).length}
-          advanced={<>
-            <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
-            <Field label="渠道"><input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} /></Field>
-            <TimeRangeFields labelPrefix="登记" from={from} to={to} onFrom={setFrom} onTo={setTo} />
-            <TimeRangeFields labelPrefix="确认" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
-          </>}>
-          <Field label="实收单号"><input value={receiptNo} onChange={(event) => setReceiptNo(event.target.value)} /></Field>
-          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="实收分类"><EmptySelect value={disposition} onChange={setDisposition} options={DISPOSITIONS} optionLabel={(value) => dispositionLabels[value as keyof typeof dispositionLabels]} /></Field>
-          <Field label="异常范围" error={conflict ? '仅异常与正常实收互斥' : formError || undefined}>
-            <Select value={abnormalOnly ? 'true' : ''} onChange={(value) => setAbnormalOnly(value === 'true')}>
-              <option value="">否</option>
-              <option value="true">仅异常</option>
-            </Select>
-          </Field>
-        </FilterBar>
-      </Panel>
-      <Panel className="table-panel">
-        <h2 className="table-title">实收列表</h2>
         {urlConflict || incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (

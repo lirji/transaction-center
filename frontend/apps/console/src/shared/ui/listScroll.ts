@@ -11,3 +11,9 @@ export function restoreListScroll(key: string) {
     }
   } catch { /* 无会话存储时由浏览器正常处理 */ }
 }
+
+export function focusWorkSection(id: string) {
+  const section = document.getElementById(id)
+  section?.focus({ preventScroll: true })
+  section?.scrollIntoView({ block: 'start' })
+}

@@ -1,6 +1,7 @@
+import { RecordHeader } from '../../components/WorkspaceNavigation'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, PageHeader, Panel, StateBanner } from '../../components/ui'
+import { Badge, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -17,25 +18,25 @@ export function ReceiptDetailPage() {
   })
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取实收" detail="正在获取当前记录。" /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/receipts" listLabel="返回实收列表" title="实收详情" description="核对实际收款、资金占用和关联交易。" /><StateBanner tone="loading" title="正在读取实收" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
+    return <div className="workspace record-workspace"><RecordHeader listPath="/receipts" listLabel="返回实收列表" title="实收详情" description="核对实际收款、资金占用和关联交易。" /><StateBanner tone="error" title={problem.title} detail={problem.detail} /></div>
   }
   const row = detail.data
 
   return (
-    <div className="workspace">
-      <PageHeader
+    <div className="workspace record-workspace">
+      <RecordHeader listPath="/receipts" listLabel="返回实收列表"
         title={row.businessNo ?? row.receiptNo}
-        description="unreservedAmount 是尚未被退款预占的余额，不是退款授权。"
+        description="核对实际收款、资金占用和关联交易。"
       />
-      <Panel>
+      <Panel className="record-summary">
         <h2>实收摘要</h2>
         <dl className="summary-fields">
           <div><dt>处置</dt><dd><Badge tone={row.disposition === 'NORMAL' ? 'good' : 'warn'}>{dispositionLabels[row.disposition]}</Badge></dd></div>
-          <div><dt>金额</dt><dd className="summary-amount">{formatMinor(row.amount, row.currency)} <small className="mono">{row.currency} {row.amount}</small></dd></div>
+          <div><dt>金额</dt><dd className="summary-amount">{formatMinor(row.amount, row.currency)} <small className="mono">最小单位 {row.amount}</small></dd></div>
           <div><dt>已退</dt><dd>{formatMinor(row.refundedAmount, row.currency)}</dd></div>
           <div><dt>退款预占</dt><dd>{formatMinor(row.refundReservedAmount, row.currency)}</dd></div>
           <div><dt>未占用</dt><dd>{formatMinor(row.unreservedAmount, row.currency)}</dd></div>

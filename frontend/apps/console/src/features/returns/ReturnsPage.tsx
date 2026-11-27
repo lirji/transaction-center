@@ -1,3 +1,5 @@
+import { focusWorkSection } from '../../shared/ui/listScroll'
+import { WorkSections } from '../../components/WorkspaceNavigation'
 import { NumberedPagePager } from '../../components/NumberedPager'
 import { useNumberedList, pageProjection } from '../../shared/ui/useNumberedList'
 import { adminReturnViewSchema } from '../../shared/api/schemas'
@@ -94,6 +96,12 @@ export function ReturnsPage() {
     onError: (error) => void invalidateIfVersionConflict(queryClient, error, ['return', activeNo]),
   })
 
+  function selectReturn(returnNo: string) {
+    setLookup(returnNo)
+    setActiveNo(returnNo)
+    focusWorkSection('return-lookup')
+  }
+
   function submitLookup(event: FormEvent) {
     event.preventDefault()
     setActiveNo(lookup.trim())
@@ -160,58 +168,58 @@ export function ReturnsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="退货"
-        description="可按申请号、订单或状态列出退货。点行读取详情后验收。申请本身不改变库存；验收后才产生实收事实。inspection.recordedAt 是登记时间，不是到货时间。"
+        description="定位退货单并核对验收记录。实际回库以验收结果为准。"
       />
+      <WorkSections sections={[{ id: 'return-queue', label: '退货记录' }, { id: 'return-lookup', label: '查询与验收记录' }, { id: 'return-apply', label: '申请退货' }, { id: 'return-inspect', label: '验收退货' }]} />
       {!canWrite ? <StateBanner tone="warn" title="当前令牌不能申请或验收退货" detail="仍可查询列表与详情。写入需要 trade.return.write。" /> : null}
       <MutationBanner error={create.error ?? inspect.error} success={create.data ? `已申请 ${create.data.resourceNo}` : inspect.data ? '已验收' : undefined} />
-      <Panel>
-        <h2>查询退货</h2>
-        <FilterBar applied={appliedFilters(params, remove, [
-          ['退货单号', 'returnNo', () => setReturnNoFilter('')],
-          ['订单号', 'orderNo', () => setOrderNo('')],
-          ['会员 ID', 'memberId', () => setMemberId('')],
-          ['订单明细 ID', 'orderItemId', () => setItemId('')],
-          ['仓库 ID', 'warehouseId', () => setWarehouseFilter('')],
-          ['验收状态', 'status', () => setStatus(''), (value) => value === 'OPEN' ? '待验收' : value === 'INSPECTED' ? '已验收' : value],
-          ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
-        ])}
-          onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
-          activeAdvanced={[filters.orderItemId, filters.warehouseId, filters.createdFrom || filters.createdTo].filter(Boolean).length}
-          advanced={<>
-            <Field label="订单明细 ID"><input value={itemId} onChange={(event) => setItemId(event.target.value)} /></Field>
-            <Field label="仓库 ID"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} /></Field>
-            <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
-          </>}>
-          <Field label="退货单号"><input value={returnNoFilter} onChange={(event) => setReturnNoFilter(event.target.value)} /></Field>
-          <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-          <Field label="验收状态"><EmptySelect value={status} onChange={setStatus} options={['OPEN', 'INSPECTED']} /></Field>
-        </FilterBar>
-      </Panel>
-      <Panel className="table-panel">
-        <h2 className="table-title">退货结果</h2>
+      <Panel className="table-panel queue-results" id="return-queue" tabIndex={-1}>
+        <div className="queue-heading"><h2 className="table-title">退货结果</h2><p>按退货单号、订单或验收状态定位记录。</p></div>
+        <div className="queue-filter">
+          <FilterBar applied={appliedFilters(params, remove, [
+            ['退货单号', 'returnNo', () => setReturnNoFilter('')],
+            ['订单号', 'orderNo', () => setOrderNo('')],
+            ['会员 ID', 'memberId', () => setMemberId('')],
+            ['订单明细 ID', 'orderItemId', () => setItemId('')],
+            ['仓库 ID', 'warehouseId', () => setWarehouseFilter('')],
+            ['验收状态', 'status', () => setStatus(''), (value) => value === 'OPEN' ? '待验收' : value === 'INSPECTED' ? '已验收' : value],
+            ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+          ])}
+            onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
+            activeAdvanced={[filters.orderItemId, filters.warehouseId, filters.createdFrom || filters.createdTo].filter(Boolean).length}
+            advanced={<>
+              <Field label="订单明细 ID"><input value={itemId} onChange={(event) => setItemId(event.target.value)} /></Field>
+              <Field label="仓库 ID"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} /></Field>
+              <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
+            </>}>
+            <Field label="退货单号"><input value={returnNoFilter} onChange={(event) => setReturnNoFilter(event.target.value)} /></Field>
+            <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
+            <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+            <Field label="验收状态"><EmptySelect value={status} onChange={setStatus} options={['OPEN', 'INSPECTED']} /></Field>
+          </FilterBar>
+        </div>
         {memberUrlError || incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (
           <>
             <PageQueryGate query={list} emptyTitle="没有退货申请" emptyDetail="当前筛选没有退货记录。">
-              {(page) => <ReturnRows rows={page.items} onSelect={setActiveNo} />}
+              {(page) => <ReturnRows rows={page.items} onSelect={selectReturn} />}
             </PageQueryGate>
             <NumberedPagePager numbered={list.numbered} onNumber={setPage} scope={['returns', filters]} after={after} onPage={setAfter} pageSize={pageSize} onPageSize={setPageSize}
               result={list.isSuccess ? list.data : undefined} />
           </>
         )}
       </Panel>
-      <div className="section-gap">
-        <Panel>
+      <div className="returns-operations">
+        <Panel id="return-lookup" tabIndex={-1}>
           <h2>按单号查询</h2>
           <StackForm onSubmit={submitLookup} actions={<Button tone="primary" type="submit">读取</Button>}>
             <Field label="退货单号"><input value={lookup} onChange={(event) => setLookup(event.target.value)} /></Field>
           </StackForm>
-          {detail.isFetching ? <StateBanner tone="loading" title="正在读取退货" detail={`GET /admin/returns/${activeNo}`} /> : null}
+          {detail.isFetching ? <StateBanner tone="loading" title="正在读取退货" detail="正在查找当前退货单及验收记录。" /> : null}
           {detail.isError ? <StateBanner tone="error" title={describeProblem(detail.error).title} detail={describeProblem(detail.error).detail} /> : null}
           {detail.data ? (
             <dl className="kv">
@@ -234,7 +242,7 @@ export function ReturnsPage() {
             </dl>
           ) : null}
         </Panel>
-        <Panel>
+        <Panel id="return-apply" tabIndex={-1}>
           <h2>申请退货</h2>
           <StackForm onSubmit={submitCreate} actions={<Button tone="primary" type="submit" loading={create.isPending} disabled={!canWrite}>申请</Button>}>
             <Field label="订单明细 ID" error={formError}><input value={orderItemId} onChange={(event) => setOrderItemId(event.target.value)} required /></Field>
@@ -242,11 +250,9 @@ export function ReturnsPage() {
             <Field label="申请数量"><input value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></Field>
           </StackForm>
         </Panel>
-      </div>
-      {detail.data ? (
-        <Panel>
+        <Panel id="return-inspect" tabIndex={-1}>
           <h2>验收</h2>
-          <StackForm onSubmit={submitInspect} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" loading={inspect.isPending} disabled={!canWrite}>提交验收</Button>}>
+          {detail.data ? <StackForm onSubmit={submitInspect} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" loading={inspect.isPending} disabled={!canWrite}>提交验收</Button>}>
             <Field label="验收结果">
               <Select value={result} onChange={(value) => setResult(value as typeof result)}>
                 <option value="ACCEPTED">验收通过</option>
@@ -256,9 +262,9 @@ export function ReturnsPage() {
             </Field>
             <Field label="回库数量"><input value={restockQuantity} onChange={(event) => setRestockQuantity(event.target.value)} /></Field>
             <Field label="验收凭证"><input value={evidenceRef} onChange={(event) => setEvidenceRef(event.target.value)} required /></Field>
-          </StackForm>
+          </StackForm> : <p>选择一笔退货记录后填写验收结果。</p>}
         </Panel>
-      ) : null}
+      </div>
       {confirmInspect && detail.data ? (
         <ConfirmDialog
           title="确认验收"

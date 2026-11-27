@@ -4,7 +4,7 @@ import { appliedFilters } from '../../shared/ui/appliedFilters'
 import { Select } from '../../components/Select'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, Panel, DataTable, CopyValue } from '../../components/ui'
 import { api, type AdminJobView } from '../../shared/api/client'
 import { FormValidationError, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
@@ -91,39 +91,50 @@ export function JobsPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="任务"
-        description="只读观察任务租约。leaseExpired 是观察值，本台不能领取、重试或解锁。不要与 Outbox 页混淆。"
+        description="查看任务执行、回调来源和租约。此处仅支持查询。"
       />
-      <Panel>
-        <h2>筛选</h2>
-        <FilterBar applied={appliedFilters(params, remove, [
-          ['回调接收号', 'callbackNo', () => setCallbackNo('')],
-          ['任务类型', 'jobType', () => setJobType('')],
-          ['状态', 'status', () => setStatus('')],
-          ['租约过期', 'leaseExpired', () => setLeaseExpired(''), (value) => value === 'true' ? '已过期' : '未过期'],
-          ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
-        ])}
-          onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
-          activeAdvanced={[params.get('leaseExpired'), filters.createdFrom || filters.createdTo].filter(Boolean).length}
-          advanced={<>
-            <Field label="租约过期">
-            <Select value={leaseExpired} onChange={(value) => setLeaseExpired(value)}>
-              <option value="">全部</option>
-              <option value="true">已过期</option>
-              <option value="false">未过期</option>
-            </Select>
-          </Field>
-            <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
-          </>}>
-          <Field label="回调接收号"><input value={callbackNo} onChange={(event) => setCallbackNo(event.target.value)} /></Field>
-          <Field label="任务类型"><EmptySelect value={jobType} onChange={setJobType} options={JOB_TYPES} /></Field>
-          <Field label="状态"><EmptySelect value={status} onChange={setStatus} options={JOB_STATUSES} /></Field>
-        </FilterBar>
-      </Panel>
-      <Panel className="table-panel">
-        <h2 className="table-title">任务列表</h2>
+      <Panel className="table-panel queue-results">
+        <div className="queue-heading"><h2 className="table-title">任务列表</h2><p>核对任务执行、回调来源和租约状态。</p></div>
+        <div className="queue-filter">
+          <div className="queue-actions" role="group" aria-label="任务租约">
+            <Button aria-pressed={filters.leaseExpired === undefined} onClick={() => {
+              setLeaseExpired('')
+              setFormError('')
+              apply({ ...filters, leaseExpired: undefined })
+            }}>全部任务</Button>
+            <Button aria-pressed={filters.leaseExpired === true} onClick={() => {
+              setLeaseExpired('true')
+              setFormError('')
+              apply({ ...filters, leaseExpired: 'true' })
+            }}>租约已过期</Button>
+          </div>
+          <FilterBar applied={appliedFilters(params, remove, [
+            ['回调接收号', 'callbackNo', () => setCallbackNo('')],
+            ['任务类型', 'jobType', () => setJobType('')],
+            ['状态', 'status', () => setStatus('')],
+            ['租约过期', 'leaseExpired', () => setLeaseExpired(''), (value) => value === 'true' ? '已过期' : '未过期'],
+            ['创建时间', ['createdFrom', 'createdTo'], () => { setFrom(''); setTo('') }],
+          ])}
+            onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
+            activeAdvanced={[params.get('leaseExpired'), filters.createdFrom || filters.createdTo].filter(Boolean).length}
+            advanced={<>
+              <Field label="租约过期">
+              <Select value={leaseExpired} onChange={(value) => setLeaseExpired(value)}>
+                <option value="">全部</option>
+                <option value="true">已过期</option>
+                <option value="false">未过期</option>
+              </Select>
+            </Field>
+              <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
+            </>}>
+            <Field label="回调接收号"><input value={callbackNo} onChange={(event) => setCallbackNo(event.target.value)} /></Field>
+            <Field label="任务类型"><EmptySelect value={jobType} onChange={setJobType} options={JOB_TYPES} /></Field>
+            <Field label="状态"><EmptySelect value={status} onChange={setStatus} options={JOB_STATUSES} /></Field>
+          </FilterBar>
+        </div>
         {incompleteWindow ? (
           <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (

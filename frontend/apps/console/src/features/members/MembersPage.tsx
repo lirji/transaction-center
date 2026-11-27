@@ -70,39 +70,41 @@ export function MembersPage() {
   }
 
   return (
-    <div className="workspace">
+    <div className="workspace queue-workspace">
       <PageHeader
         title="会员"
         description="查询会员注册与支付事实，按需冻结、解冻或评估资格。"
       />
       <MutationBanner error={change.error} success={change.isSuccess ? `已提交状态变更，resourceId=${change.data?.resourceId}` : undefined} />
-      <FilterBar applied={appliedFilters(params, remove, [
-          ['会员 ID', 'memberId', () => setMemberFilter('')],
-          ['会员状态', 'status', () => setStatusFilter(''), (value) => MEMBER_STATUS_LABELS[value] ?? value],
-          ['注册时间', ['registeredFrom', 'registeredTo'], () => { setRegisteredFrom(''); setRegisteredTo('') }],
-        ])}
-          onReset={clearFilters} invalid={Boolean(filterError)} activeAdvanced={params.has('registeredFrom') || params.has('registeredTo') ? 1 : 0}
-        advanced={<TimeRangeFields labelPrefix="注册" from={registeredFrom} to={registeredTo} onFrom={setRegisteredFrom} onTo={setRegisteredTo} />} onSubmit={() => {
-        setFilterError('')
-        try {
-          const window = parseTimeWindow(registeredFrom, registeredTo)
-          apply({
-            memberId: memberFilter.trim() ? parseMemberId(memberFilter, '会员 ID') : undefined,
-            status: statusFilter, registeredFrom: window?.createdFrom, registeredTo: window?.createdTo,
-          })
-        } catch (cause) {
-          setFilterError(cause instanceof Error ? cause.message : '筛选无效')
-        }
-      }}>
-        <Field label="会员 ID"><input value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} inputMode="numeric" /></Field>
-        <Field label="会员状态">
-          <EmptySelect value={statusFilter} onChange={setStatusFilter} options={Object.keys(MEMBER_STATUS_LABELS)}
-            optionLabel={(value) => MEMBER_STATUS_LABELS[value]} />
-        </Field>
-      </FilterBar>
-      {filterError ? <StateBanner tone="warn" title="筛选条件无效" detail={filterError} /> : null}
-      <Panel className="table-panel">
-        <h2 className="table-title">会员列表</h2>
+      <Panel className="table-panel queue-results">
+        <div className="queue-heading"><h2 className="table-title">会员列表</h2><p>按会员状态及注册时间核对账户。</p></div>
+        <div className="queue-filter">
+          <FilterBar applied={appliedFilters(params, remove, [
+              ['会员 ID', 'memberId', () => setMemberFilter('')],
+              ['会员状态', 'status', () => setStatusFilter(''), (value) => MEMBER_STATUS_LABELS[value] ?? value],
+              ['注册时间', ['registeredFrom', 'registeredTo'], () => { setRegisteredFrom(''); setRegisteredTo('') }],
+            ])}
+              onReset={clearFilters} invalid={Boolean(filterError)} activeAdvanced={params.has('registeredFrom') || params.has('registeredTo') ? 1 : 0}
+            advanced={<TimeRangeFields labelPrefix="注册" from={registeredFrom} to={registeredTo} onFrom={setRegisteredFrom} onTo={setRegisteredTo} />} onSubmit={() => {
+            setFilterError('')
+            try {
+              const window = parseTimeWindow(registeredFrom, registeredTo)
+              apply({
+                memberId: memberFilter.trim() ? parseMemberId(memberFilter, '会员 ID') : undefined,
+                status: statusFilter, registeredFrom: window?.createdFrom, registeredTo: window?.createdTo,
+              })
+            } catch (cause) {
+              setFilterError(cause instanceof Error ? cause.message : '筛选无效')
+            }
+          }}>
+            <Field label="会员 ID"><input value={memberFilter} onChange={(event) => setMemberFilter(event.target.value)} inputMode="numeric" /></Field>
+            <Field label="会员状态">
+              <EmptySelect value={statusFilter} onChange={setStatusFilter} options={Object.keys(MEMBER_STATUS_LABELS)}
+                optionLabel={(value) => MEMBER_STATUS_LABELS[value]} />
+            </Field>
+          </FilterBar>
+          {filterError ? <StateBanner tone="warn" title="筛选条件无效" detail={filterError} /> : null}
+        </div>
         <QueryGate query={query} emptyTitle="没有会员" emptyDetail="当前条件没有匹配的会员。">
           {(rows) => (
             <>
