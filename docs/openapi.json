@@ -8762,6 +8762,222 @@
         }
       }
     },
+    "/api/v1/trade/admin/orders/{orderNo}/operation-evidence": {
+      "get": {
+        "operationId": "adminReadOrderOperationEvidence",
+        "summary": "按订单核对交易收退款及可信商城关联",
+        "tags": [
+          "Admin queries"
+        ],
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.evidence.read"
+        ],
+        "parameters": [
+          {
+            "name": "orderNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "receiptAfter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,19}$"
+            }
+          },
+          {
+            "name": "refundAfter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,19}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "交易中心确认的原生事实，独立收款及退款游标，历史订单的试点绑定可为空。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tradeTenant": {
+                      "type": "string"
+                    },
+                    "orderId": {
+                      "type": "string"
+                    },
+                    "orderNo": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "financialStatus": {
+                      "type": "string"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "businessNo": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "paidAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "binding": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "commerceTenant": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "merchantId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "storeId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "commerceQuoteId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "scopeVersion": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "checkoutReference": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "fundingApplicationId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "receiptNextAfter": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "refundNextAfter": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "receipts": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "businessNo": {
+                            "type": "string",
+                            "maxLength": 64
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amountMinor": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                          },
+                          "disposition": {
+                            "type": "string"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "refunds": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "businessNo": {
+                            "type": "string",
+                            "maxLength": 64
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amountMinor": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "缺少交易证据读取权限"
+          },
+          "404": {
+            "description": "当前租户无此订单"
+          }
+        }
+      }
+    },
     "/api/v1/trade/admin/refunds/{refundNo}/operation-audits": {
       "get": {
         "operationId": "adminQueryRefundOperationAudit",

@@ -6,6 +6,7 @@ import com.lrj.trade.payment.*;
 import com.lrj.trade.refund.*;
 import com.lrj.trade.catalog.*;
 import com.lrj.trade.jobs.*;
+import com.lrj.trade.server.checkout.CheckoutPilotAuditLookup;
 import java.util.*;
 import java.time.Instant;
 import org.springframework.util.MultiValueMap;
@@ -29,9 +30,10 @@ public class AdminQueryController {
     private final AdminAttemptQueryService attempt;
     private final AdminRefundQueryService refund;
     private final AuditWriter operationAudit;
+    private final CheckoutPilotAuditLookup checkoutPilot;
     private final OrderReferralEvidenceService evidence;private final CustomerEligibilityService eligibility;private final AdminEvidenceAccess evidenceAccess;
     /** 管理员证据有独立入口授权，复用交易事实算法而非内部HTTP身份。 */
-    public AdminQueryController(AdminOrderQueryService order,AdminReturnQueryService returns,AdminPaymentQueryService payment,AdminReceiptQueryService receipt,AdminQuoteQueryService quote,AdminJobQueryService job,AdminAttemptQueryService attempt,AdminRefundQueryService refund,OrderReferralEvidenceService evidence,CustomerEligibilityService eligibility,AdminEvidenceAccess evidenceAccess,AuditWriter operationAudit) {
+    public AdminQueryController(AdminOrderQueryService order,AdminReturnQueryService returns,AdminPaymentQueryService payment,AdminReceiptQueryService receipt,AdminQuoteQueryService quote,AdminJobQueryService job,AdminAttemptQueryService attempt,AdminRefundQueryService refund,OrderReferralEvidenceService evidence,CustomerEligibilityService eligibility,AdminEvidenceAccess evidenceAccess,AuditWriter operationAudit,CheckoutPilotAuditLookup checkoutPilot) {
         this.order=order;
         this.returns=returns;
         this.payment=payment;
@@ -41,6 +43,7 @@ public class AdminQueryController {
         this.attempt=attempt;
         this.refund=refund;
         this.operationAudit=operationAudit;
+        this.checkoutPilot=checkoutPilot;
         this.evidence=evidence;this.eligibility=eligibility;this.evidenceAccess=evidenceAccess;
     }
     /** 有界租户查询，精确筛选不接受任意列名或自由文本搜索。 */
@@ -137,6 +140,43 @@ public class AdminQueryController {
         var owned=refund.read(actor.tenantId(),refundNo);
         return operationAudit.refundHistory(actor,owned.refundNo(),cursors==null?null:cursors.getFirst());
     }
+    /** 同单读取复用已授权的订单、收款和退款查询，以已持久化的报价绑定标记商城来源。 */
+    @GetMapping("/orders/{orderNo}/operation-evidence")
+    public OrderOperationEvidence orderOperationEvidence(@AuthenticationPrincipal Jwt jwt,@PathVariable String orderNo,
+            @RequestParam MultiValueMap<String,String> params) {
+        AdminQuery.text(orderNo,64);
+        if(params.entrySet().stream().anyMatch(entry->!Set.of("receiptAfter","refundAfter").contains(entry.getKey())
+                ||entry.getValue().size()!=1)) throw new TradeException("INVALID_ARGUMENT","审计查询参数无效");
+        long receiptAfter=params.containsKey("receiptAfter")?AdminQuery.number(params.getFirst("receiptAfter"),true):0;
+        long refundAfter=params.containsKey("refundAfter")?AdminQuery.number(params.getFirst("refundAfter"),true):0;
+        Actor actor=actor(jwt);
+        var header=order.read(actor.tenantId(),orderNo);
+        return operationAudit.readOrderEvidence(actor,header.orderNo(),()->{
+            var binding=checkoutPilot.find(actor.tenantId(),Long.parseLong(header.orderId())).orElse(null);
+            var receipts=receipt.page(actor.tenantId(),new AdminQuery(receiptAfter,20,null,null,Map.of("orderNo",header.orderNo())));
+            var refunds=refund.page(actor.tenantId(),new AdminQuery(refundAfter,20,null,null,Map.of("orderNo",header.orderNo(),"status","ALL")));
+            return new OrderOperationEvidence(Long.toString(actor.tenantId()),header.orderId(),header.orderNo(),header.businessNo(),
+                header.status(),header.financialStatus(),header.currency(),header.createdAt(),header.paidAt(),binding,
+                receipts.items().stream().map(row->new OrderReceipt(
+                    row.businessNo()==null?row.receiptNo():row.businessNo(),Long.toString(row.amount()),row.currency(),
+                    row.disposition(),row.confirmedAt())).toList(),receipts.nextAfter(),
+                refunds.items().stream().map(row->new OrderRefund(
+                    row.businessNo()==null?row.refundNo():row.businessNo(), Long.toString(row.amount()),
+                    row.currency(),row.status(),row.createdAt())).toList(),refunds.nextAfter());
+        });
+    }
+
+    /** 交易侧返回安全的原生订单证据，可按收款和退款来源独立分页。 */
+    public record OrderOperationEvidence(String tradeTenant,String orderId,String orderNo,String businessNo,
+            String status,String financialStatus,String currency,Instant createdAt,Instant paidAt,CheckoutPilotAuditLookup.Binding binding,
+            List<OrderReceipt> receipts,String receiptNextAfter,List<OrderRefund> refunds,String refundNextAfter) {}
+
+    /** 金额从实际支付回执取得，币种和处置结果一起返回。 */
+    public record OrderReceipt(String businessNo,String amountMinor,String currency,String disposition,Instant confirmedAt) {}
+
+    /** 退款实际状态来自原生退款表，使用展示号可继续查看操作轨迹。 */
+    public record OrderRefund(String businessNo,String amountMinor,String currency,String status,Instant createdAt) {}
+
     /** 证据读取不预占资格，不改变首单或资金事实。 */
     @GetMapping("/orders/{orderNo}/referral-evidence")
     public OrderEvidence evidence(@AuthenticationPrincipal Jwt jwt,@PathVariable String orderNo,@RequestParam MultiValueMap<String,String> params) {

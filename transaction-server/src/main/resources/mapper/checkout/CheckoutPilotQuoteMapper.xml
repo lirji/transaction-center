@@ -48,6 +48,13 @@
         FROM tc_checkout_pilot_quote_ref q JOIN tc_order o ON o.tenant_id=q.tenant_id AND o.id=q.native_order_id
         WHERE q.tenant_id=#{tenant} AND q.quote_ref=#{reference}
     </select>
+    <select id="findAuditBinding" useCache="false" resultType="com.lrj.trade.server.checkout.CheckoutPilotAuditLookup$Binding">
+        SELECT JSON_UNQUOTE(JSON_EXTRACT(evidence_json, '$.commerceTenantId')) AS commerceTenant,
+               JSON_UNQUOTE(JSON_EXTRACT(evidence_json, '$.merchantId')) AS merchantId,
+               store_id AS storeId, commerce_quote_id AS commerceQuoteId, scope_version AS scopeVersion,
+               quote_ref AS checkoutReference, funding_application_id AS fundingApplicationId
+        FROM tc_checkout_pilot_quote_ref WHERE tenant_id=#{tenant} AND native_order_id=#{orderId}
+    </select>
     <update id="acceptFunding">
         UPDATE tc_checkout_pilot_quote_ref SET funding_application_id=#{funding.applicationId},
             funding_receipt_hash=#{funding.receiptHash}, funding_valid_until=#{funding.validUntil}

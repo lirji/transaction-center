@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class AuditWriter {
     private static final Logger LOG=LoggerFactory.getLogger(AuditWriter.class);
     private static final int DEFAULT_PAGE_SIZE=50;
+    private static final String READ_ORDER_AUDIT="order.audit.evidence.read";
     private static final String READ_REFUND_AUDIT="refund.audit.list";
     private static final String INVALID_CURSOR="审计查询游标无效";
     private static final Pattern SENSITIVE=Pattern.compile(
@@ -97,6 +98,15 @@ public class AuditWriter {
             String next=rows.size()>DEFAULT_PAGE_SIZE?items.getLast().occurredAt()+","+items.getLast().id():null;
             expectWritten(mapper.insertOutcome(actor.tenantId(),attempt,"SUCCEEDED",null,refundNo,null));
             return new History(items,next);
+        });
+    }
+
+    /** 汇总参照真实订单范围，读取事实同样保持审计可追溯。 */
+    public <T> T readOrderEvidence(Actor actor,String orderNo,java.util.function.Supplier<T> read) {
+        return capture(actor,READ_ORDER_AUDIT,orderNo,attempt->{
+            T evidence=read.get();
+            expectWritten(mapper.insertOutcome(actor.tenantId(),attempt,"SUCCEEDED",null,orderNo,null));
+            return evidence;
         });
     }
 

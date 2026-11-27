@@ -79,7 +79,7 @@ public class SecurityConfiguration {
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.return.write")))
                 // 精确只读权限规则必须先于admin通配规则，管理身份不能隐式取得证据或租约权限。
-                .requestMatchers("/api/v1/trade/admin/orders/*/referral-evidence")
+                .requestMatchers("/api/v1/trade/admin/orders/*/referral-evidence","/api/v1/trade/admin/orders/*/operation-evidence")
                     .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.evidence.read")))

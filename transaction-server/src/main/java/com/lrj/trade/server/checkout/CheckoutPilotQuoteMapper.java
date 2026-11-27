@@ -28,6 +28,9 @@ public interface CheckoutPilotQuoteMapper {
 
     /** 从交易自己的订单复核当前可支付状态及关联证据，不外传原始签名和买家字段。 */
     Optional<BoundOrder> findBoundOrder(@Param("tenant") long tenant, @Param("reference") String reference);
+    /** 只返回这笔交易实际冻结的商城关联，不展开买家、价格凭据或签名。 */
+    Optional<CheckoutPilotAuditLookup.Binding> findAuditBinding(@Param("tenant") long tenant, @Param("orderId") long orderId);
+
     /** 仅首份有效预算回执可以开放试点订单支付。 */
     int acceptFunding(@Param("tenant") long tenant, @Param("funding") FundingBinding funding);
 

@@ -18,6 +18,7 @@
 | GET /payment-receipts | 按 receiptNo/paymentNo/orderNo/channelCode/disposition/abnormalOnly 查实收 |
 | GET /payment-receipts/{receiptNo} | 实收、累计退款、预占及未占用金额 |
 | GET /refunds/{refundNo} | 退款分项、审批引用、版本、processingReasonCode |
+| GET /orders/{orderNo}/operation-evidence | 订单及实际收退款记录，独立分页，试点返回已冻结商城报价关联；另需 trade.admin.evidence.read |
 | GET /refunds/{refundNo}/operation-audits | 当前租户退款的申请、审批、已核实渠道终态、重复请求及业务效果证据 |
 | GET /returns | 按 returnNo/orderNo/memberId/orderItemId/warehouseId/status 查退货申请 |
 | GET /quotes | 按 quoteId/memberId 查不可变报价 |

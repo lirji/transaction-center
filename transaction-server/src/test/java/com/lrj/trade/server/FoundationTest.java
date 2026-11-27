@@ -2365,6 +2365,19 @@ class FoundationTest {
 
         jwt("operation-audit-admin","trade.admin",tenant);
         jwt("operation-audit-other","trade.admin",TENANTS.incrementAndGet());
+        String evidencePath="/api/v1/trade/admin/orders/"+order.orderNo()+"/operation-evidence";
+        assertEquals(403,request("GET",evidencePath,"operation-audit-admin",null).statusCode());
+        jwt("order-evidence-admin","trade.admin trade.admin.evidence.read",tenant);
+        jwt("order-evidence-other","trade.admin trade.admin.evidence.read",TENANTS.incrementAndGet());
+        assertEquals(404,request("GET",evidencePath,"order-evidence-other",null).statusCode());
+        var evidenceReply=request("GET",evidencePath,"order-evidence-admin",null);
+        assertEquals(200,evidenceReply.statusCode(),evidenceReply.body());
+        var evidence=tools.jackson.databind.json.JsonMapper.builder().build().readTree(evidenceReply.body());
+        assertEquals(order.orderNo(),evidence.path("orderNo").asText());
+        assertTrue(evidence.path("binding").isNull());
+        assertEquals("NORMAL",evidence.path("receipts").get(0).path("disposition").asText());
+        assertEquals(refund.businessNo(),evidence.path("refunds").get(0).path("businessNo").asText());
+        assertEquals("SUCCEEDED",evidence.path("refunds").get(0).path("status").asText());
         String path="/api/v1/trade/admin/refunds/"+refund.businessNo()+"/operation-audits";
         assertEquals(404,request("GET",path,"operation-audit-other",null).statusCode());
         var reply=request("GET",path,"operation-audit-admin",null);
