@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, Field, Modal, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
 import { api, type Member } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -54,15 +54,24 @@ export function MembersPage() {
     onError: (error) => void invalidateIfVersionConflict(queryClient, error, ['members']),
   })
 
+  function clearFilters() {
+    setMemberFilter('')
+    setStatusFilter('')
+    setRegisteredFrom('')
+    setRegisteredTo('')
+    setFilterError('')
+    apply({})
+  }
+
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Members"
         title="会员"
         description="查询会员注册与支付事实，按需冻结、解冻或评估资格。"
       />
       <MutationBanner error={change.error} success={change.isSuccess ? `已提交状态变更，resourceId=${change.data?.resourceId}` : undefined} />
-      <FilterBar onSubmit={() => {
+      <FilterBar onReset={clearFilters} invalid={Boolean(filterError)} activeAdvanced={params.has('registeredFrom') || params.has('registeredTo') ? 1 : 0}
+        advanced={<TimeRangeFields labelPrefix="注册" from={registeredFrom} to={registeredTo} onFrom={setRegisteredFrom} onTo={setRegisteredTo} />} onSubmit={() => {
         setFilterError('')
         try {
           const window = parseTimeWindow(registeredFrom, registeredTo)
@@ -79,26 +88,26 @@ export function MembersPage() {
           <EmptySelect value={statusFilter} onChange={setStatusFilter} options={Object.keys(MEMBER_STATUS_LABELS)}
             optionLabel={(value) => MEMBER_STATUS_LABELS[value]} />
         </Field>
-        <TimeRangeFields labelPrefix="注册" from={registeredFrom} to={registeredTo} onFrom={setRegisteredFrom} onTo={setRegisteredTo} />
       </FilterBar>
       {filterError ? <StateBanner tone="warn" title="筛选条件无效" detail={filterError} /> : null}
       <Panel className="table-panel">
+        <h2 className="table-title">会员列表</h2>
         <QueryGate query={query} emptyTitle="没有会员" emptyDetail="当前条件没有匹配的会员。">
           {(rows) => (
             <>
-              <table className="data-table trade-list-table">
-                <thead><tr><th>会员名称</th><th>会员 ID</th><th>会员状态</th><th>注册时间（北京时间）</th><th>曾确认支付</th><th>版本</th><th>操作</th></tr></thead>
+              <DataTable label="会员列表" className="trade-list-table pin-key">
+                <thead><tr><th>会员名称</th><th>会员 ID</th><th>会员状态</th><th className="time-cell">注册时间（北京时间）</th><th>曾确认支付</th><th>版本</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.memberId}>
                       <td>{row.displayName}</td>
                       <td className="mono">{row.memberId}</td>
                       <td><Badge tone={row.status === MEMBER_FROZEN ? 'danger' : 'good'}>{MEMBER_STATUS_LABELS[row.status] ?? row.status}</Badge></td>
-                      <td>{formatBeijingTime(row.registeredAt)}</td>
+                      <td className="time-cell">{formatBeijingTime(row.registeredAt)}</td>
                       <td>{row.everPaid ? '是' : '否'}</td>
                       <td className="mono">{row.version}</td>
                       <td>
-                        <Button tone="ghost" onClick={() => { setSelected(row); setReason(''); setFormError(''); change.reset() }}>
+                        <Button tone="ghost" aria-haspopup="dialog" onClick={() => { setSelected(row); setReason(''); setFormError(''); change.reset() }}>
                           {row.status === MEMBER_FROZEN ? '解冻' : '冻结'}
                         </Button>
                         {canEvidence ? <Button tone="ghost" onClick={() => {
@@ -109,8 +118,8 @@ export function MembersPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-              <PagePager after={after} nextAfter={rows.at(-1)?.memberId ?? null} hasMore={rows.length === 20} onReset={() => setAfter('0')} onNext={setAfter} />
+              </DataTable>
+              <PagePager count={rows.length} after={after} nextAfter={rows.at(-1)?.memberId ?? null} hasMore={rows.length === 20} onReset={() => setAfter('0')} onNext={setAfter} />
             </>
           )}
         </QueryGate>
@@ -118,7 +127,8 @@ export function MembersPage() {
       {selected && (
         <Modal
           title={selected.status === MEMBER_FROZEN ? '解冻会员' : '冻结会员'}
-          description={`将提交 expectedVersion=${selected.version} 与 If-Match。冲突时请关闭后重新读取，不要换键盲重试。`}
+          description={`${selected.displayName || selected.memberId} · 会员 ID ${selected.memberId}。请填写状态变更原因。`}
+          pending={change.isPending}
           onClose={() => setSelected(undefined)}
         >
           <form onSubmit={(event) => {
@@ -131,12 +141,12 @@ export function MembersPage() {
             const targetStatus = selected.status === MEMBER_FROZEN ? 'ACTIVE' : 'FROZEN'
             change.mutate({ member: selected, targetStatus, reason: reason.trim() })
           }}>
-            {isVersionConflict(change.error) ? <StateBanner tone="warn" title="请重新读取" detail="版本已变化。关闭对话框并刷新列表后再提交新动作。" /> : null}
+            {isVersionConflict(change.error) ? <StateBanner tone="warn" title="请重新读取" detail="版本已变化。关闭对话框并刷新列表后再提交新动作。" /> : <MutationBanner error={change.error} />}
             <Field label="原因" error={formError}>
               <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={255} required />
             </Field>
             <div className="modal-actions">
-              <Button onClick={() => setSelected(undefined)}>取消</Button>
+              <Button onClick={() => setSelected(undefined)} disabled={change.isPending}>取消</Button>
               <Button tone="primary" type="submit" disabled={change.isPending}>提交</Button>
             </div>
           </form>

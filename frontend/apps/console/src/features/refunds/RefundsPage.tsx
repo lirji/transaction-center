@@ -131,13 +131,26 @@ export function RefundsPage() {
     setParams(search, { replace: true })
   }
 
+  function resetFilters() {
+    setApprovalNo('')
+    setRefundNo('')
+    setOrderNo('')
+    setMemberId('')
+    setFrom('')
+    setTo('')
+    setBusinessFrom('')
+    setBusinessTo('')
+    setFilterError('')
+    setAfter(0)
+    setParams({}, { replace: true })
+  }
+
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Refunds"
         title="退款"
         description="查询退款进度、审批截止时间及关联订单。"
-        actions={<Button onClick={openPolicy}>退款政策</Button>}
+        actions={<Button aria-haspopup="dialog" onClick={openPolicy}>退款政策</Button>}
       />
       <StateBanner tone="info" title="不能在此批准退款" detail="审批结果由独立审批流程签收，可在此查询退款进度。" />
       <div className="section-gap">
@@ -146,23 +159,27 @@ export function RefundsPage() {
           <div className="queue-actions" role="group" aria-label="退款队列">
             {PRESETS.map((value) => <Button key={value} aria-pressed={status === value} onClick={() => changeStatus(value)}>{statusLabel(value)}</Button>)}
           </div>
-          <FilterBar onSubmit={submitFilters}>
+          <FilterBar onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
+            activeAdvanced={[filters.approvalNo, filters.memberId, filters.createdFrom || filters.createdTo, filters.approvalDeadlineFrom || filters.approvalDeadlineTo].filter(Boolean).length}
+            advanced={<>
+              <Field label="审批单号"><input value={approvalNo} onChange={(event) => setApprovalNo(event.target.value)} /></Field>
+              <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
+              <TimeRangeFields labelPrefix="申请" from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
+                <TimeRangeFields labelPrefix="审批截止" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
+            </>}>
             <Field label="状态">
               <select value={status} onChange={(event) => changeStatus(event.target.value)}>
                 {STATUSES.map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}
               </select>
             </Field>
-            <Field label="审批单号"><input value={approvalNo} onChange={(event) => setApprovalNo(event.target.value)} /></Field>
             <Field label="退款单号"><input value={refundNo} onChange={(event) => setRefundNo(event.target.value)} /></Field>
             <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-            <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-            <TimeRangeFields labelPrefix="申请" from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
-          <TimeRangeFields labelPrefix="审批截止" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
           </FilterBar>
         </Panel>
         <Panel className="table-panel">
+          <h2 className="table-title">退款列表</h2>
           {memberUrlError || incompleteWindow ? (
-            <p className="empty-state" style={{ minHeight: 120 }}>当前筛选无效，未向服务器发送请求。</p>
+            <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
           ) : (
             <QueryGate query={queue} emptyTitle="队列为空" emptyDetail="当前状态下没有退款单。">
               {(rows: RefundQueueItem[]) => (
@@ -176,7 +193,7 @@ export function RefundsPage() {
         </Panel>
       </div>
       {policyOpen ? (
-        <Modal title="退款政策" description="设置同一订单的累计免审退款金额上限。额度为零时需审批。" onClose={closePolicy}>
+        <Modal title="退款政策" description="设置同一订单的累计免审退款金额上限。额度为零时需审批。" onClose={closePolicy} pending={update.isPending}>
           {policy.isLoading ? <StateBanner tone="loading" title="正在读取政策" detail="请等待载入当前币种和额度。" /> : null}
           {policy.isError ? <StateBanner tone="error" title={describeProblem(policy.error).title} detail={describeProblem(policy.error).detail} /> : null}
           {policy.data ? (

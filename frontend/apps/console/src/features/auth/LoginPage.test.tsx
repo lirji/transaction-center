@@ -33,13 +33,12 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { name: '登录交易中枢' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '使用 Casdoor 登录' })).toBeEnabled()
     expect(screen.getAllByText(/trade\.admin/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/tenant_id=900001/)).toBeInTheDocument()
+    expect(screen.getByText('登录与权限帮助')).toBeInTheDocument()
   })
 
   it('keeps the operational aside visible', () => {
     renderLogin(<LoginPage />, guest())
-    expect(screen.getByRole('heading', { name: /后台可审计/ })).toBeInTheDocument()
-    expect(screen.getByText('租户来自令牌')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '交易运营控制台' })).toBeInTheDocument()
   })
 
   it('redirects an authenticated operator to the workspace', () => {

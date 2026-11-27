@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel } from '../../components/ui'
+import { Badge, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
 import { api, type AdminPaymentView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseMemberId, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
-import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
+import { isoFromSearch, useAdminListSearch, useListLinkState } from '../../shared/ui/useAdminListSearch'
 import { dash, formatBeijingTime, statusTone } from '../../shared/ui/display'
 import { paymentStatusSchema } from '../../shared/api/schemas'
 
@@ -17,30 +17,31 @@ const paymentLabels: Record<(typeof PAYMENT_STATUSES)[number], string> = {
 }
 
 export function PaymentRows({ rows }: { rows: AdminPaymentView[] }) {
+  const listState = useListLinkState('/payments')
   return (
-    <table className="data-table trade-list-table">
+    <DataTable label="支付列表" className="trade-list-table pin-key">
       <thead>
         <tr>
-          <th>支付单号</th><th>订单号</th><th>支付状态</th><th>期望金额</th><th>币种</th><th>成功实收单号</th><th>关闭屏障（北京时间）</th><th>更新时间（北京时间）</th>
+          <th>支付单号</th><th>订单号</th><th>支付状态</th><th className="numeric-cell">期望金额</th><th>币种</th><th>成功实收单号</th><th className="time-cell">关闭屏障（北京时间）</th><th className="time-cell">更新时间（北京时间）</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.paymentNo}>
             <td>
-              <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.businessNo ?? row.paymentNo}</Link>
+              <Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} state={listState} className="mono">{row.businessNo ?? row.paymentNo}</Link>
             </td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Badge tone={statusTone(row.status)}>{paymentLabels[row.status]}</Badge></td>
-            <td>{formatMinorAmount(row.expectedAmount)}</td>
+            <td className="numeric-cell">{formatMinorAmount(row.expectedAmount)}</td>
             <td>{row.currency}</td>
             <td className="mono">{row.succeededReceiptNo ? <Link to={`/receipts/${encodeURIComponent(row.succeededReceiptNo)}`}>{row.succeededReceiptBusinessNo ?? row.succeededReceiptNo}</Link> : dash(row.succeededReceiptNo)}</td>
-            <td>{formatBeijingTime(row.closeFenceAt)}</td>
-            <td>{formatBeijingTime(row.updatedAt)}</td>
+            <td className="time-cell">{formatBeijingTime(row.closeFenceAt)}</td>
+            <td className="time-cell">{formatBeijingTime(row.updatedAt)}</td>
           </tr>
         ))}
       </tbody>
-    </table>
+    </DataTable>
   )
 }
 
@@ -91,32 +92,46 @@ export function PaymentsPage() {
     }
   }
 
+  function resetFilters() {
+    setPaymentNo('')
+    setOrderNo('')
+    setMemberId('')
+    setStatus('')
+    setFrom('')
+    setTo('')
+    setFormError('')
+    apply({})
+  }
+
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Payments"
         title="支付"
         description="查询支付意图。UNKNOWN 尝试不等于失败；closeFenceAt 不是渠道关闭证明。本台不能发起付款跳转。"
       />
       <Panel>
         <h2>筛选</h2>
-        <FilterBar onSubmit={submit}>
+        <FilterBar onSubmit={submit} onReset={resetFilters} invalid={Boolean(formError) || incompleteWindow}
+          activeAdvanced={[filters.createdFrom || filters.createdTo].filter(Boolean).length}
+          advanced={<>
+            <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
+          </>}>
           <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
           <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
           <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
           <Field label="支付状态"><EmptySelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} optionLabel={(value) => paymentLabels[value as keyof typeof paymentLabels]} /></Field>
-          <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={formError} />
         </FilterBar>
       </Panel>
       <Panel className="table-panel">
+        <h2 className="table-title">支付意图列表</h2>
         {memberUrlError || incompleteWindow ? (
-          <p className="empty-state" style={{ minHeight: 120 }}>当前筛选无效，未向服务器发送请求。</p>
+          <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (
           <PageQueryGate query={query} emptyTitle="没有支付意图" emptyDetail="当前筛选没有支付记录。">
             {(page) => (
               <>
                 <PaymentRows rows={page.items} />
-                <PagePager after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
+                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}
           </PageQueryGate>

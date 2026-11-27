@@ -37,7 +37,6 @@ export function MerchantPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Merchant"
         title="逻辑商户"
         description="每个租户一份商户配置。冻结会阻止新订单，不影响已存在的资金事实。状态变更携带 expectedVersion 与 If-Match。"
       />
@@ -60,9 +59,9 @@ export function MerchantPage() {
               if (!reason.trim()) return
               setConfirmOpen(true)
             }}
-            actions={<Button tone="danger" type="submit" disabled={change.isPending || !reason.trim()}>{query.data.status === 'FROZEN' ? '恢复接单' : '冻结新订单'}</Button>}
+            actions={<Button tone={nextStatus === 'FROZEN' ? 'danger' : 'primary'} type="submit" aria-haspopup="dialog" disabled={change.isPending || !reason.trim()}>{query.data.status === 'FROZEN' ? '恢复接单' : '冻结新订单'}</Button>}
           >
-            <Field label="原因"><input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={255} /></Field>
+            <Field label="原因"><input required value={reason} onChange={(event) => setReason(event.target.value)} maxLength={255} /></Field>
           </StackForm>
         </Panel>
       ) : null}
@@ -80,6 +79,7 @@ export function MerchantPage() {
           title={nextStatus === 'FROZEN' ? '冻结新订单' : '恢复接单'}
           description={`商户 ${query.data.name}（${query.data.merchantNo}），当前版本 ${query.data.version}。状态变更影响新订单受理。`}
           confirmLabel={nextStatus === 'FROZEN' ? '确认冻结' : '确认恢复'}
+          tone={nextStatus === 'FROZEN' ? 'danger' : 'primary'}
           pending={change.isPending}
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => change.mutate({
@@ -87,7 +87,7 @@ export function MerchantPage() {
             targetStatus: nextStatus,
             reason: reason.trim(),
           })}
-        />
+        ><MutationBanner error={change.error} /></ConfirmDialog>
       ) : null}
     </div>
   )

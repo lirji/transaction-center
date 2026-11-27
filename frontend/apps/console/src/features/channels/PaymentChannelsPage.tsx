@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Badge, Button, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseChannelCode, parseCurrencyCode, parseHttpsUrl } from '../../shared/api/validate'
@@ -41,17 +41,17 @@ export function PaymentChannelsPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Payments"
         title="支付渠道"
         description="列表不回显密钥或完整 returnUrl。登记渠道不等于真实渠道已执行；会员侧 202 只表示本地受理。"
       />
       <StateBanner tone="info" title="不会构造付款跳转" detail="本台没有支付跳转按钮，也不把渠道登记当成收款成功。" />
       <div className="section-gap">
         <Panel className="table-panel">
+          <h2 className="table-title">渠道绑定</h2>
           <QueryGate query={query} emptyTitle="没有渠道" emptyDetail="尚未登记支付渠道。">
             {(rows) => (
               <>
-                <table className="data-table trade-list-table">
+                <DataTable label="支付渠道列表" className="trade-list-table pin-key">
                   <thead><tr><th>渠道编码</th><th>渠道 ID</th><th>逻辑商户号</th><th>渠道商户号</th><th>币种</th><th>回跳配置编号</th><th>绑定状态</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
@@ -66,7 +66,7 @@ export function PaymentChannelsPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </DataTable>
                 <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.channelId} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
               </>
             )}

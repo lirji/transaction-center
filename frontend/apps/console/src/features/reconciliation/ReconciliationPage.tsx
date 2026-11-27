@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner } from '../../components/ui'
+import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api, type ReconciliationCase } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -42,7 +42,6 @@ export function ReconciliationPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Reconciliation"
         title="对账差异"
         description="只查单需要 trade.reconciliation.query，默认可能关闭。202 表示已排队，不是当前执行结果。禁止在此关单、补建或派发退款。"
       />
@@ -72,7 +71,7 @@ export function ReconciliationPage() {
         <QueryGate query={cases} emptyTitle="没有差异" emptyDetail="当前状态下没有对账差异。">
           {(rows) => (
             <>
-              <table className="data-table trade-list-table">
+              <DataTable label="对账差异列表" className="trade-list-table pin-actions">
                 <thead><tr><th>差异编号</th><th>账单日期</th><th>渠道 ID</th><th>状态</th><th>差异类型</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
@@ -82,12 +81,12 @@ export function ReconciliationPage() {
                       <td><Badge>{row.status}</Badge></td>
                       <td><Badge>{row.differenceType}</Badge></td>
                       <td>
-                        <Button tone="ghost" disabled={!canQuery} onClick={() => { setSelected(row); setReason(''); setTicketRef('') }}>只查单</Button>
+                        <Button tone="ghost" aria-haspopup="dialog" disabled={!canQuery} onClick={() => { setSelected(row); setReason(''); setTicketRef('') }}>只查单</Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               <CursorPager after={after} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
             </>
           )}
@@ -95,7 +94,7 @@ export function ReconciliationPage() {
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">查单作业</h2>
-        <div style={{ padding: '0 18px 8px' }}>
+        <div className="panel-inset">
           <select value={opState} onChange={(event) => { setOpState(event.target.value as typeof opState); setOpAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
             <option value="QUEUED">QUEUED</option>
@@ -106,26 +105,26 @@ export function ReconciliationPage() {
         <QueryGate query={operations} emptyTitle="没有作业" emptyDetail="当前状态下没有查单作业。">
           {(rows) => (
             <>
-              <table className="data-table">
-                <thead><tr><th>作业编号</th><th>差异编号</th><th>查单动作</th><th>状态</th><th>受理时间（北京时间）</th><th>结果代码</th></tr></thead>
+              <DataTable label="对账查单操作列表">
+                <thead><tr><th>作业编号</th><th>差异编号</th><th>查单动作</th><th>状态</th><th className="time-cell">受理时间（北京时间）</th><th>结果代码</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
                       <td className="mono">{row.businessNo ?? row.operationNo}</td><td className="mono">{row.caseNo}</td>
                       <td>{row.action}</td>
                       <td><Badge>{row.status}</Badge></td>
-                      <td>{formatBeijingTime(row.acceptedAt)}</td><td>{row.lastCode ?? '—'}</td>
+                      <td className="time-cell">{formatBeijingTime(row.acceptedAt)}</td><td>{row.lastCode ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               <CursorPager after={opAfter} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setOpAfter(0)} onNext={setOpAfter} />
             </>
           )}
         </QueryGate>
       </Panel>
       {selected && (
-        <Modal title="原渠道只查单" description={`caseNo=${selected.caseNo} · version=${selected.version}。202 只表示排队。`} onClose={() => setSelected(undefined)}>
+        <Modal title="原渠道只查单" description={`caseNo=${selected.caseNo} · version=${selected.version}。202 只表示排队。`} pending={queryCase.isPending} onClose={() => setSelected(undefined)}>
           <form onSubmit={(event) => {
             event.preventDefault()
             queryCase.mutate({
@@ -136,6 +135,7 @@ export function ReconciliationPage() {
               ticketRef: ticketRef.trim(),
             })
           }}>
+            <MutationBanner error={queryCase.error} />
             <Field label="查单动作">
               <select value={action} onChange={(event) => setAction(event.target.value as typeof action)}>
                 <option value="QUERY_PAYMENT">QUERY_PAYMENT</option>
@@ -145,7 +145,7 @@ export function ReconciliationPage() {
             <Field label="原因"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
             <Field label="工单引用"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
             <div className="modal-actions">
-              <Button onClick={() => setSelected(undefined)}>取消</Button>
+              <Button onClick={() => setSelected(undefined)} disabled={queryCase.isPending}>取消</Button>
               <Button tone="primary" type="submit" disabled={queryCase.isPending}>排队查单</Button>
             </div>
           </form>

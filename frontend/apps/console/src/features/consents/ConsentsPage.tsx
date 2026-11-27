@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, CursorPager, Field, PageHeader, Panel, StackForm } from '../../components/ui'
+import { Button, CursorPager, Field, PageHeader, Panel, StackForm, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 
@@ -48,16 +48,16 @@ export function ConsentsPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Consent"
         title="条款文档"
         description="后台发布不可变版本后再给会员展示。服务端不抓取远端正文，也不把列表中的任一版本暗中当成已同意。注册不会自动勾选营销条款。"
       />
       <div className="section-gap">
         <Panel className="table-panel">
+          <h2 className="table-title">条款版本</h2>
           <QueryGate query={query} emptyTitle="尚未发布条款" emptyDetail="发布后会出现在本租户列表。不要按 documentVersion 字符串排序当最新。">
             {(rows) => (
               <>
-                <table className="data-table trade-list-table">
+                <DataTable label="条款版本列表" className="trade-list-table">
                   <thead><tr><th>用途</th><th>版本</th><th>标题</th><th>正文</th><th>SHA-256 摘要</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
@@ -70,7 +70,7 @@ export function ConsentsPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </DataTable>
                 <CursorPager after={after} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
               </>
             )}

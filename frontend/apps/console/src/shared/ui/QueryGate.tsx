@@ -9,7 +9,7 @@ export function QueryError({ query }: { query: UseQueryResult<unknown> }) {
   return (
     <>
       <StateBanner tone="error" title={problem.title} detail={problem.detail} />
-      {retryable ? <div className="pager"><Button disabled={query.isFetching} onClick={() => void query.refetch()}>重试</Button></div> : null}
+      {retryable ? <div className="state-actions"><Button disabled={query.isFetching} onClick={() => void query.refetch()}>重试</Button></div> : null}
     </>
   )
 }
@@ -20,7 +20,7 @@ export function QueryGate<T>({ query, emptyTitle, emptyDetail, children }: {
   emptyDetail: string
   children: (data: T) => ReactNode
 }) {
-  if (query.isLoading) return <StateBanner tone="loading" title="正在读取" detail="正在从交易中心接口加载，没有使用页面内缓存业务数据。" />
+  if (query.isLoading) return <StateBanner tone="loading" title="正在读取" detail="正在获取当前记录，请稍候。" />
   if (query.isError) return <QueryError query={query} />
   const data = query.data
   if (data === undefined || (Array.isArray(data) && data.length === 0)) {
@@ -35,7 +35,7 @@ export function PageQueryGate<T extends { items: unknown[] }>({ query, emptyTitl
   emptyDetail: string
   children: (data: T) => ReactNode
 }) {
-  if (query.isLoading) return <StateBanner tone="loading" title="正在读取" detail="正在从交易中心接口加载，没有使用页面内缓存业务数据。" />
+  if (query.isLoading) return <StateBanner tone="loading" title="正在读取" detail="正在获取当前记录，请稍候。" />
   if (query.isError) return <QueryError query={query} />
   const data = query.data
   if (!data || data.items.length === 0) {

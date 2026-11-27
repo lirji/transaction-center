@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, CursorPager, Field, PageHeader, PagePager, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Button, ConfirmDialog, CursorPager, Field, PageHeader, PagePager, Panel, StackForm, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { parseInteger, parsePositiveId } from '../../shared/api/money'
@@ -114,15 +114,22 @@ export function InventoryPage() {
     document.getElementById('inventory-adjustment')?.scrollIntoView({ block: 'start' })
   }
 
+  function clearFilters() {
+    setWarehouseFilter('')
+    setSkuFilter('')
+    setAvailableFilter('')
+    setBalanceError('')
+    apply({})
+  }
+
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Inventory"
         title="仓库与库存"
         description="先核对库存余额和预占，再按仓库与 SKU 查看流水或登记盘点调整。"
       />
       <MutationBanner error={createWh.error ?? adjust.error} success={createWh.data || adjust.data ? `resourceId=${(createWh.data ?? adjust.data)?.resourceId}` : undefined} />
-      <FilterBar onSubmit={() => {
+      <FilterBar onReset={clearFilters} onSubmit={() => {
         setBalanceError('')
         try {
           const available = availableFilter.trim()
@@ -146,17 +153,17 @@ export function InventoryPage() {
           <QueryGate query={balances} emptyTitle="没有余额行" emptyDetail="当前条件没有匹配的库存余额。">
             {(rows) => (
               <>
-                <table className="data-table">
-                  <thead><tr><th>仓库 ID</th><th>SKU ID</th><th>可售</th><th>预占</th><th>已售</th><th>总量</th><th>操作</th></tr></thead>
+                <DataTable label="库存余额列表" className="pin-actions">
+                  <thead><tr><th>仓库 ID</th><th>SKU ID</th><th className="numeric-cell">可售</th><th className="numeric-cell">预占</th><th className="numeric-cell">已售</th><th className="numeric-cell">总量</th><th>操作</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.id}>
                         <td className="mono">{row.warehouseId}</td>
                         <td className="mono">{row.skuId}</td>
-                        <td>{row.available}</td>
-                        <td>{row.reserved}</td>
-                        <td>{row.sold}</td>
-                        <td>{row.stockTotal}</td>
+                        <td className="numeric-cell">{row.available}</td>
+                        <td className="numeric-cell">{row.reserved}</td>
+                        <td className="numeric-cell">{row.sold}</td>
+                        <td className="numeric-cell">{row.stockTotal}</td>
                         <td className="row-action-cell">
                           <Button tone="ghost" onClick={() => viewLedger(row.warehouseId, row.skuId)}>查看流水</Button>
                           <Button tone="ghost" onClick={() => prepareAdjustment(row.warehouseId, row.skuId)}>盘点调整</Button>
@@ -164,8 +171,8 @@ export function InventoryPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-                <PagePager after={balAfter} nextAfter={rows.at(-1)?.id ?? null} hasMore={rows.length === 20} onReset={() => setBalAfter('0')} onNext={setBalAfter} />
+                </DataTable>
+                <PagePager count={rows.length} after={balAfter} nextAfter={rows.at(-1)?.id ?? null} hasMore={rows.length === 20} onReset={() => setBalAfter('0')} onNext={setBalAfter} />
               </>
             )}
           </QueryGate>
@@ -175,20 +182,20 @@ export function InventoryPage() {
           <QueryGate query={warehouses} emptyTitle="没有仓库" emptyDetail="先创建仓库，再做盘点。">
             {(rows) => (
               <>
-                <table className="data-table">
+                <DataTable label="仓库列表">
                   <thead><tr><th>仓库名称</th><th>仓库编号</th><th>仓库 ID</th><th>版本</th></tr></thead>
                   <tbody>
                     {rows.map((row) => (
                       <tr key={row.id}><td>{row.name}</td><td className="mono">{row.warehouseNo}</td><td className="mono">{row.id}</td><td className="mono">{row.version}</td></tr>
                     ))}
                   </tbody>
-                </table>
+                </DataTable>
                 <CursorPager after={whAfter} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setWhAfter(0)} onNext={setWhAfter} />
               </>
             )}
           </QueryGate>
         </Panel>
-        <div className="section-gap">
+        <div className="page-grid">
           <Panel>
             <h2>创建仓库</h2>
             <StackForm onSubmit={submitWarehouse} actions={<Button tone="primary" type="submit" disabled={createWh.isPending}>创建</Button>}>
@@ -199,7 +206,7 @@ export function InventoryPage() {
           <section id="inventory-adjustment">
             <Panel>
               <h2>盘点调整</h2>
-              <StackForm onSubmit={submitAdjust} actions={<Button tone="primary" type="submit" disabled={adjust.isPending}>提交</Button>}>
+              <StackForm onSubmit={submitAdjust} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" disabled={adjust.isPending}>提交</Button>}>
                 <Field label="仓库">
                   <select value={adjWarehouse} onChange={(event) => setAdjWarehouse(event.target.value)} required>
                     <option value="">选择仓库</option>
@@ -240,13 +247,12 @@ export function InventoryPage() {
               <QueryGate query={ledgers} emptyTitle="没有流水" emptyDetail="该仓库与 SKU 组合尚无审计记录。">
                 {(rows) => (
                   <>
-                    <div className="table-scroll">
-                    <table className="data-table trade-list-table">
-                      <thead><tr><th>发生时间（北京时间）</th><th>操作类型</th><th>可售变化</th><th>预占变化</th><th>已售变化</th><th>总量变化</th><th>业务引用</th><th>原因</th></tr></thead>
+                    <DataTable label="库存流水列表" className="trade-list-table">
+                      <thead><tr><th className="time-cell">发生时间（北京时间）</th><th>操作类型</th><th>可售变化</th><th>预占变化</th><th>已售变化</th><th>总量变化</th><th>业务引用</th><th>原因</th></tr></thead>
                       <tbody>
                         {rows.map((row) => (
                           <tr key={row.id}>
-                            <td>{formatBeijingTime(row.occurredAt)}</td>
+                            <td className="time-cell">{formatBeijingTime(row.occurredAt)}</td>
                             <td>{row.operationType}</td>
                             <td>{row.availableDelta}</td>
                             <td>{row.reservedDelta}</td>
@@ -257,8 +263,7 @@ export function InventoryPage() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                    </div>
+                    </DataTable>
                     <CursorPager after={ledgerAfter} pageSize={20} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setLedgerAfter(0)} onNext={setLedgerAfter} />
                   </>
                 )}
@@ -284,6 +289,7 @@ export function InventoryPage() {
             }
           }}
         >
+          <MutationBanner error={adjust.error} />
           <p>仓库 {adjWarehouse}，SKU {adjSku}，调整数量 {delta}</p>
         </ConfirmDialog>
       ) : null}

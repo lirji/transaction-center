@@ -55,13 +55,13 @@ export function AdmissionPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Admission"
         title="准入策略"
         description="关闭只影响新增受理，不会取消既有恢复。写入同时需要 trade.admin 与 trade.admission.write。"
       />
       {!canWrite ? <StateBanner tone="warn" title="当前令牌不能改策略" detail="仍可读取。保存需要 trade.admission.write。" /> : null}
       <MutationBanner error={update.error} success={update.data ? `已保存 version=${update.data.version}` : undefined} />
       <Panel>
+        <h2>订单与支付受理</h2>
         {query.isLoading ? <StateBanner tone="loading" title="正在读取" detail="GET /admin/admission-policy" /> : null}
         {query.isError ? <StateBanner tone="error" title={describeProblem(query.error).title} detail={describeProblem(query.error).detail} /> : null}
         {query.data ? (
@@ -83,7 +83,7 @@ export function AdmissionPage() {
                 <option value="false">关闭新支付</option>
               </select>
             </Field>
-            <Field label="原因"><input value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
+            <Field label="原因" wide><input value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
           </StackForm>
         ) : null}
       </Panel>
@@ -99,6 +99,7 @@ export function AdmissionPage() {
             if (body) update.mutate(body)
           }}
         >
+          <MutationBanner error={update.error} />
           <p>下单 {nextOrder ? '允许' : '关闭'} · 支付 {nextPayment ? '允许' : '关闭'}</p>
         </ConfirmDialog>
       ) : null}

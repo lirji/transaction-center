@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { toDatetimeLocal } from '../api/validate'
 
 export function useAdminListSearch() {
@@ -25,4 +25,9 @@ export function useAdminListSearch() {
 
 export function isoFromSearch(params: URLSearchParams, key: string) {
   return toDatetimeLocal(params.get(key))
+}
+
+export function useListLinkState(path: string) {
+  const location = useLocation()
+  return location.pathname === path ? { listSearch: location.search } : undefined
 }

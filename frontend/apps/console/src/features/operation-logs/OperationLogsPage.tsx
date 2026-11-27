@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Field, PageHeader, PagePager, Panel } from '../../components/ui'
+import { Badge, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import type { OperationAuditEntry } from '../../shared/api/schemas'
 import { parseTimeWindow } from '../../shared/api/validate'
@@ -79,14 +79,14 @@ function ResourceReference({ row }: { row: OperationAuditEntry }) {
 
 function OperationRows({ rows }: { rows: OperationAuditEntry[] }) {
   return (
-    <table className="data-table trade-list-table operation-log-table">
+    <DataTable label="操作日志列表" className="trade-list-table operation-log-table">
       <thead>
-        <tr><th>时间（北京时间）</th><th>对象类型</th><th>对象编号</th><th>动作</th><th>结果</th><th>操作人摘要</th><th>追踪编号</th></tr>
+        <tr><th className="time-cell">时间（北京时间）</th><th>对象类型</th><th>对象编号</th><th>动作</th><th>结果</th><th>操作人摘要</th><th>追踪编号</th></tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.id}>
-            <td>{formatBeijingTime(row.occurredAt)}</td>
+            <td className="time-cell">{formatBeijingTime(row.occurredAt)}</td>
             <td>{resourceLabels[row.resourceType] ?? row.resourceType}</td>
             <td><ResourceReference row={row} /></td>
             <td>{actionLabels[row.action] ?? row.action}</td>
@@ -99,7 +99,7 @@ function OperationRows({ rows }: { rows: OperationAuditEntry[] }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </DataTable>
   )
 }
 
@@ -137,7 +137,9 @@ function OperationFilters({ params, apply }: { params: URLSearchParams; apply: (
   return (
     <Panel>
       <h2>筛选</h2>
-      <FilterBar onSubmit={submit} onReset={reset}>
+      <FilterBar onSubmit={submit} onReset={reset} invalid={Boolean(error)}
+        activeAdvanced={params.has('createdFrom') || params.has('createdTo') ? 1 : 0}
+        advanced={<TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={error} />}>
         <Field label="对象类型">
           <EmptySelect value={resourceType} onChange={setResourceType}
             options={resourceType && !resourceTypes.includes(resourceType) ? [...resourceTypes, resourceType] : resourceTypes}
@@ -146,7 +148,6 @@ function OperationFilters({ params, apply }: { params: URLSearchParams; apply: (
         <Field label="对象编号" hint="精确匹配日志中的对象编号">
           <input value={resourceRef} onChange={(event) => setResourceRef(event.target.value)} maxLength={64} />
         </Field>
-        <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={error} />
       </FilterBar>
     </Panel>
   )
@@ -168,17 +169,16 @@ export function OperationLogsPage() {
 
   return (
     <div className="workspace">
-      <PageHeader eyebrow="运行与准入" title="操作日志" description="查看当前租户已记录的交易业务操作。" />
+      <PageHeader title="操作日志" description="查看当前租户已记录的交易业务操作。" />
       <div className="section-gap">
         <OperationFilters key={JSON.stringify(filters)} params={params} apply={apply} />
         <Panel className="table-panel">
+          <h2 className="table-title">操作日志记录</h2>
           <PageQueryGate query={query} emptyTitle="暂无操作日志" emptyDetail="当前筛选范围没有操作记录。">
             {(page) => (
               <>
-                <div className="table-scroll" role="region" aria-label="操作日志列表" tabIndex={0}>
-                  <OperationRows rows={page.items} />
-                </div>
-                <PagePager after={after} nextAfter={page.nextCursor} hasMore={Boolean(page.nextCursor)}
+                <OperationRows rows={page.items} />
+                <PagePager count={page.items.length} after={after} nextAfter={page.nextCursor} hasMore={Boolean(page.nextCursor)}
                   onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}

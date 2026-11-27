@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, Field, PageHeader, PagePager, Panel } from '../../components/ui'
+import { Badge, Button, Field, PageHeader, PagePager, Panel, DataTable } from '../../components/ui'
 import { api, type AdminReceiptView } from '../../shared/api/client'
 import { formatMinorAmount } from '../../shared/api/money'
 import { FormValidationError, parseReceiptDispositionFilter, parseTimeWindow } from '../../shared/api/validate'
 import { PageQueryGate } from '../../shared/ui/QueryGate'
 import { EmptySelect, FilterBar, TimeRangeFields } from '../../shared/ui/FilterBar'
-import { isoFromSearch, useAdminListSearch } from '../../shared/ui/useAdminListSearch'
+import { isoFromSearch, useAdminListSearch, useListLinkState } from '../../shared/ui/useAdminListSearch'
 import { formatBeijingTime } from '../../shared/ui/display'
 import { receiptDispositionSchema } from '../../shared/api/schemas'
 import { dispositionLabels } from './receiptDisposition'
@@ -16,30 +16,31 @@ const DISPOSITIONS = receiptDispositionSchema.options
 const NORMAL_RECEIPT = receiptDispositionSchema.enum.NORMAL
 
 export function ReceiptRows({ rows }: { rows: AdminReceiptView[] }) {
+  const listState = useListLinkState('/receipts')
   return (
-    <table className="data-table receipt-table">
+    <DataTable label="实收列表" className="receipt-table pin-key">
       <thead>
         <tr>
-          <th>实收单号</th><th>实收分类</th><th>实收金额</th><th>币种</th><th>渠道</th>
-          <th>订单号</th><th>支付单号</th><th>确认时间（北京时间）</th><th>未占用金额</th>
+          <th>实收单号</th><th>实收分类</th><th className="numeric-cell">实收金额</th><th>币种</th><th>渠道</th>
+          <th>订单号</th><th>支付单号</th><th className="time-cell">确认时间（北京时间）</th><th>未占用金额</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.receiptNo}>
-            <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} className="mono">{row.businessNo ?? row.receiptNo}</Link></td>
+            <td><Link to={`/receipts/${encodeURIComponent(row.receiptNo)}`} state={listState} className="mono">{row.businessNo ?? row.receiptNo}</Link></td>
             <td><Badge tone={row.disposition === NORMAL_RECEIPT ? 'good' : 'warn'}>{dispositionLabels[row.disposition]}</Badge></td>
-            <td>{formatMinorAmount(row.amount)}</td>
+            <td className="numeric-cell">{formatMinorAmount(row.amount)}</td>
             <td>{row.currency}</td>
             <td>{row.channelCode}</td>
             <td><Link to={`/orders/${encodeURIComponent(row.orderNo)}`} className="mono">{row.orderBusinessNo ?? row.orderNo}</Link></td>
             <td><Link to={`/payments/${encodeURIComponent(row.paymentNo)}`} className="mono">{row.paymentBusinessNo ?? row.paymentNo}</Link></td>
-            <td>{formatBeijingTime(row.confirmedAt)}</td>
-            <td>{formatMinorAmount(row.unreservedAmount)}</td>
+            <td className="time-cell">{formatBeijingTime(row.confirmedAt)}</td>
+            <td className="numeric-cell">{formatMinorAmount(row.unreservedAmount)}</td>
           </tr>
         ))}
       </tbody>
-    </table>
+    </DataTable>
   )
 }
 
@@ -111,10 +112,24 @@ export function ReceiptsPage() {
     }
   }
 
+  function resetFilters() {
+    setReceiptNo('')
+    setPaymentNo('')
+    setOrderNo('')
+    setChannelCode('')
+    setDisposition('')
+    setAbnormalOnly(false)
+    setFrom('')
+    setTo('')
+    setBusinessFrom('')
+    setBusinessTo('')
+    setFormError('')
+    apply({})
+  }
+
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Receipts"
         title="实收"
         description="查看渠道实际收款和异常分类。未占用金额用于核对资金，退款资格由退款流程判定。"
       />
@@ -124,11 +139,16 @@ export function ReceiptsPage() {
           <Button aria-pressed={!filters.abnormalOnly && !filters.disposition} onClick={() => applyPreset(false)}>全部实收</Button>
           <Button aria-pressed={Boolean(filters.abnormalOnly && !filters.disposition)} onClick={() => applyPreset(true)}>异常实收</Button>
         </div>
-        <FilterBar onSubmit={submit}>
+        <FilterBar onSubmit={submit} onReset={resetFilters} invalid={incompleteWindow || (Boolean(formError) && !conflict)}
+          activeAdvanced={[filters.paymentNo, filters.channelCode, filters.createdFrom || filters.createdTo, filters.confirmedFrom || filters.confirmedTo].filter(Boolean).length}
+          advanced={<>
+            <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
+            <Field label="渠道"><input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} /></Field>
+            <TimeRangeFields labelPrefix="登记" from={from} to={to} onFrom={setFrom} onTo={setTo} />
+            <TimeRangeFields labelPrefix="确认" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
+          </>}>
           <Field label="实收单号"><input value={receiptNo} onChange={(event) => setReceiptNo(event.target.value)} /></Field>
-          <Field label="支付单号"><input value={paymentNo} onChange={(event) => setPaymentNo(event.target.value)} /></Field>
           <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
-          <Field label="渠道"><input value={channelCode} onChange={(event) => setChannelCode(event.target.value)} /></Field>
           <Field label="实收分类"><EmptySelect value={disposition} onChange={setDisposition} options={DISPOSITIONS} optionLabel={(value) => dispositionLabels[value as keyof typeof dispositionLabels]} /></Field>
           <Field label="异常范围" error={conflict ? '仅异常与正常实收互斥' : formError || undefined}>
             <select value={abnormalOnly ? 'true' : ''} onChange={(event) => setAbnormalOnly(event.target.value === 'true')}>
@@ -136,19 +156,18 @@ export function ReceiptsPage() {
               <option value="true">仅异常</option>
             </select>
           </Field>
-          <TimeRangeFields labelPrefix="登记" from={from} to={to} onFrom={setFrom} onTo={setTo} />
-          <TimeRangeFields labelPrefix="确认" from={businessFrom} to={businessTo} onFrom={setBusinessFrom} onTo={setBusinessTo} />
         </FilterBar>
       </Panel>
       <Panel className="table-panel">
+        <h2 className="table-title">实收列表</h2>
         {urlConflict || incompleteWindow ? (
-          <p className="empty-state" style={{ minHeight: 120 }}>当前筛选无效，未向服务器发送请求。</p>
+          <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (
           <PageQueryGate query={query} emptyTitle="没有收款" emptyDetail="当前筛选没有实收记录。">
             {(page) => (
               <>
                 <ReceiptRows rows={page.items} />
-                <PagePager after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
+                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}
           </PageQueryGate>

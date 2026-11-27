@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
-import { Badge, Button, ConfirmDialog, CursorPager, Field, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
+import { Link, useLocation, useParams } from 'react-router-dom'
+import { Badge, Button, ConfirmDialog, CursorPager, DataTable, Field, Modal, PageHeader, Panel, StackForm, StateBanner } from '../../components/ui'
 import { api, type Sku } from '../../shared/api/client'
 import { MutationBanner } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -18,6 +18,8 @@ export function ProductDetailPage() {
 
 function ProductDetail({ id }: { id: string }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
+  const list = { pathname: '/products', search: typeof location.state?.listSearch === 'string' ? location.state.listSearch : '' }
   const product = useQuery({ queryKey: ['product', id], queryFn: () => api.product(id), enabled: Boolean(id) })
   const [skuAfter, setSkuAfter] = useState(0)
   const skus = useQuery({ queryKey: ['product-skus', id, skuAfter], queryFn: () => api.productSkus(id, skuAfter), enabled: Boolean(id) })
@@ -30,9 +32,11 @@ function ProductDetail({ id }: { id: string }) {
   const [stockType, setStockType] = useState<'PHYSICAL' | 'SERVICE'>('PHYSICAL')
   const [specKey, setSpecKey] = useState('color')
   const [specValue, setSpecValue] = useState('')
+  const [skuAddError, setSkuAddError] = useState('')
   const [formError, setFormError] = useState('')
   const [confirm, setConfirm] = useState<'publish' | 'unpublish'>()
   const [editing, setEditing] = useState<Sku>()
+  const [skuEditError, setSkuEditError] = useState('')
   const [editPrice, setEditPrice] = useState('')
   const [editCurrency, setEditCurrency] = useState('CNY')
   const [editStockType, setEditStockType] = useState<'PHYSICAL' | 'SERVICE'>('PHYSICAL')
@@ -78,10 +82,10 @@ function ProductDetail({ id }: { id: string }) {
     onError: onConflict,
   })
 
-  if (product.isLoading) return <div className="workspace"><StateBanner tone="loading" title="正在读取商品" detail={`GET /admin/products/${id}`} /></div>
+  if (product.isLoading) return <div className="workspace"><StateBanner tone="loading" title="正在读取商品" detail="正在获取商品目录及规格。" /></div>
   if (product.isError || !product.data) {
     const problem = describeProblem(product.error)
-    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to="/products">返回列表</Link></div>
+    return <div className="workspace"><StateBanner tone="error" title={problem.title} detail={problem.detail} /><Link to={list}>返回列表</Link></div>
   }
   const current = product.data
   const draft = current.status === productStatusSchema.enum.DRAFT
@@ -106,7 +110,7 @@ function ProductDetail({ id }: { id: string }) {
 
   function submitSku(event: FormEvent) {
     event.preventDefault()
-    setFormError('')
+    setSkuAddError('')
     try {
       const specification: Record<string, string> = {}
       if (specKey.trim() && specValue.trim()) specification[specKey.trim()] = specValue.trim()
@@ -119,14 +123,14 @@ function ProductDetail({ id }: { id: string }) {
         specification,
       })
     } catch (cause) {
-      setFormError(cause instanceof Error ? cause.message : '输入无效')
+      setSkuAddError(cause instanceof Error ? cause.message : '输入无效')
     }
   }
 
   function submitSkuEdit(event: FormEvent) {
     event.preventDefault()
     if (!editing) return
-    setFormError('')
+    setSkuEditError('')
     try {
       const specification = { ...editing.specification }
       if (editSpecKey.trim() && editSpecValue.trim()) specification[editSpecKey.trim()] = editSpecValue.trim()
@@ -139,48 +143,45 @@ function ProductDetail({ id }: { id: string }) {
         specification,
       })
     } catch (cause) {
-      setFormError(cause instanceof Error ? cause.message : '输入无效')
+      setSkuEditError(cause instanceof Error ? cause.message : '输入无效')
     }
   }
 
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Catalog"
         title={current.name}
-        description={`状态 ${productStatusLabels[current.status]} · 版本 ${current.version}。目录价不是下单应付额。`}
-        actions={<Link className="button secondary" to="/products">返回列表</Link>}
+        description={`版本 ${current.version} · 目录价用于商品管理，实际应付额以订单为准。`}
+        actions={<>
+          <Link className="button secondary" to={list}>返回列表</Link>
+          {draft && <Button tone="primary" disabled={publish.isPending} aria-haspopup="dialog" onClick={() => setConfirm('publish')}>发布</Button>}
+          {current.status === productStatusSchema.enum.PUBLISHED &&
+            <Button disabled={unpublish.isPending} aria-haspopup="dialog" onClick={() => setConfirm('unpublish')}>下架</Button>}
+        </>}
       />
       <MutationBanner
-        error={edit.error ?? publish.error ?? unpublish.error ?? addSku.error ?? saveSku.error}
+        error={edit.error ?? addSku.error}
         success={edit.data || publish.data || unpublish.data || addSku.data || saveSku.data ? `resourceId=${(edit.data ?? publish.data ?? unpublish.data ?? addSku.data ?? saveSku.data)?.resourceId}` : undefined}
       />
       <div className="section-gap">
-        <div className="section-gap">
-          <Panel>
-            <dl className="kv">
-              <dt>商品 ID</dt><dd className="mono">{current.productId}</dd>
-              <dt>主 SKU</dt><dd className="mono">{current.skuId}</dd>
-              <dt>状态</dt><dd><Badge tone={current.status === productStatusSchema.enum.PUBLISHED ? 'good' : 'warn'}>{productStatusLabels[current.status]}</Badge></dd>
-              <dt>发布修订</dt><dd className="mono">{current.publishedRevision ?? '无'}</dd>
-              <dt>目录价</dt><dd>{formatMinor(current.unitPrice, current.currency)}</dd>
-            </dl>
-            {draft ? (
-              <div className="heading-actions">
-                <Button tone="primary" disabled={publish.isPending} onClick={() => setConfirm('publish')}>发布</Button>
-              </div>
-            ) : current.status === productStatusSchema.enum.PUBLISHED ? (
-              <Button disabled={unpublish.isPending} onClick={() => setConfirm('unpublish')}>下架</Button>
-            ) : null}
-          </Panel>
-          <Panel className="table-panel">
-            <h2 className="table-title">SKU</h2>
-            {skus.isLoading ? <StateBanner tone="loading" title="正在读取 SKU" detail="GET /admin/products/{id}/skus" /> : null}
-            {skus.isError ? <StateBanner tone="error" title={describeProblem(skus.error).title} detail={describeProblem(skus.error).detail} /> : null}
-            {skus.data && skus.data.length > 0 ? (
-              <>
-              <table className="data-table trade-list-table">
-                <thead><tr><th>SKU 标题</th><th>SKU 编码</th><th>SKU ID</th><th>规格</th><th>库存类型</th><th>单价</th><th>币种</th><th>修订</th>{draft ? <th>操作</th> : null}</tr></thead>
+        <Panel>
+          <h2>商品摘要</h2>
+          <dl className="summary-fields">
+            <div><dt>发布状态</dt><dd><Badge tone={current.status === productStatusSchema.enum.PUBLISHED ? 'good' : 'neutral'}>{productStatusLabels[current.status]}</Badge></dd></div>
+            <div><dt>目录价</dt><dd className="summary-amount">{formatMinor(current.unitPrice, current.currency)}</dd></div>
+            <div><dt>主 SKU</dt><dd className="mono">{current.skuId}</dd></div>
+            <div><dt>商品 ID</dt><dd className="mono">{current.productId}</dd></div>
+            <div><dt>发布修订</dt><dd className="mono">{current.publishedRevision ?? '无'}</dd></div>
+          </dl>
+        </Panel>
+        <Panel className="table-panel">
+          <h2 className="table-title">商品 SKU</h2>
+          {skus.isLoading ? <StateBanner tone="loading" title="正在读取 SKU" detail="正在获取当前商品的规格记录。" /> : null}
+          {skus.isError ? <StateBanner tone="error" title={describeProblem(skus.error).title} detail={describeProblem(skus.error).detail} /> : null}
+          {skus.data && skus.data.length > 0 ? (
+            <>
+              <DataTable label="商品 SKU 列表" className="trade-list-table pin-key">
+                <thead><tr><th>SKU 标题</th><th>SKU 编码</th><th>SKU ID</th><th>规格</th><th>库存类型</th><th className="numeric-cell">单价</th><th>币种</th><th>修订</th>{draft ? <th>操作</th> : null}</tr></thead>
                 <tbody>
                   {skus.data.map((row) => (
                     <tr key={row.skuId}>
@@ -189,12 +190,12 @@ function ProductDetail({ id }: { id: string }) {
                       <td className="mono">{row.skuId}</td>
                       <td>{Object.entries(row.specification).map(([key, value]) => `${key} ${value}`).join('、') || '—'}</td>
                       <td>{stockTypeLabels[row.stockType]}</td>
-                      <td>{formatMinorAmount(row.unitPrice)}</td>
+                      <td className="numeric-cell">{formatMinorAmount(row.unitPrice)}</td>
                       <td>{row.currency}</td>
                       <td className="mono">{row.revision}</td>
                       {draft ? (
-                        <td>
-                          <Button tone="ghost" onClick={() => {
+                        <td className="row-action-cell">
+                          <Button tone="ghost" aria-haspopup="dialog" onClick={() => {
                             const entry = Object.entries(row.specification)[0]
                             setEditing(row)
                             setEditPrice(String(row.unitPrice))
@@ -202,38 +203,36 @@ function ProductDetail({ id }: { id: string }) {
                             setEditStockType(row.stockType)
                             setEditSpecKey(entry?.[0] ?? '')
                             setEditSpecValue(entry?.[1] ?? '')
-                            setFormError('')
+                            setSkuEditError('')
+                            saveSku.reset()
                           }}>编辑</Button>
                         </td>
                       ) : null}
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               <CursorPager after={skuAfter} pageSize={20} lastId={skus.data.at(-1)?.skuId} length={skus.data.length} onReset={() => setSkuAfter(0)} onNext={setSkuAfter} />
-              </>
-            ) : skus.data ? <div style={{ padding: '16px 18px' }}><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
-          </Panel>
-        </div>
-        <div className="section-gap">
-          {draft ? (
+            </>
+          ) : skus.data ? <div className="panel-inset"><StateBanner tone="info" title="还没有 SKU" detail="草稿阶段可以追加 SKU。" /></div> : null}
+        </Panel>
+        {draft ? (
+          <div className="page-grid">
             <Panel>
               <h2>编辑草稿</h2>
               <StackForm onSubmit={submitEdit} actions={<Button tone="primary" type="submit" disabled={edit.isPending}>保存</Button>}>
-                <Field label="名称"><input value={name} placeholder={current.name} onChange={(event) => setName(event.target.value)} /></Field>
+                <Field label="名称" wide><input value={name} placeholder={current.name} onChange={(event) => setName(event.target.value)} /></Field>
                 <Field label="单价（最小单位）" error={formError}>
                   <input value={unitPrice} placeholder={String(current.unitPrice)} onChange={(event) => setUnitPrice(event.target.value)} />
                 </Field>
                 <Field label="币种"><input value={currency} placeholder={current.currency} onChange={(event) => setCurrency(event.target.value)} /></Field>
               </StackForm>
             </Panel>
-          ) : <StateBanner tone="info" title="已发布快照不可改商品正文" detail="下架不会清理库存或历史快照。" />}
-          {draft ? (
             <Panel>
               <h2>追加 SKU</h2>
               <StackForm onSubmit={submitSku} actions={<Button tone="primary" type="submit" disabled={addSku.isPending}>追加</Button>}>
-                <Field label="skuNo"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} required /></Field>
-                <Field label="单价"><input value={skuPrice} onChange={(event) => setSkuPrice(event.target.value)} required /></Field>
+                <Field label="SKU 编码"><input value={skuNo} onChange={(event) => setSkuNo(event.target.value)} required /></Field>
+                <Field label="单价（最小单位）" error={skuAddError}><input value={skuPrice} onChange={(event) => setSkuPrice(event.target.value)} required /></Field>
                 <Field label="币种"><input value={skuCurrency} placeholder={current.currency} onChange={(event) => setSkuCurrency(event.target.value)} /></Field>
                 <Field label="库存类型">
                   <select value={stockType} onChange={(event) => setStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
@@ -245,31 +244,30 @@ function ProductDetail({ id }: { id: string }) {
                 <Field label="规格值"><input value={specValue} onChange={(event) => setSpecValue(event.target.value)} /></Field>
               </StackForm>
             </Panel>
-          ) : null}
-          {draft && editing ? (
-            <Panel>
-              <h2>编辑 SKU {editing.skuNo}</h2>
-              <StackForm onSubmit={submitSkuEdit} actions={
-                <>
-                  <Button onClick={() => setEditing(undefined)}>取消</Button>
-                  <Button tone="primary" type="submit" disabled={saveSku.isPending}>保存 SKU</Button>
-                </>
-              }>
-                <Field label="单价" error={formError}><input value={editPrice} onChange={(event) => setEditPrice(event.target.value)} required /></Field>
-                <Field label="币种"><input value={editCurrency} onChange={(event) => setEditCurrency(event.target.value)} /></Field>
-                <Field label="库存类型">
-                  <select value={editStockType} onChange={(event) => setEditStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
-                    <option value="PHYSICAL">实物</option>
-                    <option value="SERVICE">服务</option>
-                  </select>
-                </Field>
-                <Field label="规格键"><input value={editSpecKey} onChange={(event) => setEditSpecKey(event.target.value)} /></Field>
-                <Field label="规格值"><input value={editSpecValue} onChange={(event) => setEditSpecValue(event.target.value)} /></Field>
-              </StackForm>
-            </Panel>
-          ) : null}
-        </div>
+          </div>
+        ) : <StateBanner tone="info" title="已发布快照不可改商品正文" detail="下架不会清理库存或历史快照。" />}
       </div>
+      {draft && editing && (
+        <Modal title={`编辑 SKU ${editing.skuNo}`} pending={saveSku.isPending} onClose={() => setEditing(undefined)}>
+          <form className="modal-form-grid" onSubmit={submitSkuEdit}>
+            <MutationBanner error={saveSku.error} />
+            <Field label="单价" error={skuEditError}><input data-initial-focus value={editPrice} onChange={(event) => setEditPrice(event.target.value)} required /></Field>
+            <Field label="币种"><input value={editCurrency} onChange={(event) => setEditCurrency(event.target.value)} /></Field>
+            <Field label="库存类型">
+              <select value={editStockType} onChange={(event) => setEditStockType(event.target.value as 'PHYSICAL' | 'SERVICE')}>
+                <option value="PHYSICAL">实物</option>
+                <option value="SERVICE">服务</option>
+              </select>
+            </Field>
+            <Field label="规格键"><input value={editSpecKey} onChange={(event) => setEditSpecKey(event.target.value)} /></Field>
+            <Field label="规格值"><input value={editSpecValue} onChange={(event) => setEditSpecValue(event.target.value)} /></Field>
+            <footer className="modal-actions">
+              <Button onClick={() => setEditing(undefined)} disabled={saveSku.isPending}>取消</Button>
+              <Button tone="primary" type="submit" disabled={saveSku.isPending}>{saveSku.isPending ? '正在保存…' : '保存 SKU'}</Button>
+            </footer>
+          </form>
+        </Modal>
+      )}
       {confirm === 'publish' ? (
         <ConfirmDialog
           title="发布商品"
@@ -279,7 +277,7 @@ function ProductDetail({ id }: { id: string }) {
           pending={publish.isPending}
           onClose={() => setConfirm(undefined)}
           onConfirm={() => publish.mutate({ expectedVersion: current.version })}
-        />
+        ><MutationBanner error={publish.error} /></ConfirmDialog>
       ) : null}
       {confirm === 'unpublish' ? (
         <ConfirmDialog
@@ -289,7 +287,7 @@ function ProductDetail({ id }: { id: string }) {
           pending={unpublish.isPending}
           onClose={() => setConfirm(undefined)}
           onConfirm={() => unpublish.mutate({ expectedVersion: current.version })}
-        />
+        ><MutationBanner error={unpublish.error} /></ConfirmDialog>
       ) : null}
     </div>
   )

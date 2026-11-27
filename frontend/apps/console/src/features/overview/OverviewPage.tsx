@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Badge, PageHeader, Panel } from '../../components/ui'
+import { Badge, PageHeader, Panel, DataTable } from '../../components/ui'
 import { api, ApiProblem } from '../../shared/api/client'
 import { merchantSchema } from '../../shared/api/schemas'
 import { useAuth } from '../../shared/auth/useAuth'
@@ -25,7 +25,7 @@ function QueueRow<T>({ label, href, query, describe }: {
   return (
     <tr>
       <th scope="row">{label}</th>
-      <td>{query.isPending ? '读取中' : query.isError ? '暂不可读' : sample ? describe(sample) : '当前无事项'}</td>
+      <td>{query.isPending ? '读取中' : query.isError ? <Badge tone="warn">暂不可读</Badge> : sample ? describe(sample) : '当前无事项'}</td>
       <td><Link to={href} aria-label={`查看${label}`}>查看队列</Link></td>
     </tr>
   )
@@ -62,36 +62,38 @@ export function OverviewPage() {
 
   return (
     <div className="workspace">
-      <PageHeader eyebrow="Overview" title="交易运营工作台" description="查看当前交易受理状态，进入需要跟进的业务队列。" />
+      <PageHeader title="交易运营工作台" description="查看当前交易受理状态，进入需要跟进的业务队列。" />
       <div className="section-gap">
-        <Panel>
-          <h2>交易受理</h2>
-          <dl className="summary-fields">
-            <div><dt>当前租户</dt><dd>{auth.tenantId || '未声明'}</dd></div>
-            <div><dt>逻辑商户</dt><dd><Link to="/merchant">{merchantName}</Link></dd></div>
-            <div><dt>商户状态</dt><dd>{merchant.data ? <Badge tone={activeMerchant ? 'good' : 'danger'}>{activeMerchant ? '正常' : '冻结'}</Badge> : '—'}</dd></div>
-            <div><dt>新订单</dt><dd>{admission.isPending ? '读取中' : admission.data ? admission.data.orderEnabled ? '接收' : '已暂停' : '暂不可读'}</dd></div>
-            <div><dt>新支付</dt><dd>{admission.isPending ? '读取中' : admission.data ? admission.data.paymentEnabled ? '接收' : '已暂停' : '暂不可读'}</dd></div>
-          </dl>
-        </Panel>
-        <Panel className="table-panel">
-          <h2 className="table-title">当前待处理</h2>
-          <table className="data-table queue-table overview-queue-table">
-            <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
-            <tbody>
-              <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}
-                describe={(item) => `${item.businessNo ?? item.receiptNo} · ${dispositionLabels[item.disposition]}`} />
-              <QueueRow label="待审批退款" href={`/refunds?status=${PENDING_REFUND.status}`} query={refunds}
-                describe={(item) => item.approvalDeadline
-                  ? `${item.businessNo ?? item.refundNo} · ${formatBeijingTime(item.approvalDeadline)}（北京时间）截止`
-                  : item.businessNo ?? item.refundNo} />
-              <QueueRow label="未结对账差异" href={`/reconciliation?state=${OPEN_CASE}`} query={reconciliation}
-                describe={(item) => `${item.businessNo ?? item.caseNo} · ${item.differenceType}`} />
-              <QueueRow label="发布异常" href={`/outbox?state=${PUBLICATION_REVIEW}`} query={publications}
-                describe={(item) => `${item.eventId} · ${item.eventType}`} />
-            </tbody>
-          </table>
-        </Panel>
+        <div className="workbench-top">
+          <Panel className="table-panel">
+            <h2 className="table-title">当前待处理</h2>
+            <DataTable label="当前待处理事项" className="queue-table overview-queue-table">
+              <thead><tr><th>事项</th><th>当前样本</th><th>处理入口</th></tr></thead>
+              <tbody>
+                <QueueRow label="异常实收" href="/receipts?abnormalOnly=true" query={receipts}
+                  describe={(item) => `${item.businessNo ?? item.receiptNo} · ${dispositionLabels[item.disposition]}`} />
+                <QueueRow label="待审批退款" href={`/refunds?status=${PENDING_REFUND.status}`} query={refunds}
+                  describe={(item) => item.approvalDeadline
+                    ? `${item.businessNo ?? item.refundNo} · ${formatBeijingTime(item.approvalDeadline)}（北京时间）截止`
+                    : item.businessNo ?? item.refundNo} />
+                <QueueRow label="未结对账差异" href={`/reconciliation?state=${OPEN_CASE}`} query={reconciliation}
+                  describe={(item) => `${item.businessNo ?? item.caseNo} · ${item.differenceType}`} />
+                <QueueRow label="发布异常" href={`/outbox?state=${PUBLICATION_REVIEW}`} query={publications}
+                  describe={(item) => `${item.eventId} · ${item.eventType}`} />
+              </tbody>
+            </DataTable>
+          </Panel>
+          <Panel>
+            <h2>交易受理</h2>
+            <dl className="summary-fields admission-summary">
+              <div><dt>当前租户</dt><dd>{auth.tenantId || '未声明'}</dd></div>
+              <div><dt>逻辑商户</dt><dd><Link to="/merchant">{merchantName}</Link></dd></div>
+              <div><dt>商户状态</dt><dd>{merchant.data ? <Badge tone={activeMerchant ? 'good' : 'danger'}>{activeMerchant ? '正常' : '冻结'}</Badge> : '—'}</dd></div>
+              <div><dt>新订单</dt><dd>{admission.isPending ? '读取中' : admission.data ? <Badge tone={admission.data.orderEnabled ? 'good' : 'warn'}>{admission.data.orderEnabled ? '接收' : '已暂停'}</Badge> : '暂不可读'}</dd></div>
+              <div><dt>新支付</dt><dd>{admission.isPending ? '读取中' : admission.data ? <Badge tone={admission.data.paymentEnabled ? 'good' : 'warn'}>{admission.data.paymentEnabled ? '接收' : '已暂停'}</Badge> : '暂不可读'}</dd></div>
+            </dl>
+          </Panel>
+        </div>
         <OperationsSummary />
       </div>
     </div>

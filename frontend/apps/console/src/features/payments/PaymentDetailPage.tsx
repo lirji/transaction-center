@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, PageHeader, PagePager, Panel, StateBanner } from '../../components/ui'
+import { Badge, PageHeader, PagePager, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { describeProblem } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
@@ -26,7 +26,7 @@ export function PaymentDetailPage() {
   })
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取支付" detail={`GET /admin/payments/${paymentNo}`} /></div>
+    return <div className="workspace"><StateBanner tone="loading" title="正在读取支付" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
@@ -37,29 +37,30 @@ export function PaymentDetailPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Payment"
         title={payment.businessNo ?? payment.paymentNo}
         description="UNKNOWN 不等于失败。closeFenceAt 只是本地关闭屏障，不是渠道已关单证明。"
       />
       <div className="section-gap">
         <Panel>
-          <dl className="kv">
-            <dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(payment.orderNo)}`}>{payment.orderBusinessNo ?? payment.orderNo}</Link></dd>
-            <dt>会员</dt><dd className="mono">{payment.memberId}</dd>
-            <dt>状态</dt><dd><Badge tone={statusTone(payment.status)}>{payment.status}</Badge></dd>
-            <dt>期望金额</dt><dd>{formatMinor(payment.expectedAmount, payment.currency)} <small className="mono">{payment.currency} {payment.expectedAmount}</small></dd>
-            <dt>当前尝试</dt><dd className="mono">{dash(payment.activeAttemptNo)}</dd>
-            <dt>成功实收</dt>
-            <dd>{payment.succeededReceiptNo
+          <h2>支付摘要</h2>
+          <dl className="summary-fields">
+            <div><dt>状态</dt><dd><Badge tone={statusTone(payment.status)}>{payment.status}</Badge></dd></div>
+            <div><dt>期望金额</dt><dd className="summary-amount">{formatMinor(payment.expectedAmount, payment.currency)} <small className="mono">{payment.currency} {payment.expectedAmount}</small></dd></div>
+            <div><dt>订单</dt><dd><Link className="mono" to={`/orders/${encodeURIComponent(payment.orderNo)}`}>{payment.orderBusinessNo ?? payment.orderNo}</Link></dd></div>
+            <div><dt>会员</dt><dd className="mono">{payment.memberId}</dd></div>
+            <div><dt>成功实收</dt><dd>{payment.succeededReceiptNo
               ? <Link className="mono" to={`/receipts/${encodeURIComponent(payment.succeededReceiptNo)}`}>{payment.succeededReceiptBusinessNo ?? payment.succeededReceiptNo}</Link>
-              : '—'}</dd>
+              : '—'}</dd></div>
+            <div><dt>当前尝试</dt><dd className="mono">{dash(payment.activeAttemptNo)}</dd></div>
+          </dl>
+          <dl className="kv detail-meta">
             <dt>关闭屏障（北京时间）</dt><dd className="mono">{formatBeijingTime(payment.closeFenceAt)}</dd>
             <dt>版本</dt><dd className="mono">{payment.version}</dd>
             <dt>读取时间（北京时间）</dt><dd className="mono">{formatBeijingTime(payment.observedAt)}</dd>
           </dl>
         </Panel>
         <Panel className="table-panel">
-          <div style={{ padding: '16px 18px 0', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div className="table-toolbar">
             <h2>尝试</h2>
             <label>status
               <select value={status} onChange={(event) => { setStatus(event.target.value); setAfter('0') }}>
@@ -74,22 +75,22 @@ export function PaymentDetailPage() {
           <PageQueryGate query={attempts} emptyTitle="没有尝试" emptyDetail="该支付意图没有匹配的尝试记录。">
             {(page) => (
               <>
-                <table className="data-table">
-                  <thead><tr><th>尝试编号</th><th>尝试 ID</th><th>渠道</th><th>状态</th><th>提交时间（北京时间）</th><th>关闭时间（北京时间）</th><th>关闭证据</th></tr></thead>
+                <DataTable label="支付尝试列表">
+                  <thead><tr><th>尝试编号</th><th>尝试 ID</th><th>渠道</th><th>状态</th><th className="time-cell">提交时间（北京时间）</th><th className="time-cell">关闭时间（北京时间）</th><th>关闭证据</th></tr></thead>
                   <tbody>
                     {page.items.map((row) => (
                       <tr key={row.attemptId}>
                         <td className="mono">{row.attemptNo}</td><td className="mono">{row.attemptId}</td>
                         <td className="mono">{row.channelCode}</td>
                         <td><Badge tone={row.status === 'UNKNOWN' ? 'warn' : statusTone(row.status)}>{row.status}</Badge></td>
-                        <td className="mono">{formatBeijingTime(row.submittedAt)}</td>
-                        <td className="mono">{formatBeijingTime(row.closedAt)}</td>
+                        <td className="time-cell">{formatBeijingTime(row.submittedAt)}</td>
+                        <td className="time-cell">{formatBeijingTime(row.closedAt)}</td>
                         <td>{row.hasCloseEvidence ? '有' : '无'}</td>
                       </tr>
                     ))}
                   </tbody>
-                </table>
-                <PagePager after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
+                </DataTable>
+                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}
           </PageQueryGate>

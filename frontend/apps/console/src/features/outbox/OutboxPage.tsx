@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner } from '../../components/ui'
+import { Badge, Button, CursorPager, Field, Modal, PageHeader, Panel, StateBanner, DataTable } from '../../components/ui'
 import { api, type OutboxPublication } from '../../shared/api/client'
 import { MutationBanner, QueryGate } from '../../shared/ui/QueryGate'
 import { invalidateIfVersionConflict } from '../../shared/ui/invalidateIfVersionConflict'
@@ -39,9 +39,8 @@ export function OutboxPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Outbox"
         title="发布隔离"
-        description="列表不含 payload。重放同时要求 trade.admin 与 trade.events.replay，且仅 REVIEW 匹配版本可重放。重放不改变资金事实，返回成功不代表已发送。"
+        description="查看事件发布异常与重放任务。重放受理后可在任务列表跟踪结果。"
       />
       {!canReplay ? <StateBanner tone="warn" title="当前令牌不能重放" detail="缺少 trade.events.replay。仍可查看队列。" /> : null}
       <MutationBanner error={replay.error} success={replay.data ? `已受理重放 eventId=${replay.data.eventId} replayCount=${replay.data.replayCount}` : undefined} />
@@ -58,18 +57,19 @@ export function OutboxPage() {
         <QueryGate query={publications} emptyTitle="没有发布记录" emptyDetail="当前状态下没有 Outbox 元数据。">
           {(rows) => (
             <>
-              <table className="data-table trade-list-table">
-                <thead><tr><th>事件编号</th><th>事件类型</th><th>业务对象 ID</th><th>发布状态</th><th>失败次数</th><th>最近失败（北京时间）</th><th>最近错误</th><th>重放次数</th><th>操作</th></tr></thead>
+              <DataTable label="事件发布列表" className="trade-list-table pin-actions">
+                <thead><tr><th>事件编号</th><th>事件类型</th><th>业务对象 ID</th><th>发布状态</th><th>失败次数</th><th className="time-cell">最近失败（北京时间）</th><th>最近错误</th><th>重放次数</th><th>操作</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
                       <td className="mono">{row.eventId}</td>
                       <td>{row.eventType}</td><td className="mono">{row.aggregateId}</td>
                       <td><Badge tone={row.status === 'REVIEW' ? 'warn' : 'neutral'}>{row.status}</Badge></td>
-                      <td>{row.failureCount}</td><td>{formatBeijingTime(row.lastFailureAt)}</td><td>{row.lastError ?? '—'}</td><td>{row.replayCount}</td>
+                      <td>{row.failureCount}</td><td className="time-cell">{formatBeijingTime(row.lastFailureAt)}</td><td>{row.lastError ?? '—'}</td><td>{row.replayCount}</td>
                       <td>
                         <Button
                           tone="ghost"
+                          aria-haspopup="dialog"
                           disabled={!canReplay || row.status !== 'REVIEW'}
                           onClick={() => { setSelected(row); setReason(''); setTicketRef('') }}
                         >
@@ -79,7 +79,7 @@ export function OutboxPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               <CursorPager after={after} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setAfter(0)} onNext={setAfter} />
             </>
           )}
@@ -87,7 +87,7 @@ export function OutboxPage() {
       </Panel>
       <Panel className="table-panel">
         <h2 className="table-title">维护任务</h2>
-        <div style={{ padding: '0 18px' }}>
+        <div className="panel-inset">
           <select value={taskState} onChange={(event) => { setTaskState(event.target.value as typeof taskState); setTaskAfter(0) }}>
             <option value="REVIEW">REVIEW</option>
             <option value="READY">READY</option>
@@ -98,34 +98,35 @@ export function OutboxPage() {
         <QueryGate query={tasks} emptyTitle="没有任务" emptyDetail="当前状态下没有发布任务。">
           {(rows) => (
             <>
-              <table className="data-table">
-                <thead><tr><th>任务编号</th><th>事件编号</th><th>引用摘要</th><th>状态</th><th>尝试次数</th><th>下次运行（北京时间）</th><th>最近错误</th></tr></thead>
+              <DataTable label="重放任务列表">
+                <thead><tr><th>任务编号</th><th>事件编号</th><th>引用摘要</th><th>状态</th><th>尝试次数</th><th className="time-cell">下次运行（北京时间）</th><th>最近错误</th></tr></thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.id}>
                       <td className="mono">{row.id}</td><td>{row.eventId ?? '—'}</td><td className="mono">{row.referenceHash}</td>
                       <td><Badge>{row.status}</Badge></td>
-                      <td>{row.attempts}</td><td>{formatBeijingTime(row.nextRunAt)}</td>
+                      <td>{row.attempts}</td><td className="time-cell">{formatBeijingTime(row.nextRunAt)}</td>
                       <td>{row.lastError ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
               <CursorPager after={taskAfter} pageSize={50} lastId={rows.at(-1)?.id} length={rows.length} onReset={() => setTaskAfter(0)} onNext={setTaskAfter} />
             </>
           )}
         </QueryGate>
       </Panel>
       {selected && (
-        <Modal title="受控重放" description={`eventId=${selected.eventId} · expectedVersion=${selected.version}。ticketRef 不代表自动开单。`} onClose={() => setSelected(undefined)}>
+        <Modal title="受控重放" description={`eventId=${selected.eventId} · expectedVersion=${selected.version}。ticketRef 不代表自动开单。`} pending={replay.isPending} onClose={() => setSelected(undefined)}>
           <form onSubmit={(event) => {
             event.preventDefault()
             replay.mutate({ eventId: selected.eventId, expectedVersion: selected.version, reason: reason.trim(), ticketRef: ticketRef.trim() })
           }}>
+            <MutationBanner error={replay.error} />
             <Field label="原因"><textarea value={reason} onChange={(event) => setReason(event.target.value)} required /></Field>
             <Field label="工单引用"><input value={ticketRef} onChange={(event) => setTicketRef(event.target.value)} required /></Field>
             <div className="modal-actions">
-              <Button onClick={() => setSelected(undefined)}>取消</Button>
+              <Button onClick={() => setSelected(undefined)} disabled={replay.isPending}>取消</Button>
               <Button tone="primary" type="submit" disabled={replay.isPending}>确认重放</Button>
             </div>
           </form>

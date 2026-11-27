@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
 import { RequireAuth } from './app/RequireAuth'
@@ -49,40 +49,38 @@ export default function App() {
     )
   }
   return (
-    <Suspense fallback={<div className="route-loading" role="status">正在加载…</div>}>
-      <Routes>
-        <Route path="login" element={<LoginPage />} />
-        <Route path="auth/callback" element={<AuthCallbackPage />} />
-        <Route element={<RequireAuth><AppShell /></RequireAuth>}>
-          <Route index element={<Admin><OverviewPage /></Admin>} />
-          <Route path="members" element={<Admin><MembersPage /></Admin>} />
-          <Route path="consents" element={<Admin><ConsentsPage /></Admin>} />
-          <Route path="merchant" element={<Admin><MerchantPage /></Admin>} />
-          <Route path="products" element={<Admin><ProductsPage /></Admin>} />
-          <Route path="products/:id" element={<Admin><ProductDetailPage /></Admin>} />
-          <Route path="inventory" element={<Admin><InventoryPage /></Admin>} />
-          <Route path="orders" element={<Admin><OrdersPage /></Admin>} />
-          <Route path="orders/:orderNo" element={<Admin><OrderDetailPage /></Admin>} />
-          <Route path="payments" element={<Admin><PaymentsPage /></Admin>} />
-          <Route path="payments/:paymentNo" element={<Admin><PaymentDetailPage /></Admin>} />
-          <Route path="receipts" element={<Admin><ReceiptsPage /></Admin>} />
-          <Route path="receipts/:receiptNo" element={<Admin><ReceiptDetailPage /></Admin>} />
-          <Route path="quotes" element={<Admin><QuotesPage /></Admin>} />
-          <Route path="quotes/:quoteId" element={<Admin><QuoteDetailPage /></Admin>} />
-          <Route path="refunds" element={<Admin><RefundsPage /></Admin>} />
-          <Route path="refunds/:refundNo" element={<Admin><RefundDetailPage /></Admin>} />
-          <Route path="payment-channels" element={<Admin><PaymentChannelsPage /></Admin>} />
-          <Route path="returns" element={<Admin><ReturnsPage /></Admin>} />
-          <Route path="fulfillment" element={<Admin><FulfillmentPage /></Admin>} />
-          <Route path="jobs" element={<Admin><RequireScope anyOf={[TRADE_ADMIN_JOBS_READ]}><JobsPage /></RequireScope></Admin>} />
-          <Route path="jobs/:jobId" element={<Admin><RequireScope anyOf={[TRADE_ADMIN_JOBS_READ]}><JobDetailPage /></RequireScope></Admin>} />
-          <Route path="outbox" element={<Admin><OutboxPage /></Admin>} />
-          <Route path="reconciliation" element={<Admin><ReconciliationPage /></Admin>} />
-          <Route path="admission" element={<Admin><AdmissionPage /></Admin>} />
-          <Route path="operation-logs" element={<Admin><OperationLogsPage /></Admin>} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
-    </Suspense>
+    <Routes>
+      <Route path="login" element={<LoginPage />} />
+      <Route path="auth/callback" element={<AuthCallbackPage />} />
+      <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+        <Route index element={<Admin><OverviewPage /></Admin>} />
+        <Route path="members" element={<Admin><MembersPage /></Admin>} />
+        <Route path="consents" element={<Admin><ConsentsPage /></Admin>} />
+        <Route path="merchant" element={<Admin><MerchantPage /></Admin>} />
+        <Route path="products" element={<Admin><ProductsPage /></Admin>} />
+        <Route path="products/:id" element={<Admin><ProductDetailPage /></Admin>} />
+        <Route path="inventory" element={<Admin><InventoryPage /></Admin>} />
+        <Route path="orders" element={<Admin><OrdersPage /></Admin>} />
+        <Route path="orders/:orderNo" element={<Admin><OrderDetailPage /></Admin>} />
+        <Route path="payments" element={<Admin><PaymentsPage /></Admin>} />
+        <Route path="payments/:paymentNo" element={<Admin><PaymentDetailPage /></Admin>} />
+        <Route path="receipts" element={<Admin><ReceiptsPage /></Admin>} />
+        <Route path="receipts/:receiptNo" element={<Admin><ReceiptDetailPage /></Admin>} />
+        <Route path="quotes" element={<Admin><QuotesPage /></Admin>} />
+        <Route path="quotes/:quoteId" element={<Admin><QuoteDetailPage /></Admin>} />
+        <Route path="refunds" element={<Admin><RefundsPage /></Admin>} />
+        <Route path="refunds/:refundNo" element={<Admin><RefundDetailPage /></Admin>} />
+        <Route path="payment-channels" element={<Admin><PaymentChannelsPage /></Admin>} />
+        <Route path="returns" element={<Admin><ReturnsPage /></Admin>} />
+        <Route path="fulfillment" element={<Admin><FulfillmentPage /></Admin>} />
+        <Route path="jobs" element={<Admin><RequireScope anyOf={[TRADE_ADMIN_JOBS_READ]}><JobsPage /></RequireScope></Admin>} />
+        <Route path="jobs/:jobId" element={<Admin><RequireScope anyOf={[TRADE_ADMIN_JOBS_READ]}><JobDetailPage /></RequireScope></Admin>} />
+        <Route path="outbox" element={<Admin><OutboxPage /></Admin>} />
+        <Route path="reconciliation" element={<Admin><ReconciliationPage /></Admin>} />
+        <Route path="admission" element={<Admin><AdmissionPage /></Admin>} />
+        <Route path="operation-logs" element={<Admin><OperationLogsPage /></Admin>} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
   )
 }

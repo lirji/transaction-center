@@ -110,7 +110,7 @@ test('latest orders keep the same order across cursor pages', async ({ page }) =
 
 test('product SKU, member registration, and available inventory filters read past the first page', async ({ page }) => {
   await login(page, 'admin', '/products')
-  await expect(page.getByRole('cell', { name: 'INTEGRATION-P', exact: true })).toBeVisible()
+  await expect(page.getByRole('cell').filter({ hasText: 'INTEGRATION-P' })).toBeVisible()
   const baseline = await api(page, '/admin/products?limit=1')
   expect(baseline.status).toBe(200)
   expect(baseline.body[0]).not.toHaveProperty('productNo')
@@ -120,8 +120,8 @@ test('product SKU, member registration, and available inventory filters read pas
   expect(search.body[0].productId).not.toBe(baseline.body[0].productId)
   await page.getByLabel('按 SKU 编码').fill('INTEGRATION-ALT-SECOND')
   await page.getByRole('button', { name: '查询', exact: true }).click()
-  await expect(page.getByRole('cell', { name: 'INTEGRATION-ALT', exact: true })).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'INTEGRATION-P', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('cell').filter({ hasText: 'INTEGRATION-ALT' })).toBeVisible()
+  await expect(page.getByRole('cell').filter({ hasText: 'INTEGRATION-P' })).toHaveCount(0)
 
   const members = await api(page, `/admin/members?memberId=${data.memberId}`)
   expect(members.status).toBe(200)
@@ -142,7 +142,7 @@ test('product SKU, member registration, and available inventory filters read pas
   expect((await api(page, '/admin/inventories?maxAvailable=-1')).status).toBe(400)
 })
 
-test('operations totals reconcile with paged facts for the same window, currency and tenant', async ({ page }) => {
+test('operations totals reconcile with paged facts for the same window, currency and tenant', async ({ page }, testInfo) => {
   await login(page, 'admin', '/')
   const paid = await api(page, `/admin/orders/${data.paidOrder}`)
   const seedTime = Date.parse(paid.body.createdAt)
@@ -188,6 +188,7 @@ test('operations totals reconcile with paged facts for the same window, currency
   await page.getByLabel('统计结束时间（北京时间）').fill(beijing(to))
   await page.getByRole('button', { name: '查询', exact: true }).click()
   await expect(page.getByRole('row', { name: /期间净收款/ })).toContainText('19,000')
+  await page.screenshot({ path: testInfo.outputPath('workbench-summary.png'), fullPage: true })
   await page.getByRole('button', { name: '查看期间净收款明细' }).click()
   await expect(page.getByRole('heading', { name: '期间净收款明细' })).toBeVisible()
   const refundNo = netRefund.body.items[0].refundBusinessNo
@@ -198,6 +199,7 @@ test('operations totals reconcile with paged facts for the same window, currency
   await expect(page.getByRole('link', { name: data.successfulRefund, exact: true })).toHaveCount(0)
   await expect(page.locator(`a[href="/refunds/${data.submittedRefund}"]`)).toHaveCount(0)
   await page.getByRole('link', { name: '查看创建订单' }).click()
+  await page.getByRole('button', { name: /高级筛选/ }).click()
   await expect(page.getByLabel('币种', { exact: true })).toHaveValue('CNY')
   await expect(page.getByRole('link', { name: data.freeOrder, exact: true })).toBeVisible()
 })
@@ -250,7 +252,11 @@ test('diagnostic scopes show evidence and jobs; ordinary admin cannot read them'
   expect((await api(page, `/admin/orders/${data.paidOrder}/referral-evidence`)).status).toBe(200)
   await page.goto('/jobs')
   await expect(page.getByRole('heading', { name: '任务', exact: true })).toBeVisible()
-  expect((await api(page, '/admin/jobs')).body.items.length).toBeGreaterThan(0)
+  const jobs = (await api(page, '/admin/jobs')).body.items
+  expect(jobs.length).toBeGreaterThan(0)
+  await page.getByRole('link', { name: jobs[0].jobId, exact: true }).click()
+  await expect(page.getByRole('heading', { name: jobs[0].jobId, exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '运行摘要' })).toBeVisible()
 })
 
 test('ordinary admin scope denial and genuine rate-limit response', async ({ page }) => {

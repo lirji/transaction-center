@@ -1,20 +1,34 @@
-import { useMemo, type FormEvent, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useId, useState, type FormEvent, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { ChevronDown, Search } from 'lucide-react'
 import { Button, Field } from '../../components/ui'
 
-export function FilterBar({ children, onSubmit, onReset }: { children: ReactNode; onSubmit: () => void; onReset?: () => void }) {
+export function FilterBar({ children, onSubmit, onReset, advanced, activeAdvanced = 0, invalid = false }: {
+  children: ReactNode
+  onSubmit: () => void
+  onReset?: () => void
+  advanced?: ReactNode
+  activeAdvanced?: number
+  invalid?: boolean
+}) {
+  const id = useId()
+  const [expanded, setExpanded] = useState(false)
+  const showAdvanced = expanded || invalid
   return (
-    <form
-      className="filter-bar"
-      onSubmit={(event: FormEvent) => {
-        event.preventDefault()
-        onSubmit()
-      }}
-    >
-      {children}
-      <div className="modal-actions">
-        <Button tone="primary" type="submit">查询</Button>
+    <form className="filter-bar" aria-label="查询条件" onSubmit={(event: FormEvent) => {
+      event.preventDefault()
+      onSubmit()
+    }}>
+      <div className="filter-fields">{children}</div>
+      <div className="filter-actions">
+        <Button tone="primary" type="submit"><Search size={14} aria-hidden="true" />查询</Button>
         {onReset && <Button onClick={onReset}>清空筛选</Button>}
+        {advanced && <Button tone="ghost" aria-expanded={showAdvanced} aria-controls={id} disabled={invalid}
+          onClick={() => setExpanded(!showAdvanced)}>
+          高级筛选{activeAdvanced > 0 && <span className="filter-count" aria-label={`已应用 ${activeAdvanced} 项高级条件`}>{activeAdvanced}</span>}
+          <ChevronDown size={15} aria-hidden="true" />
+        </Button>}
       </div>
+      {advanced && <div className="filter-fields advanced-fields" id={id} hidden={!showAdvanced}>{advanced}</div>}
     </form>
   )
 }
@@ -61,11 +75,10 @@ export function EmptySelect({
   allowEmpty?: boolean
   optionLabel?: (value: string) => string
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange' | 'value'>) {
-  const items = useMemo(() => options, [options])
   return (
     <select id={id} value={value} onChange={(event) => onChange(event.target.value)} {...rest}>
       {allowEmpty ? <option value="">全部</option> : null}
-      {items.map((item) => <option key={item} value={item}>{optionLabel?.(item) ?? item}</option>)}
+      {options.map((item) => <option key={item} value={item}>{optionLabel?.(item) ?? item}</option>)}
     </select>
   )
 }

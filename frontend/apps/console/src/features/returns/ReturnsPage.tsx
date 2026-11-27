@@ -141,36 +141,52 @@ export function ReturnsPage() {
     }
   }
 
+  function resetFilters() {
+    setReturnNoFilter('')
+    setOrderNo('')
+    setMemberId('')
+    setItemId('')
+    setWarehouseFilter('')
+    setStatus('')
+    setFrom('')
+    setTo('')
+    setFilterError('')
+    apply({})
+  }
+
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Returns"
         title="退货"
         description="可按申请号、订单或状态列出退货。点行读取详情后验收。申请本身不改变库存；验收后才产生实收事实。inspection.recordedAt 是登记时间，不是到货时间。"
       />
       {!canWrite ? <StateBanner tone="warn" title="当前令牌不能申请或验收退货" detail="仍可查询列表与详情。写入需要 trade.return.write。" /> : null}
       <MutationBanner error={create.error ?? inspect.error} success={create.data ? `已申请 ${create.data.resourceNo}` : inspect.data ? '已验收' : undefined} />
       <Panel>
-        <h2>退货列表</h2>
-        <FilterBar onSubmit={submitFilters}>
+        <h2>查询退货</h2>
+        <FilterBar onSubmit={submitFilters} onReset={resetFilters} invalid={Boolean(filterError) || incompleteWindow}
+          activeAdvanced={[filters.orderItemId, filters.warehouseId, filters.createdFrom || filters.createdTo].filter(Boolean).length}
+          advanced={<>
+            <Field label="订单明细 ID"><input value={itemId} onChange={(event) => setItemId(event.target.value)} /></Field>
+            <Field label="仓库 ID"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} /></Field>
+            <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
+          </>}>
           <Field label="退货单号"><input value={returnNoFilter} onChange={(event) => setReturnNoFilter(event.target.value)} /></Field>
           <Field label="订单号"><input value={orderNo} onChange={(event) => setOrderNo(event.target.value)} /></Field>
           <Field label="会员 ID"><input value={memberId} onChange={(event) => setMemberId(event.target.value)} /></Field>
-          <Field label="订单明细 ID"><input value={itemId} onChange={(event) => setItemId(event.target.value)} /></Field>
-          <Field label="仓库 ID"><input value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} /></Field>
           <Field label="验收状态"><EmptySelect value={status} onChange={setStatus} options={['OPEN', 'INSPECTED']} /></Field>
-          <TimeRangeFields from={from} to={to} onFrom={setFrom} onTo={setTo} error={filterError} />
         </FilterBar>
       </Panel>
       <Panel className="table-panel">
+        <h2 className="table-title">退货结果</h2>
         {memberUrlError || incompleteWindow ? (
-          <p className="empty-state" style={{ minHeight: 120 }}>当前筛选无效，未向服务器发送请求。</p>
+          <p className="invalid-filter" role="alert">当前筛选无效，请检查或清空筛选条件。</p>
         ) : (
           <PageQueryGate query={list} emptyTitle="没有退货申请" emptyDetail="当前筛选没有退货记录。">
             {(page) => (
               <>
                 <ReturnRows rows={page.items} onSelect={setActiveNo} />
-                <PagePager after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
+                <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
               </>
             )}
           </PageQueryGate>
@@ -217,7 +233,7 @@ export function ReturnsPage() {
       {detail.data ? (
         <Panel>
           <h2>验收</h2>
-          <StackForm onSubmit={submitInspect} actions={<Button tone="primary" type="submit" disabled={inspect.isPending || !canWrite}>提交验收</Button>}>
+          <StackForm onSubmit={submitInspect} actions={<Button tone="primary" type="submit" aria-haspopup="dialog" disabled={inspect.isPending || !canWrite}>提交验收</Button>}>
             <Field label="result">
               <select value={result} onChange={(event) => setResult(event.target.value as typeof result)}>
                 <option value="ACCEPTED">ACCEPTED</option>
@@ -246,6 +262,7 @@ export function ReturnsPage() {
             evidenceRef: evidenceRef.trim(),
           })}
         >
+          <MutationBanner error={inspect.error} />
           <p>结论 {result} · 回库 {restockQuantity}</p>
         </ConfirmDialog>
       ) : null}

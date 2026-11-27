@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Badge, Button, CursorPager, PageHeader, PagePager, Panel, StateBanner } from '../../components/ui'
+import { Badge, Button, CursorPager, DataTable, PageHeader, PagePager, Panel, StateBanner } from '../../components/ui'
 import { api } from '../../shared/api/client'
 import { formatMinor } from '../../shared/api/money'
 import { PageQueryGate, QueryError, QueryGate } from '../../shared/ui/QueryGate'
@@ -47,7 +47,7 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
     enabled: Boolean(orderNo),
   })
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取订单" detail={`GET /admin/orders/${orderNo}`} /></div>
+    return <div className="workspace"><StateBanner tone="loading" title="正在读取订单" detail="正在读取订单摘要及商品明细。" /></div>
   }
   if (detail.isError || !detail.data) {
     return <div className="workspace"><QueryError query={detail} /></div>
@@ -61,11 +61,10 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Order"
         title={order.businessNo ?? order.orderNo}
         description="查看订单状态、冻结商品与关联交易记录。"
         actions={<>
-          <button type="button" className="button secondary" onClick={async () => {
+          <button type="button" className="button ghost" onClick={async () => {
             try {
               await navigator.clipboard.writeText(order.businessNo ?? order.orderNo)
               setCopyResult('已复制订单号')
@@ -77,14 +76,14 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
           {showFulfill ? <Link className="button primary" to={`/fulfillment?orderNo=${encodeURIComponent(order.orderNo)}`}>声明履约</Link> : null}
         </>}
       />
-      <div role="status" aria-live="polite">{copyResult}</div>
+      <div className="copy-feedback" role="status" aria-live="polite">{copyResult}</div>
       <div className="section-gap">
         <Panel>
           <h2>订单摘要</h2>
           <dl className="summary-fields">
             <div><dt>订单状态</dt><dd><Badge tone={statusTone(order.status)}>{orderLabels[order.status]}</Badge></dd></div>
             <div><dt>资金状态</dt><dd><Badge tone={statusTone(order.financialStatus)}>{financialLabels[order.financialStatus]}</Badge></dd></div>
-            <div><dt>应付金额</dt><dd>{formatMinor(order.payableAmount, order.currency)}</dd></div>
+            <div><dt>应付金额</dt><dd className="summary-amount">{formatMinor(order.payableAmount, order.currency)}</dd></div>
             <div><dt>创建时间（北京时间）</dt><dd>{formatBeijingTime(order.createdAt)}</dd></div>
             <div><dt>支付确认时间（北京时间）</dt><dd>{noPayment ? '无需支付' : formatBeijingTime(order.paidAt)}</dd></div>
             <div><dt>有效至（北京时间）</dt><dd>{formatBeijingTime(order.expiresAt)}</dd></div>
@@ -106,9 +105,9 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
             </dl>
           </details>
         </Panel>
-        <nav aria-label="订单信息分区" className="queue-actions">
+        <nav aria-label="订单信息分区" className="detail-tabs">
           {visibleSections.map(({ id, label }) => (
-            <Button key={id} tone={active === id ? 'primary' : 'secondary'} aria-pressed={active === id} onClick={() => {
+            <Button key={id} tone="ghost" aria-pressed={active === id} onClick={() => {
               const next = new URLSearchParams(params)
               if (id === 'items') next.delete('section')
               else next.set('section', id)
@@ -131,23 +130,23 @@ function OrderDetail({ orderNo }: { orderNo: string }) {
         ) : null}
         {active === 'items' ? <Panel className="table-panel">
           <h2 className="table-title">冻结商品</h2>
-          <table className="data-table">
-            <thead><tr><th>明细编号</th><th>SKU</th><th>SKU 修订</th><th>商品快照标题</th><th>数量</th><th>已验收退货量</th><th>冻结单价</th><th>行应付</th></tr></thead>
+          <DataTable label="冻结商品明细">
+            <thead><tr><th>商品快照标题</th><th>SKU</th><th className="numeric-cell">数量</th><th className="numeric-cell">已验收退货量</th><th className="numeric-cell">冻结单价</th><th className="numeric-cell">行应付</th><th>SKU 修订</th><th>明细编号</th></tr></thead>
             <tbody>
               {order.items.map((item) => (
                 <tr key={item.itemId}>
-                  <td className="mono">{item.itemId}</td>
-                  <td className="mono">{item.skuId}</td>
-                  <td className="mono">{item.skuRevision}</td>
                   <td>{item.title}</td>
-                  <td>{item.quantity}</td>
-                  <td>{item.returnedQuantity}</td>
-                  <td>{formatMinor(item.unitPrice, order.currency)}</td>
-                  <td>{formatMinor(item.payableAmount, order.currency)}</td>
+                  <td className="mono">{item.skuId}</td>
+                  <td className="numeric-cell">{item.quantity}</td>
+                  <td className="numeric-cell">{item.returnedQuantity}</td>
+                  <td className="numeric-cell">{formatMinor(item.unitPrice, order.currency)}</td>
+                  <td className="numeric-cell">{formatMinor(item.payableAmount, order.currency)}</td>
+                  <td className="mono">{item.skuRevision}</td>
+                  <td className="mono">{item.itemId}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
         </Panel> : null}
         {active === 'payments' && !detail.isFetching ? (
           <OrderRecords key="payments" orderNo={order.orderNo} resource="admin-payments" title="支付意图" emptyTitle="本单无支付意图" read={api.payments}>
@@ -194,7 +193,7 @@ function OrderRecords<T>({ orderNo, resource, title, emptyTitle, read, children 
       <PageQueryGate query={query} emptyTitle={emptyTitle} emptyDetail="当前订单没有匹配记录。">
         {(page) => (<>
           {children(page.items)}
-          <PagePager after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
+          <PagePager count={page.items.length} after={after} nextAfter={page.nextAfter} hasMore={page.hasMore} observedAt={page.observedAt} onReset={() => setAfter('0')} onNext={setAfter} />
         </>)}
       </PageQueryGate>
     </Panel>

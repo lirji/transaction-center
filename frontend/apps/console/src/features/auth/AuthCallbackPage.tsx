@@ -29,10 +29,9 @@ export function AuthCallbackPage() {
       <main className="login-root">
         <div className="login-card login-card-narrow">
           <section className="login-form">
-            <p className="login-kicker">Casdoor SSO</p>
-            <h1 className="login-form-title">无法完成登录</h1>
+              <h1 className="login-form-title">无法完成登录</h1>
             <p className="login-alert" role="alert">{error}</p>
-            <Link className="login-submit" to="/login">返回登录</Link>
+            <Link className="button primary login-submit" to="/login">返回登录</Link>
           </section>
         </div>
       </main>
@@ -40,7 +39,7 @@ export function AuthCallbackPage() {
   }
   return (
     <main className="login-root">
-      <p className="login-foot" role="status">正在完成登录…</p>
+      <p className="login-alert info" role="status">正在完成登录…</p>
     </main>
   )
 }

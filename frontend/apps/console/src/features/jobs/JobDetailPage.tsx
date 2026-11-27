@@ -22,7 +22,7 @@ export function JobDetailPage() {
   })
 
   if (detail.isLoading) {
-    return <div className="workspace"><StateBanner tone="loading" title="正在读取任务" detail={`GET /admin/jobs/${jobId}`} /></div>
+    return <div className="workspace"><StateBanner tone="loading" title="正在读取任务" detail="正在获取当前记录。" /></div>
   }
   if (detail.isError || !detail.data) {
     const problem = describeProblem(detail.error)
@@ -34,23 +34,24 @@ export function JobDetailPage() {
   return (
     <div className="workspace">
       <PageHeader
-        eyebrow="Job"
         title={row.jobId}
         description="只读。leaseExpired 是观察值，不能在此重试或解锁。"
       />
       <Panel>
-        <dl className="kv">
-          <dt>类型</dt><dd className="mono">{row.jobType}</dd>
-          <dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{row.status}</Badge></dd>
-          <dt>尝试</dt><dd>{row.attempts}</dd>
-          <dt>下次运行（北京时间）</dt><dd className="mono">{formatBeijingTime(row.nextRunAt)}</dd>
-          <dt>租约到期（北京时间）</dt><dd className="mono">{formatBeijingTime(row.leaseUntil)}</dd>
-          <dt>租约过期</dt><dd>{row.leaseExpired ? '是（观察值）' : '否'}</dd>
+        <h2>运行摘要</h2>
+        <dl className="summary-fields">
+          <div><dt>状态</dt><dd><Badge tone={statusTone(row.status)}>{row.status}</Badge></dd></div>
+          <div><dt>类型</dt><dd className="mono">{row.jobType}</dd></div>
+          <div><dt>尝试</dt><dd>{row.attempts}</dd></div>
+          <div><dt>下次运行（北京时间）</dt><dd className="mono">{formatBeijingTime(row.nextRunAt)}</dd></div>
+          <div><dt>租约到期（北京时间）</dt><dd className="mono">{formatBeijingTime(row.leaseUntil)}</dd></div>
+          <div><dt>租约过期</dt><dd>{row.leaseExpired ? '是（观察值）' : '否'}</dd></div>
+        </dl>
+        <dl className="kv detail-meta">
           <dt>最近错误</dt><dd>{dash(row.lastError)}</dd>
           <dt>创建时间（北京时间）</dt><dd>{formatBeijingTime(row.createdAt)}</dd>
           <dt>更新时间（北京时间）</dt><dd>{formatBeijingTime(row.updatedAt)}</dd>
-          <dt>业务引用</dt>
-          <dd>{row.businessReference
+          <dt>业务引用</dt><dd>{row.businessReference
             ? href
               ? <Link className="mono" to={href}>{row.businessReference.resourceType} {row.businessReference.businessNo ?? row.businessReference.resourceNo}</Link>
               : <span className="mono">{row.businessReference.resourceType} {row.businessReference.businessNo ?? row.businessReference.resourceNo}</span>

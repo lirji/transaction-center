@@ -37,6 +37,7 @@ describe('ProductsPage', () => {
     })
     renderWithApp(<ProductsPage />)
     expect(await screen.findByText('没有商品')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '创建草稿' }))
     await userEvent.type(screen.getByLabelText('商品编号'), 'P-1')
     await userEvent.type(screen.getByLabelText('商品名称'), '演示茶')
     await userEvent.type(screen.getByLabelText('主 SKU 编码'), 'SKU-1')
