@@ -1,6 +1,7 @@
 package com.lrj.trade.server;
 
 import com.lrj.trade.server.operations.OperationsReportController;
+import com.lrj.trade.server.auditarchive.RefundArchiveController;
 import java.nio.file.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ class OpenApiTest {
         var spec=JsonMapper.builder().build().readTree(Files.readString(Path.of("../docs/openapi.json")));
         var paths=spec.path("paths");
         Set<String> actual=new HashSet<>();
-        for(var controller:List.of(AdminQueryController.class,TradeController.class,EvidenceController.class,OutboxOperationsController.class,ReconciliationController.class,ReconciliationCaseController.class,ReconciliationOperationController.class,AdmissionController.class,FulfillmentController.class,OperationsReportController.class)) for(var method:controller.getDeclaredMethods()) {
+        for(var controller:List.of(AdminQueryController.class,TradeController.class,EvidenceController.class,OutboxOperationsController.class,ReconciliationController.class,ReconciliationCaseController.class,ReconciliationOperationController.class,AdmissionController.class,FulfillmentController.class,OperationsReportController.class,RefundArchiveController.class)) for(var method:controller.getDeclaredMethods()) {
             String verb=null; String route=null;
             if(method.isAnnotationPresent(GetMapping.class)) { verb="get"; route=method.getAnnotation(GetMapping.class).value()[0]; }
             if(method.isAnnotationPresent(PostMapping.class)) { verb="post"; route=method.getAnnotation(PostMapping.class).value()[0]; }
@@ -28,6 +29,6 @@ class OpenApiTest {
         for(var path:paths.properties()) for(var operation:path.getValue().properties())
             documented.add(operation.getKey()+" "+path.getKey());
         assertEquals(actual,documented);
-        assertEquals(86,actual.size());
+        assertEquals(88,actual.size());
     }
 }

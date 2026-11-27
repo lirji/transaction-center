@@ -91,6 +91,14 @@ public class SecurityConfiguration {
                     .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
                         org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.jobs.read")))
+                .requestMatchers(org.springframework.http.HttpMethod.POST,"/api/v1/trade/admin/refund-audit-archives/*/restore")
+                    .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.audit.archive.restore")))
+                .requestMatchers("/api/v1/trade/admin/refund-audit-archives/*")
+                    .access(org.springframework.security.authorization.AuthorizationManagers.allOf(
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin"),
+                        org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority("SCOPE_trade.admin.audit.archive.read")))
                 .requestMatchers("/api/v1/trade/admin/**").hasAuthority("SCOPE_trade.admin")
                 .requestMatchers("/api/v1/trade/**").authenticated()
                 .anyRequest().denyAll())

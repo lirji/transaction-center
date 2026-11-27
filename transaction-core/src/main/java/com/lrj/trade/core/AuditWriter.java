@@ -25,6 +25,8 @@ public class AuditWriter {
     private static final int DEFAULT_PAGE_SIZE=50;
     private static final String READ_ORDER_AUDIT="order.audit.evidence.read";
     private static final String READ_REFUND_AUDIT="refund.audit.list";
+    private static final String RESTORE_REFUND_ARCHIVE="refund.audit.archive.restore";
+    private static final String READ_REFUND_ARCHIVE="refund.audit.archive.read";
     private static final String INVALID_CURSOR="审计查询游标无效";
     private static final Pattern SENSITIVE=Pattern.compile(
         "(?iu)bearer\\s|token\\s*[:=]|password\\s*[:=]|cookie\\s*[:=]|密码\\s*[：:]|[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}|[0-9][0-9 ()+.-]{8,}[0-9]");
@@ -106,6 +108,17 @@ public class AuditWriter {
         return capture(actor,READ_ORDER_AUDIT,orderNo,attempt->{
             T evidence=read.get();
             expectWritten(mapper.insertOutcome(actor.tenantId(),attempt,"SUCCEEDED",null,orderNo,null));
+            return evidence;
+        });
+    }
+
+    /** 写入恢复或查阅尝试及结果，敏感内容仅在留痕成功后返回。 */
+    public <T> T readRefundArchive(Actor actor, String ticket, boolean restore, java.util.function.Supplier<T> read) {
+        String action = restore ? RESTORE_REFUND_ARCHIVE : READ_REFUND_ARCHIVE;
+        String reference = ticket != null && ticket.matches("[A-Za-z0-9_-]{1,64}") ? ticket : null;
+        return capture(actor, action, reference, attempt -> {
+            T evidence = read.get();
+            expectWritten(mapper.insertOutcome(actor.tenantId(), attempt, "SUCCEEDED", null, reference, null));
             return evidence;
         });
     }

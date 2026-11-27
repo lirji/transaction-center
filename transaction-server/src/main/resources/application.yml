@@ -32,6 +32,22 @@ server:
   address: ${TRADE_BIND:127.0.0.1}
   shutdown: graceful
 trade:
+  refund-archive:
+    enabled: ${TRADE_REFUND_ARCHIVE_ENABLED:false}
+    recovery-enabled: ${TRADE_REFUND_ARCHIVE_RECOVERY_ENABLED:false}
+    scheduler-enabled: ${TRADE_REFUND_ARCHIVE_SCHEDULER_ENABLED:false}
+    tenant-id: ${TRADE_REFUND_ARCHIVE_TENANT_ID:0}
+    minimum-age: ${TRADE_REFUND_ARCHIVE_MINIMUM_AGE:P90D}
+    endpoint: ${TRADE_REFUND_ARCHIVE_ENDPOINT:}
+    bucket: ${TRADE_REFUND_ARCHIVE_BUCKET:}
+    region: ${TRADE_REFUND_ARCHIVE_REGION:us-east-1}
+    write-key: ${TRADE_REFUND_ARCHIVE_WRITE_KEY:}
+    write-secret: ${TRADE_REFUND_ARCHIVE_WRITE_SECRET:}
+    restore-key: ${TRADE_REFUND_ARCHIVE_RESTORE_KEY:}
+    restore-secret: ${TRADE_REFUND_ARCHIVE_RESTORE_SECRET:}
+    scheduler-admin: ${TRADE_REFUND_ARCHIVE_SCHEDULER_ADMIN:}
+    scheduler-token: ${TRADE_REFUND_ARCHIVE_SCHEDULER_TOKEN:}
+    scheduler-port: ${TRADE_REFUND_ARCHIVE_SCHEDULER_PORT:10082}
   checkout-pilot:
     enabled: ${TRADE_CHECKOUT_PILOT_ENABLED:false}
     freeze-enabled: ${TRADE_CHECKOUT_PILOT_FREEZE_ENABLED:false}

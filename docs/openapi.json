@@ -10128,6 +10128,348 @@
           }
         }
       }
+    },
+    "/api/v1/trade/admin/refund-audit-archives/{ticket}/restore": {
+      "post": {
+        "operationId": "adminRestoreRefundAuditArchive",
+        "summary": "按工单回读退款归档",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "精确核验单一交易退款档案版本，只返回临时区行数。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.audit.archive.restore"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "工单有效并完成审计留痕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "factCount"
+                  ],
+                  "properties": {
+                    "factCount": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 200
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数无效"
+          },
+          "401": {
+            "description": "缺少认证"
+          },
+          "403": {
+            "description": "缺少操作专岗权限"
+          },
+          "404": {
+            "description": "入口未启用或本人的恢复工单与投影不存在"
+          },
+          "503": {
+            "description": "档案或审计证据暂不可用"
+          }
+        }
+      }
+    },
+    "/api/v1/trade/admin/refund-audit-archives/{ticket}": {
+      "get": {
+        "operationId": "adminReadRestoredRefundAuditArchive",
+        "summary": "查阅已核验退款归档",
+        "tags": [
+          "Admin queries"
+        ],
+        "description": "只读取本人有效工单的临时脱敏副本。ORDER_ITEM 为同订单和同冻结明细的退货上下文。",
+        "security": [
+          {
+            "BearerJWT": []
+          }
+        ],
+        "x-required-scopes": [
+          "trade.admin",
+          "trade.admin.audit.archive.read"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "工单有效并完成审计留痕",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "refund",
+                    "operations",
+                    "references"
+                  ],
+                  "properties": {
+                    "refund": {
+                      "type": "object",
+                      "required": [
+                        "refundNo",
+                        "orderNo",
+                        "receiptNo",
+                        "amountMinor",
+                        "currency",
+                        "state",
+                        "updatedAt"
+                      ],
+                      "properties": {
+                        "refundNo": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "orderNo": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "approvalNo": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "receiptNo": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "amountMinor": {
+                          "type": "string",
+                          "pattern": "^[0-9]+$"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "pattern": "^[A-Z]{3}$"
+                        },
+                        "state": {
+                          "enum": [
+                            "SUCCEEDED",
+                            "REJECTED",
+                            "FAILED",
+                            "EXPIRED"
+                          ]
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    "operations": {
+                      "type": "array",
+                      "maxItems": 200,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "action",
+                          "actorId",
+                          "resourceId",
+                          "occurredAt",
+                          "result"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "requestId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "traceId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "action": {
+                            "type": "string"
+                          },
+                          "actorId": {
+                            "type": "string"
+                          },
+                          "resourceId": {
+                            "type": "string"
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "result": {
+                            "type": "string"
+                          },
+                          "errorCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "effectId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "beforeVersion": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "afterVersion": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "orderNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "businessNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "amountMinor": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "currency": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "beforeState": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "afterState": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "references": {
+                      "type": "array",
+                      "maxItems": 200,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "sourceId",
+                          "occurredAt",
+                          "type",
+                          "reference",
+                          "relation"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "CHANNEL",
+                              "APPROVAL",
+                              "RETURN"
+                            ]
+                          },
+                          "sourceId": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "result": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 64
+                          },
+                          "relation": {
+                            "enum": [
+                              "REFUND",
+                              "ORDER_ITEM"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数无效"
+          },
+          "401": {
+            "description": "缺少认证"
+          },
+          "403": {
+            "description": "缺少操作专岗权限"
+          },
+          "404": {
+            "description": "入口未启用或本人的恢复工单与投影不存在"
+          },
+          "503": {
+            "description": "档案或审计证据暂不可用"
+          }
+        }
+      }
     }
   },
   "components": {

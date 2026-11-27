@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lrj.trade.server.auditarchive.RefundArchiveMapper">
+  <resultMap id="subject" type="com.lrj.trade.server.auditarchive.RefundArchiveMapper$Subject">
+    <constructor>
+      <idArg column="id" javaType="_long"/>
+      <arg column="tenant_id" javaType="_long"/>
+      <arg column="refund_no" javaType="java.lang.String"/>
+      <arg column="order_no" javaType="java.lang.String"/>
+      <arg column="approval_no" javaType="java.lang.String"/>
+      <arg column="receipt_no" javaType="java.lang.String"/>
+      <arg column="amount_minor" javaType="java.lang.String"/>
+      <arg column="currency" javaType="java.lang.String"/>
+      <arg column="state" javaType="java.lang.String"/>
+      <arg column="updated_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="fact" type="com.lrj.trade.server.auditarchive.RefundArchiveMapper$Fact">
+    <constructor>
+      <arg column="kind" javaType="java.lang.String"/>
+      <arg column="source_id" javaType="java.lang.String"/>
+      <arg column="occurred_at" javaType="java.time.Instant"/>
+      <arg column="type" javaType="java.lang.String"/>
+      <arg column="result" javaType="java.lang.String"/>
+      <arg column="reference" javaType="java.lang.String"/>
+      <arg column="relation" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="batch" type="com.lrj.trade.server.auditarchive.RefundArchiveMapper$Batch">
+    <constructor>
+      <arg column="tenant_id" javaType="_long"/>
+      <arg column="batch_id" javaType="java.lang.String"/>
+      <arg column="refund_id" javaType="_long"/>
+      <arg column="refund_no" javaType="java.lang.String"/>
+      <arg column="schema_version" javaType="_int"/>
+      <arg column="facts_from" javaType="java.time.Instant"/>
+      <arg column="facts_until" javaType="java.time.Instant"/>
+      <arg column="fact_count" javaType="_int"/>
+      <arg column="object_key" javaType="java.lang.String"/>
+      <arg column="object_version" javaType="java.lang.String"/>
+      <arg column="sha256" javaType="java.lang.String"/>
+      <arg column="payload_bytes" javaType="_int"/>
+      <arg column="payload" javaType="_byte[]"/>
+      <arg column="state" javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+  <resultMap id="grant" type="com.lrj.trade.server.auditarchive.RefundArchiveMapper$Grant">
+    <constructor>
+      <idArg column="ticket_id" javaType="java.lang.String"/>
+      <arg column="batch_id" javaType="java.lang.String"/>
+      <arg column="expires_at" javaType="java.time.Instant"/>
+    </constructor>
+  </resultMap>
+
+  <select id="subject" resultMap="subject" useCache="false">
+    SELECT r.id,r.tenant_id,COALESCE(r.business_no,r.refund_no) AS refund_no,
+      COALESCE(o.business_no,r.order_no) AS order_no,COALESCE(r.approval_business_no,r.approval_ref) AS approval_no,
+      COALESCE(p.business_no,r.receipt_no) AS receipt_no,CAST(r.amount AS CHAR) AS amount_minor,
+      r.currency,r.status AS state,r.updated_at
+    FROM tc_refund r
+    JOIN tc_order o ON o.tenant_id=r.tenant_id AND o.id=r.order_id
+    JOIN tc_payment_receipt p ON p.tenant_id=r.tenant_id AND p.id=r.receipt_id AND p.order_id=r.order_id
+    WHERE r.tenant_id=#{tenant} AND r.id=#{id} AND r.updated_at&lt;=#{cutoff}
+      AND r.status IN('SUCCEEDED','REJECTED','FAILED','EXPIRED')
+  </select>
+
+  <!-- 只投影内部引用及稳定状态。退货同明细关联不证明该次退款由退货触发。 -->
+  <select id="references" resultMap="fact" useCache="false">
+    SELECT kind,source_id,occurred_at,type,result,reference,relation FROM (
+      (SELECT 'CHANNEL' AS kind,CAST(c.id AS CHAR) AS source_id,
+        COALESCE(c.processed_at,c.received_at) AS occurred_at,c.observation_kind AS type,c.status AS result,
+        COALESCE(c.business_no,c.callback_no) AS reference,'REFUND' AS relation
+        FROM tc_refund r JOIN tc_refund_callback c ON r.tenant_id=c.tenant_id AND r.refund_no=c.refund_no
+        WHERE r.tenant_id=#{tenant} AND r.id=#{id} ORDER BY c.id LIMIT #{limit})
+      UNION ALL
+      (SELECT 'APPROVAL',CAST(a.id AS CHAR),a.created_at,'ACCEPTED',r.approval_decision,a.receipt_no,'REFUND'
+        FROM tc_refund r JOIN tc_refund_approval_receipt a ON r.tenant_id=a.tenant_id AND r.refund_no=a.refund_no
+        WHERE r.tenant_id=#{tenant} AND r.id=#{id} ORDER BY a.id LIMIT #{limit})
+      UNION ALL
+      (SELECT 'RETURN',CAST(t.id AS CHAR),t.updated_at,'AFTER_SALE',t.status,COALESCE(t.business_no,t.return_no),'ORDER_ITEM'
+        FROM tc_refund r JOIN tc_return_request t ON r.tenant_id=t.tenant_id AND r.order_id=t.order_id
+        WHERE r.tenant_id=#{tenant} AND r.id=#{id} AND EXISTS (
+          SELECT 1 FROM tc_refund_item i WHERE i.tenant_id=r.tenant_id AND i.refund_id=r.id
+            AND i.order_id=r.order_id AND i.order_item_id=t.order_item_id
+        ) ORDER BY t.id LIMIT #{limit})
+    ) refs ORDER BY occurred_at,kind,source_id LIMIT #{limit}
+  </select>
+  <select id="latestOutcome" resultType="java.time.Instant" useCache="false">
+    SELECT o.recorded_at
+    FROM tc_audit_attempt_outcome o JOIN tc_audit_operation_attempt a ON a.tenant_id=o.tenant_id AND a.id=o.attempt_id
+    WHERE o.tenant_id=#{tenant} AND o.resource_id=#{refundNo} AND a.action_code&lt;&gt;'refund.audit.list'
+    ORDER BY o.recorded_at DESC,o.id DESC LIMIT 1
+  </select>
+  <sql id="batchFields">
+    tenant_id,batch_id,refund_id,refund_no,schema_version,facts_from,facts_until,fact_count,object_key,object_version,
+    sha256,payload_bytes,payload,state
+  </sql>
+  <insert id="claim">
+    INSERT INTO tc_refund_audit_archive_batch(<include refid="batchFields"/>)
+    VALUES(#{batch.tenantId},#{batch.batchId},#{batch.refundId},#{batch.refundNo},#{batch.schemaVersion},
+      #{batch.factsFrom},#{batch.factsUntil},#{batch.factCount},#{batch.objectKey},#{batch.objectVersion},
+      #{batch.sha256},#{batch.payloadBytes},#{batch.payload},#{batch.state})
+    ON DUPLICATE KEY UPDATE batch_id=tc_refund_audit_archive_batch.batch_id
+  </insert>
+  <select id="batchByDigest" resultMap="batch" useCache="false">
+    SELECT <include refid="batchFields"/> FROM tc_refund_audit_archive_batch
+    WHERE tenant_id=#{tenant} AND refund_id=#{refundId} AND sha256=#{sha256} FOR UPDATE
+  </select>
+  <select id="batch" resultMap="batch" useCache="false">
+    SELECT <include refid="batchFields"/> FROM tc_refund_audit_archive_batch WHERE tenant_id=#{tenant} AND batch_id=#{id}
+  </select>
+  <select id="pending" resultMap="batch" useCache="false">
+    SELECT <include refid="batchFields"/> FROM tc_refund_audit_archive_batch
+    WHERE tenant_id=#{tenant} AND state IN('CLAIMED','UPLOADED') ORDER BY created_at,batch_id LIMIT 1
+  </select>
+  <update id="uploaded">
+    UPDATE tc_refund_audit_archive_batch SET state='UPLOADED',object_version=#{version}
+    WHERE tenant_id=#{tenant} AND batch_id=#{id} AND state='CLAIMED'
+  </update>
+  <update id="verified">
+    UPDATE tc_refund_audit_archive_batch SET state='VERIFIED',payload=NULL
+    WHERE tenant_id=#{tenant} AND batch_id=#{id} AND state='UPLOADED' AND object_version=#{version}
+  </update>
+  <select id="grant" resultMap="grant" useCache="false">
+    SELECT g.ticket_id,g.batch_id,g.expires_at FROM tc_refund_audit_archive_grant g
+    JOIN tc_refund_audit_archive_batch b ON b.tenant_id=g.tenant_id AND b.batch_id=g.batch_id
+    WHERE g.tenant_id=#{tenant} AND g.ticket_id=#{ticket} AND g.actor_key=#{actor}
+      AND g.expires_at&gt;UTC_TIMESTAMP(3) AND g.revoked_at IS NULL AND b.state='VERIFIED'
+    <if test="lock">FOR UPDATE</if>
+  </select>
+  <insert id="storeRestored">
+    INSERT INTO tc_refund_audit_archive_restored(tenant_id,ticket_id,batch_id,payload,expires_at)
+    VALUES(#{tenant},#{grant.ticketId},#{grant.batchId},#{payload},LEAST(#{grant.expiresAt},UTC_TIMESTAMP(3)+INTERVAL 7 DAY)) AS incoming
+    ON DUPLICATE KEY UPDATE batch_id=incoming.batch_id,payload=incoming.payload,expires_at=incoming.expires_at
+  </insert>
+  <select id="readRestored" resultType="java.lang.String" useCache="false">
+    SELECT r.payload FROM tc_refund_audit_archive_restored r
+    JOIN tc_refund_audit_archive_grant g ON g.tenant_id=r.tenant_id AND g.ticket_id=r.ticket_id
+    JOIN tc_refund_audit_archive_batch b ON b.tenant_id=g.tenant_id AND b.batch_id=g.batch_id
+    WHERE r.tenant_id=#{tenant} AND r.ticket_id=#{ticket} AND r.batch_id=g.batch_id AND g.actor_key=#{actor} AND g.revoked_at IS NULL
+      AND LEAST(r.expires_at,g.expires_at)&gt;UTC_TIMESTAMP(3) AND b.state='VERIFIED'
+  </select>
+  <delete id="removeExpiredRestorations">
+    DELETE FROM tc_refund_audit_archive_restored
+    WHERE tenant_id=#{tenant} AND expires_at&lt;=UTC_TIMESTAMP(3) ORDER BY expires_at,ticket_id LIMIT 200
+  </delete>
+</mapper>

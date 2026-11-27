@@ -46,8 +46,21 @@ class FoundationTest {
     private static final byte[] ADDRESS_TEST_KEY=new java.security.SecureRandom().generateSeed(32);
     private static final byte[] CALLBACK_TEST_KEY=new java.security.SecureRandom().generateSeed(32);
     private static final AtomicLong TENANTS=new AtomicLong(100);
+    private static final long ARCHIVE_TEST_TENANT=9_000_001;
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry r) {
+        String archiveEndpoint=System.getenv("TRADE_ARCHIVE_TEST_ENDPOINT");
+        if(archiveEndpoint!=null && archiveEndpoint.matches("http://127[.]0[.]0[.]1:[0-9]+")){
+            r.add("trade.refund-archive.enabled",()->true);
+            r.add("trade.refund-archive.recovery-enabled",()->true);
+            r.add("trade.refund-archive.tenant-id",()->ARCHIVE_TEST_TENANT);
+            r.add("trade.refund-archive.endpoint",()->archiveEndpoint);
+            r.add("trade.refund-archive.bucket",()->"trade-audit-verification");
+            r.add("trade.refund-archive.write-key",()->System.getenv("TRADE_ARCHIVE_WRITE_KEY"));
+            r.add("trade.refund-archive.write-secret",()->System.getenv("TRADE_ARCHIVE_WRITE_SECRET"));
+            r.add("trade.refund-archive.restore-key",()->System.getenv("TRADE_ARCHIVE_RESTORE_KEY"));
+            r.add("trade.refund-archive.restore-secret",()->System.getenv("TRADE_ARCHIVE_RESTORE_SECRET"));
+        }
         r.add("trade.admin-evidence.enabled",()->"true");
         r.add("trade.admin-query.tenant-rate",()->"10000");
         r.add("trade.fulfillment.enabled",()->"true");
@@ -2343,6 +2356,52 @@ class FoundationTest {
             receipt.approver(),receipt.refundNo(),receipt.approvalRef(),1,false,receipt.evidenceRef(),receipt.issuedAt(),receipt.expiresAt(),receipt.signedReceipt());
         assertCode("REFUND_APPROVAL_EVENT_CONFLICT",()->approvalReceipts.accept(changed));
     }
+    /** 基于真实退款、审批收件、渠道结果和退货操作验证隔离对象归档。 */
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(
+        named="TRADE_ARCHIVE_TEST_ENDPOINT", matches="http://127[.]0[.]0[.]1:[0-9]+")
+    void refundArchiveRecoversOriginalOperationAndChannelEvidence() throws Throwable {
+        Fixture f=paymentFixture(1,new Actor(ARCHIVE_TEST_TENANT,"https://identity.test","tester"));
+        long tenant=f.actor().tenantId();
+        var order=paidRefundOrder(f,"audit-archive",1);
+        var ingress=application.getBean(com.lrj.trade.order.FulfillmentIngressService.class);
+        ingress.deliver(f.actor(),"archive-deliver",order.orderNo(),"source","safe-proof");
+        var rma=ingress.createReturn(f.actor(),"archive-rma",Long.parseLong(order.items().getFirst().itemId()),f.warehouse(),1);
+        var refund=requestRefund(f,order,"archive-refund",100);
+        String approval=approvalReceipts.accept(approvalReceipt(f,refund,"archive-approval",
+                new Actor(tenant,"https://identity.test","archive-approver")));
+        var plan=prepareRefund(f,refund);
+        String callback=refundInbox.receive(tenant,refundEvidence(plan,"archive-callback",100,"CNY",plan.providerTransactionNo()));
+        assertEquals(List.of(com.lrj.trade.jobs.RefundCallbackWorker.Outcome.DONE),refundCallbackWorker.runBatch(tenant,"archive-worker",1));
+        String callbackDisplay=jdbc.queryForObject("""
+            SELECT COALESCE(business_no,callback_no) FROM tc_refund_callback WHERE tenant_id=? AND callback_no=?
+            """,String.class,tenant,callback);
+        String returnDisplay=jdbc.queryForObject("""
+            SELECT COALESCE(business_no,return_no) FROM tc_return_request WHERE tenant_id=? AND return_no=?
+            """,String.class,tenant,rma.resourceNo());
+        com.lrj.trade.server.auditarchive.RefundArchiveScenario.verify(application,jdbc,f.actor(),refund.refundNo(),
+                refund.businessNo(),order.businessNo(),approval,callbackDisplay,returnDisplay,()->{
+            String route="/api/v1/trade/admin/refund-audit-archives/refund-archive-review";
+            jwt("general-admin","trade.admin",tenant);
+            assertEquals(403,request("GET",route,"general-admin",null).statusCode());
+            assertEquals(403,request("HEAD",route,"general-admin",null).statusCode());
+            assertEquals(403,request("POST",route+"/restore","general-admin",null).statusCode());
+            jwt("archive-recoverer","trade.admin trade.admin.audit.archive.restore",tenant);
+            var confirmed=request("POST",route+"/restore","archive-recoverer",null);
+            assertEquals(200,confirmed.statusCode(),confirmed.body());
+            assertFalse(confirmed.body().contains(refund.businessNo()));
+            assertEquals(403,request("GET",route,"archive-recoverer",null).statusCode());
+            jwt("archive-recoverer","trade.admin trade.admin.audit.archive.read",tenant);
+            var result=request("GET",route,"archive-recoverer",null);
+            assertEquals(200,result.statusCode(),result.body());
+            var projection=tools.jackson.databind.json.JsonMapper.builder().build().readTree(result.body());
+            assertEquals(refund.businessNo(),projection.path("refund").path("refundNo").asText());
+            assertFalse(projection.path("refund").has("tenantId"));
+            assertEquals(403,request("POST",route+"/restore","archive-recoverer",null).statusCode());
+        });
+        assertApplicationAmounts(f,0,100);
+    }
+
     @Test void refundOperationsExposeOnlyScopedCommittedFactsAndRetries() throws Exception {
         Fixture f=paymentFixture(1);
         long tenant=f.actor().tenantId();
@@ -4756,7 +4815,10 @@ class FoundationTest {
     }
 
     private Fixture paymentFixture(long stock) {
-        Fixture f=orderFixture(stock);
+        return paymentFixture(stock,actor());
+    }
+    private Fixture paymentFixture(long stock,Actor actor) {
+        Fixture f=orderFixture(stock,actor);
         for(String code:List.of("TEST_A","TEST_B")) paymentChannels.create(f.actor(),"channel-"+code,code,
             "sandbox-"+f.actor().tenantId()+"-"+code,"CNY","vault:test/"+code,"return","https://shop.test/return");
         return f;
@@ -5051,7 +5113,10 @@ class FoundationTest {
     }
 
     private Fixture orderFixture(long stock) {
-        Fixture f=fixture(stock); members.register(f.actor(),"订单会员");
+        return orderFixture(stock,actor());
+    }
+    private Fixture orderFixture(long stock,Actor actor) {
+        Fixture f=fixture(stock,actor); members.register(f.actor(),"订单会员");
         merchants.create(f.actor(),"merchant","logical-merchant","测试商户");
         return f;
     }
@@ -5773,7 +5838,9 @@ class FoundationTest {
         });
     }
     private Fixture fixture(long quantity) {
-        Actor a=actor();
+        return fixture(quantity,actor());
+    }
+    private Fixture fixture(long quantity,Actor a) {
         String p=catalog.create(a,"p","p","商品","s",100,"CNY");
         catalog.publish(a,"pub",Long.parseLong(p),0);
         long sku=Long.parseLong(catalog.list(a.tenantId(),0,20,true).getFirst().skuId());
